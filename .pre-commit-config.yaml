@@ -1,0 +1,66 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: check-ast
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        args: [--branch, master]
+        stages: [pre-commit, pre-push]
+  - repo: https://github.com/google/yamlfmt
+    rev: v0.17.2
+    hooks:
+      - id: yamlfmt
+        args: [--formatter, "indent=2"]
+  - repo: https://github.com/sirosen/check-jsonschema
+    rev: 0.28.0
+    hooks:
+      - id: check-jsonschema
+        name: Validate GitHub Workflows
+        files: ^\.github/workflows/.*\.ya?ml$
+        args: [--schemafile, 'https://json.schemastore.org/github-workflow.json']
+      - id: check-jsonschema
+        name: Validate Pre-commit Config
+        files: ^\.pre-commit-config\.yaml$
+        args: [--schemafile, 'https://json.schemastore.org/pre-commit-config.json']
+      - id: check-jsonschema
+        name: Validate Docker Compose
+        files: ^docker-compose\.ya?ml$
+        args:
+          - --schemafile
+          - https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.2
+    hooks:
+      - id: gitleaks
+        args: [--redact]
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+  - repo: https://github.com/psf/black
+    rev: 24.2.0
+    hooks:
+      - id: black
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.2.2
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix, --no-cache]
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        # args: [--strict, --pretty]
+        additional_dependencies:
+          - types-requests
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.13.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
