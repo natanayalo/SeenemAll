@@ -12,6 +12,7 @@ import httpx
 import numpy as np
 
 from api.core.intent_parser import IntentFilters
+from api.core.prompt_eval import load_prompt_template
 
 logger = logging.getLogger(__name__)
 # Ensure INFO-level reranker messages surface unless overridden globally.
@@ -25,10 +26,20 @@ if not logger.handlers:
 
 _DEFAULT_MAX_ITEMS_FOR_LLM = 25
 _DEFAULT_TIMEOUT_SECONDS = 12.0
-_SYSTEM_PROMPT = (
-    "You are Seen'emAll's reranker. Reorder items and explain the top picks succinctly. "
-    "Always return valid JSON with an 'items' array."
-)
+
+
+def _get_prompt_config():
+    config = load_prompt_template("reranker")
+    return config
+
+
+@lru_cache(maxsize=1)
+def get_system_prompt() -> str:
+    """Get the system prompt from the template config."""
+    return _get_prompt_config()["system_prompt"]
+
+
+_SYSTEM_PROMPT = get_system_prompt()
 
 
 @dataclass(frozen=True)
@@ -231,10 +242,44 @@ def _call_reranker(
     user: Dict[str, Any] | None,
 ) -> List[LLMDecision]:
     if settings.provider == "openai":
-        return _call_openai_reranker(settings, items, intent, query, user)
-    if settings.provider == "gemini":
-        return _call_gemini_reranker(settings, items, intent, query, user)
-    raise RerankerError(f"Unsupported reranker provider '{settings.provider}'")
+        decisions = _call_openai_reranker(settings, items, intent, query, user)
+    elif settings.provider == "gemini":
+        decisions = _call_gemini_reranker(settings, items, intent, query, user)
+    else:
+        raise RerankerError(f"Unsupported reranker provider '{settings.provider}'")
+
+    # Validate reranker output in debug/test environments
+    if logger.isEnabledFor(logging.DEBUG):
+        config = _get_prompt_config()
+        for example in config.get("examples", []):
+            if (
+                example.get("input", {}).get("query") == query
+                and example.get("input", {}).get("intent") == intent
+            ):
+                from api.core.prompt_eval import evaluate_reranker_output
+
+                output = {
+                    "items": [
+                        {
+                            "id": d.item_id,
+                            "score": d.score,
+                            "explanation": d.explanation,
+                        }
+                        for d in decisions
+                    ]
+                }
+                score, errors = evaluate_reranker_output(
+                    output,
+                    example["expected_output"],
+                    example["input"]["intent"],
+                    example["input"]["query"],
+                )
+                if errors:
+                    logger.debug("Reranker evaluation found issues: %s", errors)
+                logger.debug("Reranker evaluation score: %.2f", score)
+                break
+
+    return decisions
 
 
 def _call_openai_reranker(

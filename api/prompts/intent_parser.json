@@ -1,0 +1,39 @@
+{
+    "system_prompt": "You are Seen'emAll's intent parser. Extract structured filters from natural language queries about movies and TV shows.",
+    "examples": [
+        {
+            "input": "light sci-fi movies under 2 hours",
+            "expected_output": {
+                "media_types": ["movie"],
+                "genres": ["Science Fiction"],
+                "max_runtime": 120,
+                "mood_keywords": ["light"]
+            }
+        }
+    ],
+    "evaluation_metrics": {
+        "genre_accuracy": {
+            "description": "Correctly identifies relevant genres from query",
+            "threshold": 0.9
+        },
+        "media_type_accuracy": {
+            "description": "Correctly determines if query targets movies, TV shows, or both",
+            "threshold": 0.95
+        },
+        "temporal_accuracy": {
+            "description": "Correctly extracts year/decade references",
+            "threshold": 0.9
+        },
+        "runtime_accuracy": {
+            "description": "Correctly parses runtime constraints",
+            "threshold": 0.95
+        }
+    },
+    "genre_mapping": {
+        "scary": ["Horror", "Thriller"],
+        "funny": ["Comedy"],
+        "action-packed": ["Action", "Adventure"],
+        "thoughtful": ["Drama"],
+        "educational": ["Documentary"]
+    }
+}

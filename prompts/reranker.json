@@ -1,0 +1,100 @@
+{
+    "system_prompt": "You are Seen'emAll's reranker. Reorder items and explain the top picks succinctly. Always return valid JSON with an 'items' array.",
+    "examples": [
+        {
+            "input": {
+                "query": "light sci-fi under 2 hours",
+                "intent": {
+                    "media_types": ["movie"],
+                    "genres": ["Science Fiction"],
+                    "max_runtime": 120
+                },
+                "items": [
+                    {
+                        "id": 1,
+                        "title": "Arrival",
+                        "media_type": "movie",
+                        "runtime": 116,
+                        "genres": ["Science Fiction", "Drama"],
+                        "overview": "When mysterious spacecrafts touch down across the globe..."
+                    },
+                    {
+                        "id": 2,
+                        "title": "Moon",
+                        "media_type": "movie",
+                        "runtime": 97,
+                        "genres": ["Science Fiction", "Drama"],
+                        "overview": "Astronaut Sam Bell has a quintessentially personal encounter..."
+                    }
+                ]
+            },
+            "expected_output": {
+                "items": [
+                    {
+                        "id": 2,
+                        "score": 0.95,
+                        "explanation": "Perfect match: A thoughtful sci-fi under 100min with an intimate story."
+                    },
+                    {
+                        "id": 1,
+                        "score": 0.85,
+                        "explanation": "Fits your request: Cerebral sci-fi just under 2 hours."
+                    }
+                ]
+            }
+        },
+        {
+            "input": {
+                "query": "fun family shows",
+                "intent": {
+                    "media_types": ["tv"],
+                    "genres": ["Family", "Comedy"]
+                },
+                "items": [
+                    {
+                        "id": 3,
+                        "title": "Bluey",
+                        "media_type": "tv",
+                        "genres": ["Animation", "Family", "Comedy"],
+                        "overview": "Follow the adventures of Bluey, a lovable and inexhaustible six-year-old Blue Heeler puppy..."
+                    },
+                    {
+                        "id": 4,
+                        "title": "Avatar: The Last Airbender",
+                        "media_type": "tv",
+                        "genres": ["Animation", "Action", "Adventure"],
+                        "overview": "In a war-torn world of elemental magic..."
+                    }
+                ]
+            },
+            "expected_output": {
+                "items": [
+                    {
+                        "id": 3,
+                        "score": 0.98,
+                        "explanation": "Perfect family show: Heartwarming comedy that both kids and parents love."
+                    },
+                    {
+                        "id": 4,
+                        "score": 0.75,
+                        "explanation": "Family-friendly adventure with broad appeal, though less focused on comedy."
+                    }
+                ]
+            }
+        }
+    ],
+    "evaluation_metrics": {
+        "ranking_accuracy": {
+            "description": "Measures if items are ordered according to how well they match the query/intent",
+            "threshold": 0.8
+        },
+        "explanation_relevance": {
+            "description": "Checks if explanations reference query terms and intent filters",
+            "threshold": 0.9
+        },
+        "explanation_length": {
+            "description": "Ensures explanations are concise (<=45 words)",
+            "threshold": 1.0
+        }
+    }
+}

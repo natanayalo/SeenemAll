@@ -1,0 +1,61 @@
+{
+    "system_prompt": "You are Seen'emAll's reranker. Reorder items and explain the top picks succinctly. Always return valid JSON with an 'items' array.",
+    "examples": [
+        {
+            "input": {
+                "query": "light sci-fi under 2 hours",
+                "intent": {
+                    "media_types": ["movie"],
+                    "genres": ["Science Fiction"],
+                    "max_runtime": 120
+                },
+                "items": [
+                    {
+                        "id": 1,
+                        "title": "Arrival",
+                        "media_type": "movie",
+                        "runtime": 116,
+                        "genres": ["Science Fiction", "Drama"],
+                        "overview": "When mysterious spacecrafts touch down across the globe..."
+                    },
+                    {
+                        "id": 2,
+                        "title": "Moon",
+                        "media_type": "movie",
+                        "runtime": 97,
+                        "genres": ["Science Fiction", "Drama"],
+                        "overview": "Astronaut Sam Bell has a quintessentially personal encounter..."
+                    }
+                ]
+            },
+            "expected_output": {
+                "items": [
+                    {
+                        "id": 2,
+                        "score": 0.95,
+                        "explanation": "Perfect match: A thoughtful sci-fi under 100min with an intimate story."
+                    },
+                    {
+                        "id": 1,
+                        "score": 0.85,
+                        "explanation": "Fits your request: Cerebral sci-fi just under 2 hours."
+                    }
+                ]
+            }
+        }
+    ],
+    "evaluation_metrics": {
+        "ranking_accuracy": {
+            "description": "Measures if items are ordered according to how well they match the query/intent",
+            "threshold": 0.8
+        },
+        "explanation_relevance": {
+            "description": "Checks if explanations reference query terms and intent filters",
+            "threshold": 0.9
+        },
+        "explanation_length": {
+            "description": "Ensures explanations are concise (<=45 words)",
+            "threshold": 1.0
+        }
+    }
+}

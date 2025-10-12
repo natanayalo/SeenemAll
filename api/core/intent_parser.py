@@ -1,11 +1,28 @@
 from __future__ import annotations
 
 import re
+import functools
+import logging
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence, TYPE_CHECKING
 
+from api.core.prompt_eval import load_prompt_template
+
 if TYPE_CHECKING:  # pragma: no cover - only used for typing
     from api.db.models import Item
+
+
+@functools.lru_cache(maxsize=1)
+def _get_prompt_config():
+    """Load the intent parser prompt configuration."""
+    return load_prompt_template("intent_parser")
+
+
+def _get_genre_mapping():
+    """Get genre mapping from prompt config."""
+    config = _get_prompt_config()
+    return config.get("genre_mapping", {})
+
 
 # Canonical TMDB genres we care about
 _CANONICAL_GENRES = [
@@ -139,13 +156,20 @@ class IntentFilters:
         seen: set[str] = set()
         ordered: List[str] = []
 
+        # Add explicitly mentioned genres first
         for genre in self.genres:
             if genre not in seen:
                 ordered.append(genre)
                 seen.add(genre)
 
+        # Add genres from mood mappings
+        genre_mapping = _get_genre_mapping()
         for mood in self.moods:
-            for mapped in _MOOD_TO_GENRES.get(mood, ()):
+            # Check both the legacy mapping and prompt-based mapping
+            legacy_genres = _MOOD_TO_GENRES.get(mood, ())
+            prompt_genres = genre_mapping.get(mood.lower(), [])
+
+            for mapped in set(legacy_genres) | set(prompt_genres):
                 if mapped not in seen:
                     ordered.append(mapped)
                     seen.add(mapped)
@@ -171,7 +195,7 @@ def parse_intent(query: str | None) -> IntentFilters:
     media_types = _extract_media_types(normalized)
     min_runtime, max_runtime = _extract_runtime(query)
 
-    return IntentFilters(
+    filters = IntentFilters(
         raw_query=query,
         genres=genres,
         moods=moods,
@@ -179,6 +203,33 @@ def parse_intent(query: str | None) -> IntentFilters:
         min_runtime=min_runtime,
         max_runtime=max_runtime,
     )
+
+    # Validate parser output in debug/test environments
+    if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
+        config = _get_prompt_config()
+        for example in config.get("examples", []):
+            if example.get("input") == query:
+                from api.core.prompt_eval import evaluate_intent_parser_output
+
+                output = {
+                    "media_types": filters.media_types,
+                    "genres": filters.effective_genres(),
+                    "min_runtime": filters.min_runtime,
+                    "max_runtime": filters.max_runtime,
+                }
+                score, errors = evaluate_intent_parser_output(
+                    output, example["expected_output"], query
+                )
+                if errors:
+                    logging.getLogger(__name__).debug(
+                        "Intent parser evaluation found issues: %s", errors
+                    )
+                logging.getLogger(__name__).debug(
+                    "Intent parser evaluation score: %.2f", score
+                )
+                break
+
+    return filters
 
 
 def item_matches_intent(item: "Item | object", filters: IntentFilters | None) -> bool:

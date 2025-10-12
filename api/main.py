@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes.health import router as health_router
@@ -6,6 +7,19 @@ from api.routes.user import router as user_router
 from api.routes.recommend import router as recommend_router
 from api.routes.watch import router as watch_router
 from api.routes.feedback import router as feedback_router
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+# Set specific loggers
+logging.getLogger("api.core.reranker").setLevel(logging.DEBUG)
+logging.getLogger("api.core.intent_parser").setLevel(logging.DEBUG)
+# Reduce noise from other modules
+logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+logging.getLogger("urllib3").setLevel(logging.INFO)
+logging.getLogger("httpx").setLevel(logging.INFO)
+logging.getLogger("httpcore").setLevel(logging.INFO)
 
 app = FastAPI(title="Seen'emAll", version="0.1.0")
 
