@@ -18,7 +18,7 @@
 | **12** | `/feedback` ingestion | ✅ | endpoint available |
 | **13** | Diversity & novelty logic | ✅ | MMR diversification available via query param |
 | **14** | Minimal web UI | ✅ | show cards + "watch" buttons |
-| **15** | Prompt & eval fixtures | ⏳ | Templates + eval suite for LLM interactions:
+| **15** | Prompt & eval fixtures | ✅ | Templates + eval suite for LLM interactions:
 - Intent parser prompts
 - Reranker prompts with examples
 - Golden dataset of queries + expected results
