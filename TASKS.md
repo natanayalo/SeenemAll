@@ -33,7 +33,7 @@
 |---|------|---------|-------|
 | **17** | Add genres to embedding text | ✅ | Genre list prepended to title+overview |
 | **18** | Test embedding templates | ✅ | Implemented configurable templates with tests |
-| **19** | Evaluate domain models | ⏳ | Research MovieCLIP and alternatives |
+| **19** | Evaluate domain models | ✅ | E5-small-v2 recommended, MovieCLIP evaluated |
 | **20** | Add temporal context | ⏳ | Include year/decade in embeddings |
 | **21** | A/B test framework | ⏳ | Compare embedding strategies |
 | **22** | Version embeddings | ⏳ | Support migrations between versions |
