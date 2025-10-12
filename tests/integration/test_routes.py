@@ -12,6 +12,7 @@ from api.main import app
 from api.routes import recommend as recommend_routes
 from api.routes import user as user_routes
 from tests.helpers import FakeResult
+from api.core import reranker
 
 
 @pytest.fixture(autouse=True)
@@ -112,6 +113,8 @@ def test_post_history_adds_events_and_upserts_profile(monkeypatch):
 
 
 def test_recommend_endpoint_returns_ranked_items(monkeypatch):
+    monkeypatch.setenv("RERANK_ENABLED", "0")
+    reranker._get_settings.cache_clear()
     items = _make_items()
     session = _RecommendSession(items)
 

@@ -9,8 +9,8 @@
 | **5** | User history + profile vectors | ✅ | `/user/history` route works |
 | **6** | Candidate ANN search | ✅ | pgvector cosine query functional |
 | **7** | `/recommend` endpoint (core) | ✅ | Returns JSON titles/posters |
-| **8** | Intent parser (LLM) | 🏗 | to parse mood/runtime/genre queries |
-| **9** | Reranker + explanation | ⏳ | re-order & add natural language reasons |
+| **8** | Intent parser (LLM) | ✅ | parses mood/runtime/genre filters |
+| **9** | Reranker + explanation | ✅ | LLM reranks candidates + inline rationales |
 | **10** | JustWatch ETL (streaming links) | ⏳ | availability per country/service |
 | **11** | `/watch-link` resolver | ⏳ | redirect deep links |
 | **12** | `/feedback` ingestion | ⏳ | collect click / impression data |

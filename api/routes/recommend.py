@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List
+from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -8,6 +8,7 @@ from api.db.models import Item
 from api.core.user_utils import load_user_state
 from api.core.candidate_gen import ann_candidates
 from api.core.intent_parser import parse_intent, item_matches_intent
+from api.core.reranker import rerank_with_explanations
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
 
@@ -42,7 +43,8 @@ def recommend(
         row.id: row
         for row in db.execute(select(Item).where(Item.id.in_(ids))).scalars().all()
     }
-    ordered = []
+    ordered: List[Dict[str, Any]] = []
+    max_candidates = min(candidate_limit, max(limit * 2, 25))
     for iid in ids:
         it = items.get(iid)
         if not it:
@@ -61,8 +63,25 @@ def recommend(
                 "original_language": it.original_language,
                 "genres": it.genres,
                 "release_year": it.release_year,
+                "original_rank": len(ordered),
             }
         )
-        if len(ordered) >= limit:
+        if len(ordered) >= max_candidates:
             break
-    return ordered
+
+    if not ordered:
+        return []
+
+    reranked = rerank_with_explanations(
+        ordered,
+        intent=intent,
+        query=query,
+        user={"user_id": user_id},
+    )
+
+    response = []
+    for entry in reranked[:limit]:
+        cleaned = dict(entry)
+        cleaned.pop("original_rank", None)
+        response.append(cleaned)
+    return response

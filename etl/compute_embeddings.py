@@ -5,9 +5,12 @@ from typing import List, Tuple
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from api.db.session import get_sessionmaker
-from api.db.models import Item, ItemEmbedding
+from api.db.session import get_engine as _get_engine, get_sessionmaker
 from api.core.embeddings import encode_texts
+from api.db.models import Item, ItemEmbedding
+
+# Re-export database engine accessor for tests that monkeypatch this module.
+get_engine = _get_engine
 
 MAX_LEN = 800  # limit overview length to keep inputs compact
 

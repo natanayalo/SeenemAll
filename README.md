@@ -24,6 +24,7 @@ cd SeenemAll
 # 2. Configure
 cp .env.example .env
 # edit TMDB_API_KEY=your_tmdb_key
+# optional: set RERANK_PROVIDER/RERANK_API_KEY for LLM reranking
 
 # 3. Launch stack
 docker compose up -d --build
@@ -45,6 +46,16 @@ curl -X POST http://localhost:8000/user/history \
 # 8. Get recommendations
 curl "http://localhost:8000/recommend?user_id=u1&limit=10"
 ````
+
+---
+
+## 🔁 LLM Reranker
+
+- Set `RERANK_PROVIDER=openai` with `RERANK_API_KEY` (or rely on `OPENAI_API_KEY`) **or**
+  `RERANK_PROVIDER=gemini` with a compatible Google Generative AI key.
+- Defaults: `RERANK_MODEL=gpt-4o-mini` for OpenAI, `gemini-2.0-flash-exp` for Gemini.
+- Disable temporarily with `RERANK_ENABLED=0`; without a key we automatically fall back
+  to ANN ordering with heuristic explanations.
 
 ---
 

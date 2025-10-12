@@ -46,12 +46,22 @@
 
 ---
 
-### 💬 5. Recommendation Agent
+### 🧠 5. Reranker Agent
+**Goal:** Reorder candidates with natural-language explanations
+**Implements:** `api/core/reranker.py`
+
+- Calls OpenAI- or Gemini-compatible APIs when configured
+- Generates concise reasons tied to the user’s query/filters
+- Falls back gracefully to ANN order when disabled or failing
+
+---
+
+### 💬 6. Recommendation Agent
 **Goal:** Serve recommendations via API
 **Implements:** `api/routes/recommend.py`
 
 - Combines user vector + ANN search
-- Returns ranked titles with metadata and poster URLs
+- Invokes the reranker for final ordering + explanations
 - Endpoint: `GET /recommend?user_id=u1&limit=10`
 
 ---
@@ -60,6 +70,5 @@
 | Agent | Description |
 |-------|--------------|
 | 🎯 **Intent Agent** | Parse free-text queries (“light sci-fi < 2h”) and filter catalog |
-| 🧠 **Reranker Agent** | Use LLM to refine candidate order & explain results |
 | 🎬 **Streaming Agent** | Resolve watch links from JustWatch |
 | ❤️ **Feedback Agent** | Collect feedback signals and retrain user vector |
