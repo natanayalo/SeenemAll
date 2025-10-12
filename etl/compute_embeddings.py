@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import List, Tuple
+import os
+from typing import List, Tuple, Dict, Any
 
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 from api.db.session import get_engine as _get_engine, get_sessionmaker
 from api.core.embeddings import encode_texts
 from api.db.models import Item, ItemEmbedding
+from etl.embedding_templates import format_with_template
 
 # Re-export database engine accessor for tests that monkeypatch this module.
 get_engine = _get_engine
@@ -15,23 +17,14 @@ get_engine = _get_engine
 MAX_LEN = 800  # limit overview length to keep inputs compact
 
 
-def _build_text(
-    title: str | None, overview: str | None, genres: List[str] | None = None
-) -> str:
-    title = (title or "").strip()
-    overview = (overview or "").strip()
-    if len(overview) > MAX_LEN:
-        overview = overview[:MAX_LEN] + "..."
-
-    # Build genre prefix if available
-    genre_text = ""
-    if genres:
-        genre_text = f"[{', '.join(genres)}] "
-
-    # Combine all components
-    if overview:
-        return f"{genre_text}{title} :: {overview}"
-    return f"{genre_text}{title}"
+def _build_text(item: Dict[str, Any]) -> str:
+    """Build text representation using configured template."""
+    template = os.getenv("EMBED_TEMPLATE", "basic")
+    overview = item.get("overview", "")
+    if overview and len(overview) > MAX_LEN:
+        item = dict(item)  # Make a copy to avoid modifying original
+        item["overview"] = overview[:MAX_LEN] + "..."
+    return format_with_template(template, item)
 
 
 def _select_missing_ids(db: Session, limit: int) -> List[int]:
@@ -58,15 +51,22 @@ def _fetch_items(db: Session, ids: List[int]) -> List[Tuple[int, str]]:
     if not ids:
         return results
 
-    stmt = select(Item.id, Item.title, Item.overview, Item.genres).where(
-        Item.id.in_(ids)
-    )
+    # Select all item fields for full context
+    stmt = select(Item).where(Item.id.in_(ids))
 
-    for iid, title, overview, genres in db.execute(stmt):
-        # Extract genre names from the JSONB array of genre objects
-        genre_names = [g.get("name") for g in (genres or []) if g.get("name")]
-        text = _build_text(title, overview, genre_names)
-        results.append((iid, text))
+    for item in db.execute(stmt).scalars():
+        # Convert SQLAlchemy model to dict for template processing
+        item_dict = {
+            "id": item.id,
+            "title": item.title,
+            "overview": item.overview,
+            "genres": item.genres,
+            "release_year": item.release_year,
+            "media_type": item.media_type,
+            "runtime": item.runtime,
+        }
+        text = _build_text(item_dict)
+        results.append((item.id, text))
 
     return results
 
