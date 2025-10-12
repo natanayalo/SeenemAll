@@ -12,7 +12,7 @@
 | **8** | Intent parser (LLM) | ✅ | parses mood/runtime/genre filters |
 | **9** | Reranker + explanation | ✅ | LLM reranks candidates + inline rationales |
 | **10** | JustWatch ETL (streaming links) | ✅ | `make etl-justwatch` fills availability |
-| **11** | `/watch-link` resolver | ⏳ | redirect deep links |
+| **11** | `/watch-link` resolver | ✅ | endpoint available |
 | **12** | `/feedback` ingestion | ⏳ | collect click / impression data |
 | **13** | Diversity & novelty logic | ⏳ | avoid repeats, inject serendipity |
 | **14** | Minimal web UI | ⏳ | show cards + “watch” buttons |

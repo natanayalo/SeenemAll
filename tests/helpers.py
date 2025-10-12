@@ -122,3 +122,8 @@ class FakeResult:
 
     def all(self) -> List[Any]:
         return list(self._rows)
+
+    def first(self) -> Any | None:
+        if not self._rows:
+            return None
+        return self._rows[0]
