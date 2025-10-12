@@ -46,7 +46,9 @@ class _RecommendSession(_HistorySession):
     def execute(self, statement, params=None):
         self.last_statement = statement
         self.last_params = params or {}
-        return FakeResult(self._items)
+        # Fake a join between Item and ItemEmbedding
+        rows = [(item, [0.1] * 384) for item in self._items]
+        return FakeResult(rows)
 
 
 def _make_items() -> List[Item]:
@@ -168,3 +170,49 @@ def test_recommend_endpoint_requires_user_vector(monkeypatch):
 
     assert resp.status_code == 400
     assert resp.json()["detail"] == "No user vector. POST /user/history first."
+
+
+def test_recommend_endpoint_diversifies_items(monkeypatch):
+    monkeypatch.setenv("RERANK_ENABLED", "0")
+    reranker._get_settings.cache_clear()
+    items = _make_items()
+    session = _RecommendSession(items)
+
+    def override_get_db() -> Iterator[_RecommendSession]:
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    def fake_load_user_state(db, user_id):
+        return np.array([0.1, 0.2]), np.array([0.3, 0.7], dtype="float32"), [999]
+
+    def fake_ann_candidates(db, vec, exclude, limit):
+        return [items[1].id, items[0].id]
+
+    called = {}
+
+    def fake_diversify(items, limit):
+        called["diversify"] = True
+        return items
+
+    monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_user_state)
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann_candidates)
+    monkeypatch.setattr(recommend_routes, "diversify_with_mmr", fake_diversify)
+
+    with TestClient(app) as client:
+        client.get(
+            "/recommend", params={"user_id": "u1", "limit": 5, "diversify": "true"}
+        )
+
+    assert called.get("diversify") is True
+
+    # Test with diversify=False
+    called.clear()
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as client:
+        client.get(
+            "/recommend", params={"user_id": "u1", "limit": 5, "diversify": "false"}
+        )
+
+    app.dependency_overrides.clear()
+    assert called.get("diversify") is None

@@ -9,6 +9,7 @@ from functools import lru_cache
 from typing import Any, Dict, Iterable, List, Sequence
 
 import httpx
+import numpy as np
 
 from api.core.intent_parser import IntentFilters
 
@@ -89,6 +90,48 @@ def rerank_with_explanations(
     except Exception:  # pragma: no cover - defensive guardrail
         logger.exception("LLM reranker failed; falling back to ANN order.")
         return base
+
+
+def diversify_with_mmr(
+    items: List[Dict[str, Any]], lambda_param: float = 0.7, limit: int | None = None
+) -> List[Dict[str, Any]]:
+    if not items:
+        return []
+
+    limit = limit or len(items)
+    unranked = list(items)
+    ranked: List[Dict[str, Any]] = []
+
+    if unranked:
+        ranked.append(unranked.pop(0))
+
+    while unranked and len(ranked) < limit:
+        max_mmr = -np.inf
+        best_item = None
+
+        for item in unranked:
+            relevance = 1 / (item["original_rank"] + 1)  # Use rank as relevance score
+            similarity_to_ranked = max(
+                [
+                    cosine_similarity(item["vector"], r_item["vector"])
+                    for r_item in ranked
+                ]
+            )
+            mmr = lambda_param * relevance - (1 - lambda_param) * similarity_to_ranked
+
+            if mmr > max_mmr:
+                max_mmr = mmr
+                best_item = item
+
+        if best_item:
+            ranked.append(best_item)
+            unranked.remove(best_item)
+
+    return ranked
+
+
+def cosine_similarity(v1, v2):
+    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
 
 
 @lru_cache(maxsize=1)

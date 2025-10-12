@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from api.db.session import get_db
-from api.db.models import Item
+from api.db.models import Item, ItemEmbedding
 from api.core.user_utils import load_user_state
 from api.core.candidate_gen import ann_candidates
 from api.core.intent_parser import parse_intent, item_matches_intent
-from api.core.reranker import rerank_with_explanations
+from api.core.reranker import rerank_with_explanations, diversify_with_mmr
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
 
@@ -21,6 +21,7 @@ def recommend(
         None,
         description="Optional natural-language intent (e.g. 'light sci-fi < 2h')",
     ),
+    diversify: bool = Query(True, description="Whether to diversify recommendations."),
     db: Session = Depends(get_db),
 ):
     long_v, short_v, exclude = load_user_state(db, user_id)
@@ -39,15 +40,19 @@ def recommend(
         return []
 
     # fetch metadata and preserve ANN order
-    items = {
-        row.id: row
-        for row in db.execute(select(Item).where(Item.id.in_(ids))).scalars().all()
+    items_with_vectors = {
+        row.id: (row, vec)
+        for row, vec in db.execute(
+            select(Item, ItemEmbedding.vector)
+            .join(ItemEmbedding, Item.id == ItemEmbedding.item_id)
+            .where(Item.id.in_(ids))
+        ).all()
     }
     ordered: List[Dict[str, Any]] = []
     max_candidates = min(candidate_limit, max(limit * 2, 25))
     for iid in ids:
-        it = items.get(iid)
-        if not it:
+        it, vec = items_with_vectors.get(iid, (None, None))
+        if not it or not vec:
             continue
         if not item_matches_intent(it, intent):
             continue
@@ -64,6 +69,7 @@ def recommend(
                 "genres": it.genres,
                 "release_year": it.release_year,
                 "original_rank": len(ordered),
+                "vector": vec,
             }
         )
         if len(ordered) >= max_candidates:
@@ -71,6 +77,9 @@ def recommend(
 
     if not ordered:
         return []
+
+    if diversify:
+        ordered = diversify_with_mmr(ordered, limit=limit)
 
     reranked = rerank_with_explanations(
         ordered,
@@ -83,5 +92,6 @@ def recommend(
     for entry in reranked[:limit]:
         cleaned = dict(entry)
         cleaned.pop("original_rank", None)
+        cleaned.pop("vector", None)
         response.append(cleaned)
     return response

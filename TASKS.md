@@ -14,7 +14,7 @@
 | **10** | JustWatch ETL (streaming links) | ✅ | `make etl-justwatch` fills availability |
 | **11** | `/watch-link` resolver | ✅ | endpoint available |
 | **12** | `/feedback` ingestion | ✅ | endpoint available |
-| **13** | Diversity & novelty logic | ⏳ | avoid repeats, inject serendipity |
+| **13** | Diversity & novelty logic | ✅ | MMR diversification available via query param |
 | **14** | Minimal web UI | ⏳ | show cards + “watch” buttons |
 | **15** | Prompt & eval fixtures | ⏳ | store prompt templates for testing |
 | **16** | CI polish & deployment | ✅ | Docker Compose + Makefile done |
