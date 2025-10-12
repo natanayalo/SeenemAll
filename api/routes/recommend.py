@@ -2,9 +2,10 @@ from __future__ import annotations
 from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, func
 from api.db.session import get_db
-from api.db.models import Item, ItemEmbedding
+from api.db.models import Item, ItemEmbedding, Availability
+from api.config import COUNTRY_DEFAULT
 from api.core.user_utils import load_user_state
 from api.core.candidate_gen import ann_candidates
 from api.core.intent_parser import parse_intent, item_matches_intent
@@ -39,23 +40,52 @@ def recommend(
     if not ids:
         return []
 
-    # fetch metadata and preserve ANN order
-    items_with_vectors = {
-        row.id: (row, vec)
-        for row, vec in db.execute(
-            select(Item, ItemEmbedding.vector)
+    # fetch metadata and streaming links, preserve ANN order
+    items_with_data = {
+        row.id: (row, vec, watch_options)
+        for row, vec, watch_options in db.execute(
+            select(
+                Item,
+                ItemEmbedding.vector,
+                func.json_agg(
+                    func.json_build_object(
+                        "service",
+                        Availability.service,
+                        "url",
+                        func.coalesce(Availability.web_url, Availability.deeplink),
+                    )
+                ).label("watch_options"),
+            )
             .join(ItemEmbedding, Item.id == ItemEmbedding.item_id)
+            .outerjoin(
+                Availability,
+                (Item.id == Availability.item_id)
+                & (Availability.country == COUNTRY_DEFAULT),
+            )
             .where(Item.id.in_(ids))
+            .group_by(Item.id, ItemEmbedding.vector)
         ).all()
     }
     ordered: List[Dict[str, Any]] = []
     max_candidates = min(candidate_limit, max(limit * 2, 25))
     for iid in ids:
-        it, vec = items_with_vectors.get(iid, (None, None))
-        if not it or not vec:
+        it, vec, watch_options = items_with_data.get(iid, (None, None, None))
+        if it is None or vec is None or len(vec) == 0:
             continue
         if not item_matches_intent(it, intent):
             continue
+
+        # Clean up watch_options - remove null entries and handle None case
+        cleaned_options = []
+        if (
+            watch_options and watch_options[0] is not None
+        ):  # PostgreSQL returns [null] when no matches
+            cleaned_options = [
+                {"service": opt["service"], "url": opt["url"]}
+                for opt in watch_options
+                if opt["url"] is not None
+            ]
+
         ordered.append(
             {
                 "id": it.id,
@@ -68,6 +98,10 @@ def recommend(
                 "original_language": it.original_language,
                 "genres": it.genres,
                 "release_year": it.release_year,
+                "watch_options": cleaned_options,
+                "watch_url": (
+                    cleaned_options[0]["url"] if cleaned_options else None
+                ),  # For backward compatibility
                 "original_rank": len(ordered),
                 "vector": vec,
             }
