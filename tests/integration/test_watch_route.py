@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from typing import Iterator, List, Tuple
@@ -6,7 +5,6 @@ from typing import Iterator, List, Tuple
 import pytest
 from fastapi.testclient import TestClient
 
-from api.db.models import Availability
 from api.db.session import get_db
 from api.main import app
 from tests.helpers import FakeResult
@@ -31,11 +29,7 @@ class _WatchSession:
 
 
 def test_get_watch_link_redirects_to_deeplink(monkeypatch):
-    session = _WatchSession(
-        [
-            ("app://deeplink", "http://web.url")
-        ]
-    )
+    session = _WatchSession([("app://deeplink", "http://web.url")])
 
     def override_get_db() -> Iterator[_WatchSession]:
         yield session
