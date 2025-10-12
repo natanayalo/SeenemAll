@@ -5,6 +5,7 @@ from api.db.session import init_engine, get_sessionmaker, get_db
 from api.routes.user import router as user_router
 from api.routes.recommend import router as recommend_router
 from api.routes.watch import router as watch_router
+from api.routes.feedback import router as feedback_router
 
 app = FastAPI(title="Seen'emAll", version="0.1.0")
 
@@ -23,6 +24,7 @@ app.include_router(
 )
 app.include_router(recommend_router)
 app.include_router(watch_router)
+app.include_router(feedback_router)
 
 
 @app.on_event("startup")
