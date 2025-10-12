@@ -15,12 +15,23 @@ get_engine = _get_engine
 MAX_LEN = 800  # limit overview length to keep inputs compact
 
 
-def _build_text(title: str | None, overview: str | None) -> str:
+def _build_text(
+    title: str | None, overview: str | None, genres: List[str] | None = None
+) -> str:
     title = (title or "").strip()
     overview = (overview or "").strip()
     if len(overview) > MAX_LEN:
         overview = overview[:MAX_LEN] + "..."
-    return f"{title} :: {overview}" if overview else title
+
+    # Build genre prefix if available
+    genre_text = ""
+    if genres:
+        genre_text = f"[{', '.join(genres)}] "
+
+    # Combine all components
+    if overview:
+        return f"{genre_text}{title} :: {overview}"
+    return f"{genre_text}{title}"
 
 
 def _select_missing_ids(db: Session, limit: int) -> List[int]:
@@ -46,9 +57,17 @@ def _fetch_items(db: Session, ids: List[int]) -> List[Tuple[int, str]]:
     results: List[Tuple[int, str]] = []
     if not ids:
         return results
-    stmt = select(Item.id, Item.title, Item.overview).where(Item.id.in_(ids))
-    for iid, title, overview in db.execute(stmt):
-        results.append((iid, _build_text(title, overview)))
+
+    stmt = select(Item.id, Item.title, Item.overview, Item.genres).where(
+        Item.id.in_(ids)
+    )
+
+    for iid, title, overview, genres in db.execute(stmt):
+        # Extract genre names from the JSONB array of genre objects
+        genre_names = [g.get("name") for g in (genres or []) if g.get("name")]
+        text = _build_text(title, overview, genre_names)
+        results.append((iid, text))
+
     return results
 
 
