@@ -71,6 +71,29 @@ curl "http://localhost:8000/recommend?user_id=u1&limit=10"
 
 ---
 
+## 🔗 Watch Links
+
+- Get a redirect to a streaming service with `/watch-link/{item_id}`.
+- Query params: `service` (e.g., `nfx`), `country` (e.g., `US`).
+- Example:
+  ```bash
+  curl "http://localhost:8000/watch-link/335984?service=nfx&country=US"
+  ```
+
+---
+
+## ❤️ Feedback
+
+- Send recommendation feedback (impressions, clicks) to the `/feedback` endpoint.
+- Example:
+  ```bash
+  curl -X POST http://localhost:8000/feedback \
+    -H "content-type: application/json" \
+    -d '{"user_id":"u1","item_id":335984,"event_type":"click","meta":{"rank":5}}'
+  ```
+
+---
+
 ## 🧠 Agents
 
 See [AGENTS.md](./AGENTS.md) for roles and flow.
