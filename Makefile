@@ -26,3 +26,6 @@ etl-tmdb:
 
 embed:
 	docker compose exec api python -m etl.compute_embeddings
+
+etl-justwatch:
+	docker compose exec api python scripts/run_justwatch_sync.py

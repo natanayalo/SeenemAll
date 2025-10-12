@@ -56,7 +56,17 @@
 
 ---
 
-### 💬 6. Recommendation Agent
+### 🎬 6. Streaming Agent
+**Goal:** Resolve watch links from JustWatch
+**Implements:** `etl/justwatch_sync.py`
+
+- Looks up TMDB ids via the unofficial JustWatch endpoints
+- Normalises offers into `availability` (country/service/deeplink)
+- Command: `make etl-justwatch`
+
+---
+
+### 💬 7. Recommendation Agent
 **Goal:** Serve recommendations via API
 **Implements:** `api/routes/recommend.py`
 
@@ -70,5 +80,4 @@
 | Agent | Description |
 |-------|--------------|
 | 🎯 **Intent Agent** | Parse free-text queries (“light sci-fi < 2h”) and filter catalog |
-| 🎬 **Streaming Agent** | Resolve watch links from JustWatch |
 | ❤️ **Feedback Agent** | Collect feedback signals and retrain user vector |

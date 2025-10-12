@@ -38,12 +38,15 @@ make etl-tmdb
 # 6. Generate embeddings
 make embed
 
-# 7. Create sample user history
+# 7. Sync streaming availability (optional)
+make etl-justwatch
+
+# 8. Create sample user history
 curl -X POST http://localhost:8000/user/history \
   -H "content-type: application/json" \
   -d '{"user_id":"u1","items":[1,2,3,4,5]}'
 
-# 8. Get recommendations
+# 9. Get recommendations
 curl "http://localhost:8000/recommend?user_id=u1&limit=10"
 ````
 
@@ -56,6 +59,15 @@ curl "http://localhost:8000/recommend?user_id=u1&limit=10"
 - Defaults: `RERANK_MODEL=gpt-4o-mini` for OpenAI, `gemini-2.0-flash-exp` for Gemini.
 - Disable temporarily with `RERANK_ENABLED=0`; without a key we automatically fall back
   to ANN ordering with heuristic explanations.
+
+---
+
+## 🌍 Streaming Availability
+
+- Configure `JUSTWATCH_COUNTRY` (default `IL`) to control the locale for offers.
+- Optional: tweak `JUSTWATCH_LANGUAGE` (default `en`) and `JUSTWATCH_PLATFORM` (default `WEB`) for different JustWatch markets.
+- Run `make etl-justwatch` to populate the `availability` table with per-service links.
+- Data is refreshed by replacing rows per item/country, keeping the table idempotent.
 
 ---
 

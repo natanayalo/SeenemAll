@@ -11,7 +11,7 @@
 | **7** | `/recommend` endpoint (core) | ✅ | Returns JSON titles/posters |
 | **8** | Intent parser (LLM) | ✅ | parses mood/runtime/genre filters |
 | **9** | Reranker + explanation | ✅ | LLM reranks candidates + inline rationales |
-| **10** | JustWatch ETL (streaming links) | ⏳ | availability per country/service |
+| **10** | JustWatch ETL (streaming links) | ✅ | `make etl-justwatch` fills availability |
 | **11** | `/watch-link` resolver | ⏳ | redirect deep links |
 | **12** | `/feedback` ingestion | ⏳ | collect click / impression data |
 | **13** | Diversity & novelty logic | ⏳ | avoid repeats, inject serendipity |
