@@ -116,14 +116,30 @@ class FakeResult:
 
     def __init__(self, rows: Sequence[Any]):
         self._rows = list(rows)
+        self._scalar_mode = False
 
     def scalars(self) -> "FakeResult":
-        return self
+        result = FakeResult(self._rows)
+        result._scalar_mode = True
+        return result
 
     def all(self) -> List[Any]:
+        if self._scalar_mode:
+            return [
+                row[0] if isinstance(row, (tuple, list)) else row for row in self._rows
+            ]
         return list(self._rows)
 
     def first(self) -> Any | None:
         if not self._rows:
             return None
+        if self._scalar_mode and isinstance(self._rows[0], (tuple, list)):
+            return self._rows[0][0]
         return self._rows[0]
+
+    def __iter__(self):
+        if self._scalar_mode:
+            return iter(
+                row[0] if isinstance(row, (tuple, list)) else row for row in self._rows
+            )
+        return iter(self._rows)

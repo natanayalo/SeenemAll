@@ -4,7 +4,16 @@ from datetime import datetime
 from typing import Optional, List
 
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import Integer, String, Text, ForeignKey, DateTime, func, JSON
+from sqlalchemy import (
+    Integer,
+    String,
+    Text,
+    ForeignKey,
+    DateTime,
+    func,
+    JSON,
+    UniqueConstraint,
+)
 from pgvector.sqlalchemy import Vector
 
 
@@ -41,11 +50,15 @@ class Item(Base):
 
 class ItemEmbedding(Base):
     __tablename__ = "item_embeddings"
+    __table_args__ = (
+        UniqueConstraint("item_id", "version", name="uq_item_embedding_item_version"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     item_id: Mapped[int] = mapped_column(
-        ForeignKey("items.id", ondelete="CASCADE"), index=True, unique=True
+        ForeignKey("items.id", ondelete="CASCADE"), index=True
     )
+    version: Mapped[str] = mapped_column(String(32), nullable=False, default="v1")
     vector: Mapped[List[float]] = mapped_column(Vector(384), nullable=False)
 
 

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import List
+
 import httpx
 import pytest
 
@@ -72,6 +74,20 @@ def test_rerank_returns_base_when_llm_decisions_empty(monkeypatch):
     _reset_settings()
 
 
+def test_rerank_with_explanations_handles_exception(monkeypatch):
+    _reset_settings()
+    monkeypatch.setenv("RERANK_API_KEY", "fake")
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("llm failed")
+
+    monkeypatch.setattr(reranker, "_call_openai_reranker", boom)
+    original = [{"id": 1, "title": "Alpha"}, {"id": 2, "title": "Beta"}]
+    result = reranker.rerank_with_explanations(original, intent=None)
+    assert [item["id"] for item in result] == [1, 2]
+    _reset_settings()
+
+
 def test_get_settings_invalid_timeout_warns(monkeypatch, capfd):
     _reset_settings()
     monkeypatch.setenv("RERANK_API_KEY", "fake")
@@ -80,6 +96,15 @@ def test_get_settings_invalid_timeout_warns(monkeypatch, capfd):
     settings = reranker._get_settings()
 
     assert settings.timeout == reranker._DEFAULT_TIMEOUT_SECONDS
+    _reset_settings()
+
+
+def test_get_settings_fallback_provider(monkeypatch):
+    _reset_settings()
+    monkeypatch.setenv("RERANK_API_KEY", "fake")
+    monkeypatch.setenv("RERANK_PROVIDER", "unsupported")
+    settings = reranker._get_settings()
+    assert settings.provider == "openai"
     _reset_settings()
 
 
@@ -137,6 +162,19 @@ def test_call_openai_reranker_parses_payload(monkeypatch):
     _reset_settings()
 
 
+def test_call_reranker_raises_on_unknown_provider():
+    settings = reranker.RerankerSettings(
+        provider="other",
+        api_key="k",
+        model="m",
+        endpoint="https://example",
+        enabled=True,
+        timeout=1.0,
+    )
+    with pytest.raises(reranker.RerankerError):
+        reranker._call_reranker(settings, [], None, None, None)
+
+
 def test_rerank_with_explanations_uses_gemini(monkeypatch):
     _reset_settings()
     monkeypatch.setenv("RERANK_API_KEY", "gem-key")
@@ -159,6 +197,51 @@ def test_rerank_with_explanations_uses_gemini(monkeypatch):
     result = reranker.rerank_with_explanations(items, intent=None, query=None)
     assert [item["id"] for item in result[:2]] == [2, 1]
     assert result[0]["explanation"] == "Gemini pick."
+    _reset_settings()
+
+
+def test_call_openai_reranker_requires_api_key():
+    settings = reranker.RerankerSettings(
+        provider="openai",
+        api_key=None,
+        model="m",
+        endpoint="https://api",
+        enabled=True,
+        timeout=1.0,
+    )
+    with pytest.raises(reranker.RerankerError):
+        reranker._call_openai_reranker(settings, [], None, None, None)
+
+
+def test_call_openai_reranker_handles_unexpected_response(monkeypatch):
+    _reset_settings()
+    monkeypatch.setenv("RERANK_API_KEY", "fake")
+    settings = reranker._get_settings()
+
+    class DummyResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {}
+
+    class DummyClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        def post(self, *args, **kwargs):
+            return DummyResponse()
+
+    monkeypatch.setattr(reranker.httpx, "Client", DummyClient)
+
+    with pytest.raises(reranker.RerankerError):
+        reranker._call_openai_reranker(settings, [], None, None, None)
     _reset_settings()
 
 
@@ -269,6 +352,66 @@ def test_call_gemini_reranker_sanitizes_error(monkeypatch, capfd):
     _reset_settings()
 
 
+def test_call_gemini_reranker_requires_api_key():
+    settings = reranker.RerankerSettings(
+        provider="gemini",
+        api_key=None,
+        model="m",
+        endpoint="https://api",
+        enabled=True,
+        timeout=1.0,
+    )
+    with pytest.raises(reranker.RerankerError):
+        reranker._call_gemini_reranker(settings, [], None, None, None)
+
+
+def test_call_gemini_reranker_returns_empty_when_no_text(monkeypatch):
+    _reset_settings()
+    monkeypatch.setenv("RERANK_API_KEY", "gem")
+    monkeypatch.setenv("RERANK_PROVIDER", "gemini")
+    settings = reranker._get_settings()
+
+    class DummyResponse:
+        status_code = 200
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"candidates": [{"content": {"parts": [{"text": ""}]}}]}
+
+    class DummyClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        def post(self, *args, **kwargs):
+            return DummyResponse()
+
+    monkeypatch.setattr(reranker.httpx, "Client", DummyClient)
+    assert reranker._call_gemini_reranker(settings, [], None, None, None) == []
+    _reset_settings()
+
+
+def test_diversify_with_mmr_balances_similarity():
+    items = [
+        {"id": 1, "original_rank": 0, "vector": [1.0, 0.0]},
+        {"id": 2, "original_rank": 1, "vector": [0.9, 0.1]},
+        {"id": 3, "original_rank": 2, "vector": [0.0, 1.0]},
+    ]
+
+    diversified = reranker.diversify_with_mmr(items, lambda_param=0.6, limit=3)
+    assert len(diversified) == 3
+    assert any(item["id"] == 3 for item in diversified)
+    sim = reranker.cosine_similarity(items[0]["vector"], items[1]["vector"])
+    assert 0.85 <= sim <= 1.0
+
+
 def test_default_explanation_uses_intent_filters():
     _reset_settings()
     filters = IntentFilters(
@@ -314,6 +457,104 @@ def test_default_explanation_falls_back_to_query():
     result = reranker.rerank_with_explanations(items, intent=None, query="mystery vibe")
     assert "mystery vibe" in result[0]["explanation"]
     _reset_settings()
+
+
+def test_call_reranker_evaluates_examples(monkeypatch, caplog):
+    _reset_settings()
+    settings = reranker.RerankerSettings(
+        provider="openai",
+        api_key="fake",
+        model="m",
+        endpoint="https://api",
+        enabled=True,
+        timeout=1.0,
+    )
+    example = reranker._get_prompt_config()["examples"][0]
+    decisions = [
+        reranker.LLMDecision(item_id=2, score=0.95, explanation="Match"),
+        reranker.LLMDecision(item_id=1, score=0.85, explanation="Runner"),
+    ]
+    monkeypatch.setattr(
+        reranker,
+        "_call_openai_reranker",
+        lambda s, items, intent, query, user: decisions,
+    )
+
+    caplog.set_level(logging.DEBUG, logger=reranker.logger.name)
+    result = reranker._call_reranker(
+        settings,
+        example["input"]["items"],
+        example["input"]["intent"],
+        example["input"]["query"],
+        user={"user_id": "u1"},
+    )
+    assert result == decisions
+    caplog.set_level(logging.INFO, logger=reranker.logger.name)
+    _reset_settings()
+
+
+def test_parse_decisions_json_skips_invalid_entries():
+    payload = {
+        "items": [
+            {"id": "bad", "score": "oops"},
+            {"id": 2, "score": "0.8", "explanation": 123},
+        ]
+    }
+    decisions = reranker._parse_decisions_json(payload)
+    assert len(decisions) == 1
+    assert decisions[0].item_id == 2
+    assert decisions[0].score == 0.8
+    assert decisions[0].explanation == "123"
+
+
+def test_build_prompt_text_includes_filters():
+    filters = IntentFilters(
+        raw_query="mystery",
+        genres=["Mystery"],
+        moods=[],
+        media_types=["movie"],
+        min_runtime=80,
+        max_runtime=120,
+    )
+    items = [
+        {
+            "id": 1,
+            "title": "Mystery Night",
+            "media_type": "movie",
+            "release_year": 2020,
+            "runtime": 90,
+            "genres": [{"name": "Mystery"}],
+            "overview": "A thrilling tale.",
+            "original_rank": 0,
+        }
+    ]
+    prompt = reranker._build_prompt_text(
+        items, filters, "mystery movie", {"user_id": "u1"}
+    )
+    assert "Preferred genres" in prompt
+    assert "Original query" in prompt
+    assert "User id: u1" in prompt
+
+
+def test_default_explanation_covers_runtime_branch():
+    filters = IntentFilters(
+        raw_query="long drama",
+        genres=["Drama"],
+        moods=[],
+        media_types=["movie"],
+        min_runtime=100,
+        max_runtime=200,
+    )
+    item = {
+        "id": 1,
+        "media_type": "movie",
+        "runtime": 150,
+        "genres": [{"name": "Drama"}],
+        "overview": "An emotional journey.",
+    }
+    explanation = reranker._default_explanation(item, filters, "long drama", ["Drama"])
+    assert "Drama" in explanation
+    assert "150" in explanation
 
 
 def test_rerank_with_explanations_uses_llm_decisions(monkeypatch):

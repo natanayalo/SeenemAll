@@ -3,6 +3,24 @@ from __future__ import annotations
 import asyncio
 
 from etl import justwatch_sync as mod
+from etl.justwatch_client import flatten_offers
+
+
+class _StubSession:
+    def __init__(self, rows):
+        self._rows = rows
+        self.last_statement = None
+
+    class _Result:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def all(self):
+            return list(self._rows)
+
+    def execute(self, stmt):
+        self.last_statement = stmt
+        return self._Result(self._rows)
 
 
 def test_normalise_offer_extracts_expected_fields():
@@ -46,6 +64,90 @@ def test_prepare_offers_deduplicates_on_service_type_web():
     assert prepared[0]["service"] == "disney"
     assert prepared[1]["service"] == "7"
     assert prepared[1]["offer_type"] == "RENT"
+
+
+def test_prepare_offers_from_graphql_payload():
+    gql_offers = [
+        {
+            "monetizationType": "FLATRATE",
+            "standardWebURL": "https://watch.example",
+            "preAffiliatedStandardWebURL": "app://watch",
+            "package": {"shortName": "hbo", "packageId": 9},
+        }
+    ]
+    flattened = flatten_offers(gql_offers)
+    prepared = mod._prepare_offers(flattened)
+    assert prepared[0]["service"] == "hbo"
+    assert prepared[0]["deeplink"] == "app://watch"
+
+
+def test_fetch_catalog_items_filters_missing_titles():
+    rows = [
+        (1, 101, "movie", "Title", 2020),
+        (2, 202, "tv", None, 2021),
+    ]
+    session = _StubSession(rows)
+    items = mod._fetch_catalog_items(session, limit=None)
+    assert len(items) == 1
+    assert items[0].title == "Title"
+
+
+def test_fetch_catalog_items_respects_limit():
+    rows = [
+        (1, 101, "movie", "One", 2020),
+        (2, 202, "tv", "Two", 2021),
+    ]
+    session = _StubSession(rows)
+    mod._fetch_catalog_items(session, limit=1)
+    assert session.last_statement._limit_clause is not None
+
+
+def test_fetch_chunk_returns_matches(monkeypatch):
+    rows = [mod.ItemRow(1, 10, "movie", "A", 2020)]
+
+    class DummyClient:
+        async def resolve_offers_for_item(self, **kwargs):
+            return (
+                {"id": "tm-a"},
+                [
+                    {
+                        "monetizationType": "FLATRATE",
+                        "standardWebURL": "https://watch.example",
+                        "package": {"shortName": "nfx"},
+                    }
+                ],
+            )
+
+    client = DummyClient()
+    results = asyncio.run(mod._fetch_chunk(client, rows))
+    assert isinstance(results, list)
+    assert results[0]["match"]["id"] == "tm-a"
+
+
+def test_pick_deeplink_considers_multiple_keys():
+    urls = {
+        "deeplink_android": "app://android",
+        "deeplink": "app://generic",
+        "alternate_web": "https://alt.example",
+    }
+    assert mod._pick_deeplink(urls) == "app://android"
+
+
+def test_normalise_offer_passthrough_fields():
+    raw = {
+        "service": "nfx",
+        "offer_type": "FLATRATE",
+        "deeplink": "app://play",
+        "web_url": "https://netflix.example",
+    }
+    normalised = mod._normalise_offer(raw)
+    assert normalised["deeplink"] == "app://play"
+    assert normalised["web_url"] == "https://netflix.example"
+
+
+def test_normalise_offer_returns_none_on_missing_provider():
+    raw = {"monetization_type": "flatrate", "urls": {}}
+    assert mod._normalise_offer(raw) is None
 
 
 def test_replace_availability_deletes_and_inserts():

@@ -37,6 +37,8 @@ MODELS = [
     # Add more models as they become available
 ]
 
+SUPPORTED_MODEL_IDS = {cfg.model_id for cfg in MODELS}
+
 
 def load_test_pairs() -> List[Tuple[int, int, float]]:
     """Load manually curated test pairs with similarity scores."""
@@ -86,8 +88,21 @@ def evaluate_model(
     test_pairs: List[Tuple[int, int, float]],
 ) -> Dict[str, float | str]:
     """Evaluate a model's performance on test pairs."""
+    if not items or not test_pairs:
+        raise Exception("Cannot evaluate model without test items and pairs")
+
+    # Basic validation to avoid attempting to download arbitrary models during tests.
+    model_id = model_config.model_id.strip()
+    if not model_id:
+        raise ValueError("Model id cannot be empty")
+    if model_id not in SUPPORTED_MODEL_IDS and not Path(model_id).exists():
+        raise ValueError(f"Unsupported model id '{model_id}'")
+
     # Load model
-    model = SentenceTransformer(model_config.model_id)
+    try:
+        model = SentenceTransformer(model_id)
+    except Exception as e:
+        raise Exception(f"Failed to load model {model_id}: {e}")
 
     # Format items using template
     texts = []

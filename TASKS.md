@@ -34,9 +34,9 @@
 | **17** | Add genres to embedding text | ✅ | Genre list prepended to title+overview |
 | **18** | Test embedding templates | ✅ | Implemented configurable templates with tests |
 | **19** | Evaluate domain models | ✅ | E5-small-v2 recommended, MovieCLIP evaluated |
-| **20** | Add temporal context | ⏳ | Include year/decade in embeddings |
-| **21** | A/B test framework | ⏳ | Compare embedding strategies |
-| **22** | Version embeddings | ⏳ | Support migrations between versions |
+| **20** | Add temporal context | ✅ | Era + year/decade folded into embedding templates |
+| **21** | A/B test framework | ✅ | Added offline embed A/B utility + unit coverage |
+| **22** | Version embeddings | ✅ | Vectors keyed by version; pipeline accepts EMBED_VERSION |
 
 ### User Profile Enhancement (Priority: High)
 | # | Task | Status | Notes |

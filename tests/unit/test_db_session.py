@@ -49,6 +49,19 @@ def test_get_engine_lazy_initialises(monkeypatch):
     assert engine == "lazy-engine"
 
 
+def test_get_sessionmaker_lazy_initialises(monkeypatch):
+    monkeypatch.setattr(session_mod, "_SessionLocal", None, raising=False)
+
+    def fake_init():
+        session_mod._SessionLocal = "lazy-session"
+
+    monkeypatch.setattr(session_mod, "init_engine", fake_init)
+
+    factory = session_mod.get_sessionmaker()
+
+    assert factory == "lazy-session"
+
+
 def test_get_db_yields_and_closes(monkeypatch):
     class DummySession:
         def __init__(self):

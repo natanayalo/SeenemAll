@@ -30,7 +30,10 @@ def test_items():
 
 @pytest.fixture
 def test_pairs():
-    return [(1, 2, 0.8)]  # Expect high similarity
+    return [
+        (1, 2, 0.8),  # Similar items
+        (1, 1, 1.0),  # Self-similarity
+    ]  # Expect high similarity for both pairs
 
 
 def test_model_evaluation(test_items, test_pairs):
@@ -46,13 +49,15 @@ def test_model_evaluation(test_items, test_pairs):
 
     assert results["model"] == "test"
     assert results["num_items"] == 2
-    assert 0 <= results["mse"] <= 1
-    assert 0 <= results["mae"] <= 1
-    assert results["encode_time"] > 0
+    assert 0 <= float(results["mse"]) <= 1.0
+    assert 0 <= float(results["mae"]) <= 1.0
+    assert float(results["encode_time"]) > 0
 
 
-def test_invalid_model():
+def test_invalid_model(test_items, test_pairs):
     with pytest.raises(Exception):
         evaluate_model(
-            ModelConfig("invalid", "nonexistent-model", 384, "Invalid"), [], []
+            ModelConfig("invalid", "nonexistent-model", 384, "Invalid"),
+            test_items,
+            test_pairs,
         )

@@ -46,8 +46,15 @@ class _RecommendSession(_HistorySession):
     def execute(self, statement, params=None):
         self.last_statement = statement
         self.last_params = params or {}
-        # Fake a join between Item and ItemEmbedding
-        rows = [(item, [0.1] * 384) for item in self._items]
+        # Simulate the complex join query result
+        rows = [
+            (
+                item,
+                np.array([0.1] * 384),
+                [{"service": "netflix", "url": f"http://test/{item.id}"}],
+            )
+            for item in self._items
+        ]
         return FakeResult(rows)
 
 

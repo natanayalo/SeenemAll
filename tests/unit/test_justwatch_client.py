@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import pytest
+import httpx
 from typing import Any, Dict, List
 
 from etl.justwatch_client import (
@@ -123,3 +125,121 @@ def test_choose_best_match_handles_missing_year():
     ]
     match = _choose_best_match("Example Show", "tv", None, candidates)
     assert match["id"] == "a"
+
+
+def test_graphql_raises_on_error(monkeypatch):
+    client = JustWatchClient(country="US")
+
+    class DummyResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"errors": [{"message": "boom"}]}
+
+    async def fake_post(url, json):
+        return DummyResponse()
+
+    monkeypatch.setattr(client._client, "post", fake_post)
+
+    async def scenario():
+        try:
+            await client._graphql("query {}", {})
+        finally:
+            await client.aclose()
+
+    with pytest.raises(Exception):
+        asyncio.run(scenario())
+
+
+def test_graphql_returns_payload(monkeypatch):
+    client = JustWatchClient(country="US")
+
+    class DummyResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"data": {"ok": True}}
+
+    async def fake_post(url, json):
+        return DummyResponse()
+
+    monkeypatch.setattr(client._client, "post", fake_post)
+
+    async def scenario():
+        try:
+            return await client._graphql("query {}", {})
+        finally:
+            await client.aclose()
+
+    data = asyncio.run(scenario())
+    assert data == {"ok": True}
+
+
+def test_resolve_offers_handles_search_failure(monkeypatch):
+    client = JustWatchClient(country="US")
+
+    async def failing_graphql(query, variables):
+        raise httpx.HTTPError("network down")
+
+    monkeypatch.setattr(client, "_graphql", failing_graphql)
+
+    async def scenario():
+        match, offers = await client.resolve_offers_for_item(
+            title="Missing", media_type="movie", release_year=2024
+        )
+        await client.aclose()
+        return match, offers
+
+    match, offers = asyncio.run(scenario())
+    assert match is None
+    assert offers == []
+
+
+def test_resolve_offers_returns_none_without_match(monkeypatch):
+    client = JustWatchClient(country="US")
+
+    async def fake_search(title, media_type, limit=5):
+        return []
+
+    monkeypatch.setattr(client, "search_candidates", fake_search)
+
+    async def scenario():
+        result = await client.resolve_offers_for_item(
+            title="Ghost", media_type="movie", release_year=2023
+        )
+        await client.aclose()
+        return result
+
+    match, offers = asyncio.run(scenario())
+    assert match is None and offers == []
+
+
+def test_resolve_offers_handles_fetch_failure(monkeypatch):
+    client = JustWatchClient(country="US")
+
+    async def fake_search(title, media_type, limit=5):
+        return [
+            {
+                "id": "tm123",
+                "objectType": "MOVIE",
+                "content": {"title": title, "originalReleaseYear": 2020},
+            }
+        ]
+
+    async def fake_fetch(node_id):
+        raise httpx.HTTPError("fetch failed")
+
+    monkeypatch.setattr(client, "search_candidates", fake_search)
+    monkeypatch.setattr(client, "fetch_offers_by_id", fake_fetch)
+
+    async def scenario():
+        result = await client.resolve_offers_for_item(
+            title="Example", media_type="movie", release_year=2020
+        )
+        await client.aclose()
+        return result
+
+    match, offers = asyncio.run(scenario())
+    assert match is not None and offers == []

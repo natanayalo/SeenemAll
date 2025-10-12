@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import numpy as np
-from fastapi.testclient import TestClient
 from types import SimpleNamespace
+from typing import Any, Sequence
 
+from fastapi.testclient import TestClient
 from tests.helpers import FakeResult
 
 from api.main import app
@@ -42,15 +43,66 @@ def test_recommend_returns_empty_when_no_candidates(monkeypatch):
     assert resp.json() == []
 
 
-class CandidateSession:
-    def __init__(self, rows):
-        self._rows = list(rows)
+class MockRow:
+    """Mock SQL result row with Item, vector, and watch_options."""
 
-    def execute(self, *_args, **_kwargs):
-        return FakeResult(self._rows)
+    def __init__(self, ns):
+        self.id = ns.id
+        self.ns = ns
+        vector = np.ones(384, dtype="float32")
+        self._data = (ns, vector, [])  # Using tuple for immutability
+
+    def __iter__(self):
+        """Make this row behave like a SQLAlchemy Row when unpacked."""
+        return iter(self._data)
+
+    def __getattr__(self, name):
+        """Delegate unknown attributes to the namespace object."""
+        return getattr(self.ns, name)
+
+    def __getitem__(self, key):
+        """Support both index and attribute access."""
+        if isinstance(key, int):
+            return self._data[key]
+        return getattr(self, key)
+
+
+class CandidateSession:
+    """Mock session that returns predefined rows for recommend route testing."""
+
+    def __init__(self, rows: Sequence[Any]):
+        self._rows = [MockRow(row) for row in rows]
+        self._closed = False
+
+    def execute(self, statement, *args, **kwargs):
+        if self._closed:
+            raise RuntimeError("Session is closed")
+        # Handle different statement types
+        if hasattr(statement, "where"):
+            # This is a select statement, return all rows
+            return FakeResult(self._rows)
+        return FakeResult([])
+
+    def close(self):
+        self._closed = True
+
+    def commit(self):
+        if self._closed:
+            raise RuntimeError("Session is closed")
+
+    def rollback(self):
+        if self._closed:
+            raise RuntimeError("Session is closed")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
 
 def test_recommend_includes_reranker_output(monkeypatch):
+    # Test data setup
     items = [
         SimpleNamespace(
             id=1,
@@ -78,11 +130,14 @@ def test_recommend_includes_reranker_output(monkeypatch):
         ),
     ]
 
+    # Create session and ensure proper cleanup
     session = CandidateSession(items)
 
     def override_get_db():
-        yield session
+        yield session  # Use yield to ensure FastAPI handles session lifecycle
 
+    # Clear any existing overrides
+    app.dependency_overrides.clear()
     app.dependency_overrides[get_db] = override_get_db
 
     monkeypatch.setattr(
@@ -107,12 +162,16 @@ def test_recommend_includes_reranker_output(monkeypatch):
 
     monkeypatch.setattr(recommend_routes, "rerank_with_explanations", fake_rerank)
 
-    try:
-        with TestClient(app) as client:
-            resp = client.get("/recommend", params={"user_id": "u1", "limit": 2})
-    finally:
-        app.dependency_overrides.clear()
+    # Create client and make request
+    client = TestClient(app)
+    resp = client.get("/recommend", params={"user_id": "u1", "limit": 2})
 
+    # Clean up resources immediately after use
+    client.close()
+    session.close()
+    app.dependency_overrides.clear()
+
+    # Now check the response
     assert resp.status_code == 200
     payload = resp.json()
     assert [item["id"] for item in payload] == [2, 1]
