@@ -41,12 +41,12 @@
 ### User Profile Enhancement (Priority: High)
 | # | Task | Status | Notes |
 |---|------|---------|-------|
-| **23** | Improve rating weights | ⏳ | Better weight for explicit feedback |
-| **24** | Genre preferences | ⏳ | Add separate genre vector |
-| **25** | Collaborative signals | ⏳ | Add similar users' signals |
-| **26** | Configurable recency | ⏳ | Make time decay configurable |
-| **27** | Negative feedback | ⏳ | Track and use "not interested" |
-| **28** | Multi-profile support | ⏳ | Allow profile switching |
+| **23** | Improve rating weights | ✅ | Event-type multipliers (watch/like/rate) applied |
+| **24** | Genre preferences | ✅ | Time-decayed genre vector stored in `users.genre_prefs` |
+| **25** | Collaborative signals | ✅ | Blend neighbor vectors from overlapping histories |
+| **26** | Configurable recency | ✅ | Half-life via USER_PROFILE_DECAY_HALF_LIFE env |
+| **27** | Negative feedback | ✅ | "not interested" events excluded & flagged for recs |
+| **28** | Multi-profile support | ✅ | Profiles append via user_id::profile, API supports switching |
 
 ### Retrieval & Ranking (Priority: Medium)
 | # | Task | Status | Notes |

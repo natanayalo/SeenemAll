@@ -114,11 +114,46 @@ def test_post_history_adds_events_and_upserts_profile(monkeypatch):
     app.dependency_overrides.clear()
 
     assert resp.status_code == 200
-    assert resp.json() == {"ok": True}
+    assert resp.json()["ok"] is True
     assert len(session.added) == 2
     assert {h.item_id for h in session.added} == {1, 2}
     assert session.commits == 2
     assert called["user_id"] == "u1"
+
+
+def test_post_history_with_profile_scopes_user(monkeypatch):
+    session = _HistorySession()
+
+    def override_get_db() -> Iterator[_HistorySession]:
+        yield session
+
+    called = {}
+
+    def fake_upsert(db, user_id):
+        called.setdefault("user_ids", []).append(user_id)
+
+    app.dependency_overrides[get_db] = override_get_db
+    monkeypatch.setattr(user_routes, "upsert_user_vectors", fake_upsert)
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/user/history",
+            json={
+                "user_id": "u1",
+                "profile": "kids",
+                "items": [3],
+                "event_type": "not_interested",
+            },
+        )
+
+    app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["ok"] is True
+    assert payload["profile"] == "kids"
+    assert session.added[0].user_id == "u1::kids"
+    assert called["user_ids"] == ["u1::kids"]
 
 
 def test_recommend_endpoint_returns_ranked_items(monkeypatch):
@@ -133,7 +168,13 @@ def test_recommend_endpoint_returns_ranked_items(monkeypatch):
     app.dependency_overrides[get_db] = override_get_db
 
     def fake_load_user_state(db, user_id):
-        return np.array([0.1, 0.2]), np.array([0.3, 0.7], dtype="float32"), [999]
+        assert user_id == "u1"
+        return (
+            np.array([0.1, 0.2]),
+            np.array([0.3, 0.7], dtype="float32"),
+            [999],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        )
 
     def fake_ann_candidates(db, vec, exclude, limit):
         assert np.allclose(vec, np.array([0.3, 0.7], dtype="float32"))
@@ -166,7 +207,13 @@ def test_recommend_endpoint_requires_user_vector(monkeypatch):
     app.dependency_overrides[get_db] = override_get_db
 
     def fake_load_user_state(db, user_id):
-        return None, None, []
+        assert user_id == "missing"
+        return (
+            None,
+            None,
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        )
 
     monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_user_state)
 
@@ -191,7 +238,13 @@ def test_recommend_endpoint_diversifies_items(monkeypatch):
     app.dependency_overrides[get_db] = override_get_db
 
     def fake_load_user_state(db, user_id):
-        return np.array([0.1, 0.2]), np.array([0.3, 0.7], dtype="float32"), [999]
+        assert user_id == "u1"
+        return (
+            np.array([0.1, 0.2]),
+            np.array([0.3, 0.7], dtype="float32"),
+            [999],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        )
 
     def fake_ann_candidates(db, vec, exclude, limit):
         return [items[1].id, items[0].id]
@@ -223,3 +276,40 @@ def test_recommend_endpoint_diversifies_items(monkeypatch):
 
     app.dependency_overrides.clear()
     assert called.get("diversify") is None
+
+
+def test_recommend_endpoint_honors_profile(monkeypatch):
+    monkeypatch.setenv("RERANK_ENABLED", "0")
+    reranker._get_settings.cache_clear()
+    session = _RecommendSession(_make_items())
+
+    def override_get_db() -> Iterator[_RecommendSession]:
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    captured = {}
+
+    def fake_load_user_state(db, user_id):
+        captured["user_id"] = user_id
+        return (
+            np.array([0.1, 0.2]),
+            np.array([0.3, 0.7], dtype="float32"),
+            [999],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        )
+
+    monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_user_state)
+    monkeypatch.setattr(
+        recommend_routes, "ann_candidates", lambda db, vec, exclude, limit: []
+    )
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend", params={"user_id": "u1", "profile": "kids", "limit": 5}
+        )
+
+    app.dependency_overrides.clear()
+    assert resp.status_code == 200
+    assert resp.json() == []
+    assert captured["user_id"] == "u1::kids"

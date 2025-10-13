@@ -22,15 +22,18 @@ def test_recommend_returns_empty_when_no_candidates(monkeypatch):
         yield DummySession()
 
     app.dependency_overrides[get_db] = override_get_db
-    monkeypatch.setattr(
-        recommend_routes,
-        "load_user_state",
-        lambda db, user_id: (
+    captured = {}
+
+    def fake_load_user_state(db, user_id):
+        captured["user_id"] = user_id
+        return (
             np.array([1.0], dtype="float32"),
             np.array([1.0], dtype="float32"),
             [],
-        ),
-    )
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        )
+
+    monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_user_state)
     monkeypatch.setattr(
         recommend_routes, "ann_candidates", lambda db, vec, exclude, limit: []
     )
@@ -41,6 +44,7 @@ def test_recommend_returns_empty_when_no_candidates(monkeypatch):
     app.dependency_overrides.clear()
     assert resp.status_code == 200
     assert resp.json() == []
+    assert captured["user_id"] == "u1"
 
 
 class MockRow:
@@ -140,15 +144,18 @@ def test_recommend_includes_reranker_output(monkeypatch):
     app.dependency_overrides.clear()
     app.dependency_overrides[get_db] = override_get_db
 
-    monkeypatch.setattr(
-        recommend_routes,
-        "load_user_state",
-        lambda db, user_id: (
+    captured = {}
+
+    def fake_load_state(db, user_id):
+        captured["user_id"] = user_id
+        return (
             np.zeros(384, dtype="float32"),
             np.ones(384, dtype="float32"),
             [],
-        ),
-    )
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        )
+
+    monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_state)
     monkeypatch.setattr(
         recommend_routes, "ann_candidates", lambda db, vec, exclude, limit: [1, 2]
     )
@@ -158,6 +165,9 @@ def test_recommend_includes_reranker_output(monkeypatch):
             {**items_payload[1], "explanation": "Because mysteries are trending."},
             {**items_payload[0], "explanation": "Classic action follow-up."},
         ]
+        assert user["user_id"] == "u1"
+        assert user["profile"] is None
+        assert user["base_user_id"] == "u1"
         return reordered
 
     monkeypatch.setattr(recommend_routes, "rerank_with_explanations", fake_rerank)
@@ -177,3 +187,91 @@ def test_recommend_includes_reranker_output(monkeypatch):
     assert [item["id"] for item in payload] == [2, 1]
     assert payload[0]["explanation"] == "Because mysteries are trending."
     assert "original_rank" not in payload[0]
+    assert captured["user_id"] == "u1"
+
+
+def test_recommend_supports_profile_parameter(monkeypatch):
+    class DummySession:
+        def execute(self, *_, **__):
+            raise AssertionError
+
+    def override_get_db():
+        yield DummySession()
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    captured = {}
+
+    def fake_load_state(db, user_id):
+        captured["user_id"] = user_id
+        return (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        )
+
+    monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_state)
+    monkeypatch.setattr(
+        recommend_routes, "ann_candidates", lambda db, vec, exclude, limit: []
+    )
+
+    with TestClient(app) as client:
+        resp = client.get("/recommend", params={"user_id": "u1", "profile": "kids"})
+
+    app.dependency_overrides.clear()
+    assert resp.status_code == 200
+    assert resp.json() == []
+    assert captured["user_id"] == "u1::kids"
+
+
+def test_recommend_filters_negative_items(monkeypatch):
+    session = CandidateSession(
+        [
+            SimpleNamespace(
+                id=1,
+                tmdb_id=101,
+                media_type="movie",
+                title="Alpha",
+                overview="Alpha saves the world.",
+                poster_url="alpha.jpg",
+                runtime=100,
+                original_language="en",
+                genres=[{"name": "Action"}],
+                release_year=2020,
+            ),
+        ]
+    )
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": [1]},
+        ),
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit: [1],
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+
+    with TestClient(app) as client:
+        resp = client.get("/recommend", params={"user_id": "u1"})
+
+    app.dependency_overrides.clear()
+    assert resp.status_code == 200
+    assert resp.json() == []
