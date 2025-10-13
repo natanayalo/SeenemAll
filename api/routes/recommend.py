@@ -5,7 +5,7 @@ import json
 import os
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, or_, literal
+from sqlalchemy import select, func, or_
 from api.db.session import get_db
 from api.db.models import Item, ItemEmbedding, Availability
 from api.config import COUNTRY_DEFAULT
@@ -261,9 +261,7 @@ def _prefilter_allowed_ids(
         for genre in genres:
             if not genre:
                 continue
-            safe_genre = genre.replace('"', '\\"')
-            path = f'$[*] ? (@.name == "{safe_genre}")'
-            filters.append(func.jsonb_path_exists(Item.genres, literal(path)))
+            filters.append(Item.genres.contains([{"name": genre}]))
         if filters:
             stmt = stmt.where(or_(*filters))
 
