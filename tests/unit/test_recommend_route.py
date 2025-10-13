@@ -4,12 +4,28 @@ import numpy as np
 from types import SimpleNamespace
 from typing import Any, Sequence
 
+import pytest
 from fastapi.testclient import TestClient
 from tests.helpers import FakeResult
 
 from api.main import app
 from api.db.session import get_db
 from api.routes import recommend as recommend_routes
+from api.core import business_rules
+
+
+@pytest.fixture(autouse=True)
+def _reset_prefilter(monkeypatch):
+    monkeypatch.setattr(
+        recommend_routes, "_prefilter_allowed_ids", lambda db, intent, limit: None
+    )
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _clear_business_rules(monkeypatch):
+    monkeypatch.setattr(business_rules, "load_rules", lambda: {})
+    yield
 
 
 class DummySession:
@@ -35,7 +51,9 @@ def test_recommend_returns_empty_when_no_candidates(monkeypatch):
 
     monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_user_state)
     monkeypatch.setattr(
-        recommend_routes, "ann_candidates", lambda db, vec, exclude, limit: []
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [],
     )
 
     with TestClient(app) as client:
@@ -157,7 +175,9 @@ def test_recommend_includes_reranker_output(monkeypatch):
 
     monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_state)
     monkeypatch.setattr(
-        recommend_routes, "ann_candidates", lambda db, vec, exclude, limit: [1, 2]
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2],
     )
 
     def fake_rerank(items_payload, intent, query, user):
@@ -188,6 +208,70 @@ def test_recommend_includes_reranker_output(monkeypatch):
     assert payload[0]["explanation"] == "Because mysteries are trending."
     assert "original_rank" not in payload[0]
     assert captured["user_id"] == "u1"
+
+
+def test_recommend_prefilter_passes_allowed_ids(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Alpha",
+            overview="Alpha saves the world.",
+            poster_url="alpha.jpg",
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Comedy"}],
+            release_year=2020,
+        )
+    ]
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "_prefilter_allowed_ids",
+        lambda db, intent, limit: [101, 202],
+    )
+
+    recorded = {}
+
+    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+        recorded["allowed"] = allowed_ids
+        return [1]
+
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+
+    with TestClient(app) as client:
+        client.get(
+            "/recommend",
+            params={"user_id": "u1", "limit": 1, "query": "comedy movie"},
+        )
+
+    app.dependency_overrides.clear()
+    session.close()
+    assert recorded["allowed"] == [101, 202]
 
 
 def test_recommend_hybrid_boosts_trending_items(monkeypatch):
@@ -257,7 +341,9 @@ def test_recommend_hybrid_boosts_trending_items(monkeypatch):
 
     monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_state)
     monkeypatch.setattr(
-        recommend_routes, "ann_candidates", lambda db, vec, exclude, limit: [1, 2, 3]
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2, 3],
     )
 
     def fake_rerank(items_payload, intent, query, user):
@@ -308,7 +394,9 @@ def test_recommend_supports_profile_parameter(monkeypatch):
 
     monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_state)
     monkeypatch.setattr(
-        recommend_routes, "ann_candidates", lambda db, vec, exclude, limit: []
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [],
     )
 
     with TestClient(app) as client:
@@ -356,7 +444,7 @@ def test_recommend_filters_negative_items(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit: [1],
+        lambda db, vec, exclude, limit, allowed_ids=None: [1],
     )
     monkeypatch.setattr(
         recommend_routes,

@@ -13,12 +13,21 @@ from api.routes import recommend as recommend_routes
 from api.routes import user as user_routes
 from tests.helpers import FakeResult
 from api.core import reranker
+from api.core import business_rules
 
 
 @pytest.fixture(autouse=True)
 def _disable_db_startup(monkeypatch):
     monkeypatch.setattr("api.main.init_engine", lambda: None)
     monkeypatch.setattr("api.main.get_sessionmaker", lambda: None)
+
+
+@pytest.fixture(autouse=True)
+def _disable_prefilters(monkeypatch):
+    monkeypatch.setattr(
+        recommend_routes, "_prefilter_allowed_ids", lambda db, intent, limit: None
+    )
+    monkeypatch.setattr(business_rules, "load_rules", lambda: {})
 
 
 class _HistorySession:
@@ -176,7 +185,7 @@ def test_recommend_endpoint_returns_ranked_items(monkeypatch):
             {"genre_prefs": {}, "neighbors": [], "negative_items": []},
         )
 
-    def fake_ann_candidates(db, vec, exclude, limit):
+    def fake_ann_candidates(db, vec, exclude, limit, allowed_ids=None):
         assert np.allclose(vec, np.array([0.3, 0.7], dtype="float32"))
         return [items[1].id, items[0].id]
 
@@ -246,7 +255,7 @@ def test_recommend_endpoint_diversifies_items(monkeypatch):
             {"genre_prefs": {}, "neighbors": [], "negative_items": []},
         )
 
-    def fake_ann_candidates(db, vec, exclude, limit):
+    def fake_ann_candidates(db, vec, exclude, limit, allowed_ids=None):
         return [items[1].id, items[0].id]
 
     called = {}
@@ -301,7 +310,9 @@ def test_recommend_endpoint_honors_profile(monkeypatch):
 
     monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_user_state)
     monkeypatch.setattr(
-        recommend_routes, "ann_candidates", lambda db, vec, exclude, limit: []
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [],
     )
 
     with TestClient(app) as client:

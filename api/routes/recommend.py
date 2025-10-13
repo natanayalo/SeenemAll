@@ -3,13 +3,13 @@ from typing import Any, Dict, List
 import os
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, literal
 from api.db.session import get_db
 from api.db.models import Item, ItemEmbedding, Availability
 from api.config import COUNTRY_DEFAULT
 from api.core.user_utils import load_user_state, canonical_profile_id
 from api.core.candidate_gen import ann_candidates
-from api.core.intent_parser import parse_intent, item_matches_intent
+from api.core.intent_parser import parse_intent, item_matches_intent, IntentFilters
 from api.core.reranker import rerank_with_explanations, diversify_with_mmr
 from api.core.business_rules import apply_business_rules
 
@@ -57,7 +57,10 @@ def recommend(
     if intent.has_filters():
         candidate_limit = min(500, max(limit, limit * 3))
 
-    ids: List[int] = ann_candidates(db, short_v, exclude, limit=candidate_limit)
+    allowlist = _prefilter_allowed_ids(db, intent, candidate_limit)
+    ids: List[int] = ann_candidates(
+        db, short_v, exclude, limit=candidate_limit, allowed_ids=allowlist
+    )
     negative_items = set(profile_meta.get("negative_items") or [])
     if negative_items:
         ids = [i for i in ids if i not in negative_items]
@@ -215,3 +218,45 @@ def _apply_hybrid_boost(candidates: List[Dict[str, Any]]) -> None:
     )
     for idx, item in enumerate(candidates):
         item["original_rank"] = idx
+
+
+def _prefilter_allowed_ids(
+    db: Session, intent: IntentFilters | None, limit: int
+) -> List[int] | None:
+    if intent is None:
+        return None
+
+    media_types = intent.media_types or []
+    genres = intent.effective_genres()
+
+    if not media_types and not genres:
+        return None
+
+    stmt = select(Item.id)
+
+    if media_types:
+        stmt = stmt.where(Item.media_type.in_(media_types))
+
+    if genres:
+        filters = []
+        for genre in genres:
+            if not genre:
+                continue
+            safe_genre = genre.replace('"', '\\"')
+            path = f'$[*] ? (@.name == "{safe_genre}")'
+            filters.append(func.jsonb_path_exists(Item.genres, literal(path)))
+        if filters:
+            stmt = stmt.where(or_(*filters))
+
+    fetch_limit = max(limit * 5, limit)
+    rows = db.execute(stmt.limit(fetch_limit)).scalars().all()
+    if not rows:
+        return []
+    # Preserve ordering but ensure uniqueness
+    seen: set[int] = set()
+    ordered: List[int] = []
+    for value in rows:
+        if value not in seen:
+            seen.add(value)
+            ordered.append(value)
+    return ordered
