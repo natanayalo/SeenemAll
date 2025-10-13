@@ -137,6 +137,18 @@ curl "http://localhost:8000/recommend?user_id=u1&profile=main&limit=10&cursor=ey
 
 ---
 
+## 🧱 Business Rules & Caching
+
+- Tweak ranking behaviour via `config/business_rules.json` (or point `BUSINESS_RULES_PATH`
+  to an environment-specific file). Filters/boosts reload automatically when the file changes.
+- Recommendation responses are cached in-memory per `(user, profile, query, limit, diversify)`
+  with optional TTL (override via `RECOMMEND_CACHE_TTL_SECONDS`, default 300s). The cache
+  is invalidated after `/user/history` updates so profile changes take effect immediately.
+- `GET /recommend` now returns `{"items": [...], "next_cursor": "..."}`; pass the returned
+  cursor back in `cursor=` to fetch the next page without recomputing the ranking pipeline.
+
+---
+
 ## 🌍 Streaming Availability
 
 - Configure `JUSTWATCH_COUNTRY` (default `IL`) to control the locale for offers.

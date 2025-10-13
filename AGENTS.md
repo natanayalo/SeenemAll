@@ -42,6 +42,7 @@
 
 - Uses pgvector `<->` distance
 - Excludes items the user has already watched
+- Respects intent-driven allowlists before ANN scoring
 - Returns ANN-ranked IDs for recommendation
 
 ---
@@ -71,7 +72,9 @@
 **Implements:** `api/routes/recommend.py`
 
 - Combines user vector + ANN search
+- Applies business-rule boosts/filters + optional MMR diversity
 - Invokes the reranker for final ordering + explanations
+- Serves cursor-based pagination with cached responses
 - Endpoint: `GET /recommend?user_id=u1&limit=10`
 
 ---
