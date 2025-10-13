@@ -51,12 +51,12 @@
 ### Retrieval & Ranking (Priority: Medium)
 | # | Task | Status | Notes |
 |---|------|---------|-------|
-| **29** | Enhanced diversity | ⏳ | Improve MMR implementation |
-| **30** | Hybrid retrieval | ⏳ | Add popularity/trending boost |
-| **31** | Business rules | ⏳ | Config for boosting/filtering |
-| **32** | Genre pre-filtering | ⏳ | Filter before ANN search |
-| **33** | Cursor pagination | ⏳ | Replace offset pagination |
-| **34** | Query cache | ⏳ | Cache frequent combinations |
+| **29** | Enhanced diversity | ✅ | MMR rewritten with normalized vectors + fallbacks |
+| **30** | Hybrid retrieval | ✅ | ANN score blended with popularity/trending boosts |
+| **31** | Business rules | ✅ | JSON-configurable filters/boosts wired into pipeline |
+| **32** | Genre pre-filtering | ✅ | Intent-driven allowlist feeds ANN retrieval |
+| **33** | Cursor pagination | ✅ | Stateless `next_cursor` replaces offset paging |
+| **34** | Query cache | ✅ | In-memory cache with TTL + invalidation on profile updates |
 
 ### Testing & Evaluation (Priority: Medium)
 | # | Task | Status | Notes |

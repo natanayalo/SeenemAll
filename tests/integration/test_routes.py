@@ -13,12 +13,21 @@ from api.routes import recommend as recommend_routes
 from api.routes import user as user_routes
 from tests.helpers import FakeResult
 from api.core import reranker
+from api.core import business_rules
 
 
 @pytest.fixture(autouse=True)
 def _disable_db_startup(monkeypatch):
     monkeypatch.setattr("api.main.init_engine", lambda: None)
     monkeypatch.setattr("api.main.get_sessionmaker", lambda: None)
+
+
+@pytest.fixture(autouse=True)
+def _disable_prefilters(monkeypatch):
+    monkeypatch.setattr(
+        recommend_routes, "_prefilter_allowed_ids", lambda db, intent, limit: None
+    )
+    monkeypatch.setattr(business_rules, "load_rules", lambda: {})
 
 
 class _HistorySession:
@@ -176,7 +185,7 @@ def test_recommend_endpoint_returns_ranked_items(monkeypatch):
             {"genre_prefs": {}, "neighbors": [], "negative_items": []},
         )
 
-    def fake_ann_candidates(db, vec, exclude, limit):
+    def fake_ann_candidates(db, vec, exclude, limit, allowed_ids=None):
         assert np.allclose(vec, np.array([0.3, 0.7], dtype="float32"))
         return [items[1].id, items[0].id]
 
@@ -189,13 +198,14 @@ def test_recommend_endpoint_returns_ranked_items(monkeypatch):
     app.dependency_overrides.clear()
 
     assert resp.status_code == 200
-    data = resp.json()
-    assert [item["id"] for item in data] == [200, 100]
-    assert data[0]["title"] == "Second"
-    assert data[0]["runtime"] == 45
-    assert data[0]["original_language"] == "es"
-    assert data[0]["genres"] == [{"id": 2, "name": "Comedy"}]
-    assert data[0]["release_year"] == 2022
+    body = resp.json()
+    items = body["items"]
+    assert [item["id"] for item in items] == [200, 100]
+    assert items[0]["title"] == "Second"
+    assert items[0]["runtime"] == 45
+    assert items[0]["original_language"] == "es"
+    assert items[0]["genres"] == [{"id": 2, "name": "Comedy"}]
+    assert items[0]["release_year"] == 2022
 
 
 def test_recommend_endpoint_requires_user_vector(monkeypatch):
@@ -246,7 +256,7 @@ def test_recommend_endpoint_diversifies_items(monkeypatch):
             {"genre_prefs": {}, "neighbors": [], "negative_items": []},
         )
 
-    def fake_ann_candidates(db, vec, exclude, limit):
+    def fake_ann_candidates(db, vec, exclude, limit, allowed_ids=None):
         return [items[1].id, items[0].id]
 
     called = {}
@@ -301,7 +311,9 @@ def test_recommend_endpoint_honors_profile(monkeypatch):
 
     monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_user_state)
     monkeypatch.setattr(
-        recommend_routes, "ann_candidates", lambda db, vec, exclude, limit: []
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [],
     )
 
     with TestClient(app) as client:
@@ -311,5 +323,62 @@ def test_recommend_endpoint_honors_profile(monkeypatch):
 
     app.dependency_overrides.clear()
     assert resp.status_code == 200
-    assert resp.json() == []
+    body = resp.json()
+    assert body["items"] == []
     assert captured["user_id"] == "u1::kids"
+
+
+def test_recommend_endpoint_provides_cursors(monkeypatch):
+    monkeypatch.setenv("RERANK_ENABLED", "0")
+    reranker._get_settings.cache_clear()
+    items = _make_items()
+    session = _RecommendSession(items)
+
+    def override_get_db() -> Iterator[_RecommendSession]:
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.array([0.1, 0.2]),
+            np.array([0.3, 0.7], dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [items[0].id, items[1].id],
+    )
+
+    with TestClient(app) as client:
+        first = client.get(
+            "/recommend",
+            params={"user_id": "u1", "limit": 1, "diversify": "false"},
+        )
+        assert first.status_code == 200
+        payload = first.json()
+        assert [item["id"] for item in payload["items"]] == [100]
+        cursor = payload.get("next_cursor")
+        assert cursor
+
+        second = client.get(
+            "/recommend",
+            params={
+                "user_id": "u1",
+                "limit": 1,
+                "diversify": "false",
+                "cursor": cursor,
+            },
+        )
+        assert second.status_code == 200
+        payload2 = second.json()
+        assert [item["id"] for item in payload2["items"]] == [200]
+        assert "next_cursor" not in payload2
+
+    app.dependency_overrides.clear()

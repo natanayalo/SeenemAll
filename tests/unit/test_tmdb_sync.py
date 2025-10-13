@@ -19,6 +19,14 @@ def test_map_item_payload_handles_movie_fields():
             "genres": [{"id": 1, "name": "Action"}],
             "poster_path": "/poster.jpg",
             "release_date": "2024-05-01",
+            "popularity": 123.4,
+            "vote_average": 8.7,
+            "vote_count": 4567,
+            "_list_ranks": {
+                "popular_rank": 2,
+                "trending_rank": 5,
+                "top_rated_rank": 4,
+            },
         }
     )
 
@@ -27,6 +35,12 @@ def test_map_item_payload_handles_movie_fields():
     assert payload["runtime"] == 95
     assert payload["poster_url"].endswith("/poster.jpg")
     assert payload["release_year"] == 2024
+    assert payload["popularity"] == 123.4
+    assert payload["vote_average"] == 8.7
+    assert payload["vote_count"] == 4567
+    assert payload["popular_rank"] == 2
+    assert payload["trending_rank"] == 5
+    assert payload["top_rated_rank"] == 4
 
 
 def test_map_item_payload_falls_back_for_tv_runtime_and_name():

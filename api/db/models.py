@@ -13,6 +13,7 @@ from sqlalchemy import (
     func,
     JSON,
     UniqueConstraint,
+    Float,
 )
 from pgvector.sqlalchemy import Vector
 
@@ -40,6 +41,12 @@ class Item(Base):
     release_year: Mapped[Optional[int]] = mapped_column(
         Integer, nullable=True, index=True
     )
+    popularity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    vote_average: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    vote_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    popular_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    trending_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    top_rated_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -41,3 +41,15 @@ def test_ann_candidates_executes_query_and_returns_ids():
     assert params["exclude"] == [1]
     assert params["lim"] == 5
     assert params["uvec"] == [float(x) for x in vec]
+    assert "allowed" not in params
+
+
+def test_ann_candidates_respects_allowlist():
+    db = DummySession()
+    vec = np.array([0.2, 0.8], dtype="float32")
+
+    result = ann_candidates(db, vec, exclude_ids=[], limit=3, allowed_ids=[42, 7, 9])
+
+    assert result == [42, 7]
+    _, params = db.calls[0]
+    assert params["allowed"] == [42, 7, 9]
