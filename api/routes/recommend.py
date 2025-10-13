@@ -11,6 +11,7 @@ from api.core.user_utils import load_user_state, canonical_profile_id
 from api.core.candidate_gen import ann_candidates
 from api.core.intent_parser import parse_intent, item_matches_intent
 from api.core.reranker import rerank_with_explanations, diversify_with_mmr
+from api.core.business_rules import apply_business_rules
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
 
@@ -144,6 +145,9 @@ def recommend(
         return []
 
     _apply_hybrid_boost(ordered)
+    ordered = apply_business_rules(ordered, intent=intent)
+    if not ordered:
+        return []
 
     if diversify:
         ordered = diversify_with_mmr(ordered, limit=limit)
