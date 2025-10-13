@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 from typing import List, Dict, Any, Optional, cast
+import logging
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from api.db.session import get_engine, get_sessionmaker
@@ -9,6 +10,14 @@ from api.config import TMDB_API_KEY, TMDB_PAGE_LIMIT
 from etl.tmdb_client import TMDBClient
 
 MEDIA_TYPES = ("movie", "tv")
+logger = logging.getLogger(__name__)
+if logger.level == logging.NOTSET:
+    logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    logger.addHandler(_handler)
+    logger.propagate = False
 
 
 def _extract_release_year(data: Dict[str, Any]) -> Optional[int]:
@@ -85,6 +94,7 @@ def map_item_payload(d: Dict[str, Any]) -> Dict[str, Any]:
 async def _fetch_and_upsert(sessionmaker, pages: int):
     client = TMDBClient(TMDB_API_KEY)
     try:
+        logger.info("Starting TMDB sync for %d pages per media type.", pages)
         # Pools to collect IDs then fetch details (for reliable fields)
         candidate_signals: Dict[tuple[str, int], Dict[str, Optional[int]]] = (
             {}
@@ -107,20 +117,26 @@ async def _fetch_and_upsert(sessionmaker, pages: int):
                 info[field] = rank
 
         for media in MEDIA_TYPES:
+            collected = 0
             rank = 0
             async for it in client.iter_list(media, "popular", pages):
                 rank += 1
+                collected += 1
                 record_signal(media, it.get("id"), "popular_rank", rank)
             rank = 0
             async for it in client.iter_list(media, "top_rated", pages // 2):
                 rank += 1
+                collected += 1
                 record_signal(media, it.get("id"), "top_rated_rank", rank)
             rank = 0
             async for it in client.iter_list(media, "trending", pages // 2):
                 rank += 1
+                collected += 1
                 record_signal(media, it.get("id"), "trending_rank", rank)
+            logger.info("Collected %d candidate IDs for %s.", collected, media)
 
         candidate_ids = list(candidate_signals.keys())
+        logger.info("Total unique candidate IDs: %d", len(candidate_ids))
 
         # Fetch details concurrently in batches
         BATCH = 20
@@ -145,6 +161,12 @@ async def _fetch_and_upsert(sessionmaker, pages: int):
             with SessionLocal as db:
                 _upsert_items(db, enriched)
                 db.commit()
+            logger.info(
+                "Processed batch %d/%d.",
+                (i // BATCH) + 1,
+                (len(candidate_ids) + BATCH - 1) // BATCH,
+            )
+        logger.info("TMDB sync completed successfully.")
     finally:
         await client.aclose()
 
