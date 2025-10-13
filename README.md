@@ -16,6 +16,68 @@ Built with **FastAPI**, **Postgres + pgvector**, and **sentence-transformers**.
 
 ---
 
+## 🏗️ High-Level Architecture
+
+```mermaid
+graph TD
+    Client["Client<br/>(Frontend / API Consumer)"]
+    API["FastAPI Service"]
+    Profiles["User Profile Agent<br/>(vectors + neighbors)"]
+    Candidates["Candidate Generator<br/>(pgvector ANN)"]
+    Rules["Business Rules<br/>(JSON config)"]
+    Reranker["LLM Reranker<br/>(OpenAI / Gemini)"]
+    DB[(Postgres + pgvector)]
+    TMDBETL["TMDB Sync<br/>(ETL Agent)"]
+    Embedder["Embedding Worker<br/>(MiniLM)"]
+    JustWatch["JustWatch Sync<br/>(Streaming Agent)"]
+
+    Client --> API
+    API --> Profiles
+    API --> Candidates
+    Profiles --> DB
+    Candidates --> DB
+    API --> Rules
+    API --> Reranker
+    Reranker --> API
+    API --> Client
+
+    TMDBETL --> DB
+    Embedder --> DB
+    JustWatch --> DB
+```
+
+---
+
+## 🔄 Request Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as FastAPI / Recommend Route
+    participant P as User Profile Loader
+    participant G as ANN Candidate Gen
+    participant B as Business Rules
+    participant D as MMR Diversifier
+    participant R as LLM Reranker
+
+    C->>A: GET /recommend (query, limit, profile)
+    A->>P: load_user_state(user_id::profile)
+    P-->>A: short_vec, long_vec, exclusions, metadata
+    A->>A: parse_intent(query)
+    A->>G: ann_candidates(short_vec, exclusions, allowlist)
+    G->>A: ranked candidate ids
+    A->>A: hydrate metadata + vectors
+    A->>B: apply filters & boosts
+    B-->>A: scored candidate list
+    A->>D: diversify_with_mmr(list, limit)
+    D-->>A: diversified list
+    A->>R: rerank_with_explanations(items, intent, user context)
+    R-->>A: ordered items + rationales
+    A-->>C: JSON response (top N)
+```
+
+---
+
 ## 🚀 Quick Start
 
 ```bash
@@ -57,6 +119,10 @@ curl -X POST http://localhost:8000/user/history \
 
 # 10. Get recommendations (profile-aware)
 curl "http://localhost:8000/recommend?user_id=u1&profile=main&limit=10"
+
+# 11. Continue with cursor pagination (optional)
+# Response payload includes {"items": [...], "next_cursor": "..."}
+curl "http://localhost:8000/recommend?user_id=u1&profile=main&limit=10&cursor=eyJyYW5rIjoxMH0"
 ````
 
 ---

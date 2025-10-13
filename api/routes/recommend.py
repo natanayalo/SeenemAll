@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict, List
+import base64
+import json
 import os
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -41,6 +43,10 @@ def recommend(
         None,
         description="Optional natural-language intent (e.g. 'light sci-fi < 2h')",
     ),
+    cursor: str | None = Query(
+        None,
+        description="Opaque cursor returned by a previous request for pagination.",
+    ),
     diversify: bool = Query(True, description="Whether to diversify recommendations."),
     profile: str | None = Query(None, description="Optional profile identifier"),
     db: Session = Depends(get_db),
@@ -53,9 +59,9 @@ def recommend(
         )
 
     intent = parse_intent(query)
-    candidate_limit = limit
+    candidate_limit = min(500, max(limit, limit * 3))
     if intent.has_filters():
-        candidate_limit = min(500, max(limit, limit * 3))
+        candidate_limit = min(500, max(candidate_limit, limit * 5))
 
     allowlist = _prefilter_allowed_ids(db, intent, candidate_limit)
     ids: List[int] = ann_candidates(
@@ -65,7 +71,7 @@ def recommend(
     if negative_items:
         ids = [i for i in ids if i not in negative_items]
     if not ids:
-        return []
+        return _empty_response()
 
     # fetch metadata and streaming links, preserve ANN order
     items_with_data = {
@@ -145,12 +151,12 @@ def recommend(
             break
 
     if not ordered:
-        return []
+        return _empty_response()
 
     _apply_hybrid_boost(ordered)
     ordered = apply_business_rules(ordered, intent=intent)
     if not ordered:
-        return []
+        return _empty_response()
 
     if diversify:
         ordered = diversify_with_mmr(ordered, limit=limit)
@@ -169,15 +175,28 @@ def recommend(
         },
     )
 
-    response = []
-    for entry in reranked[:limit]:
+    start_index = _decode_cursor(cursor)
+    if start_index < 0:
+        raise HTTPException(status_code=400, detail="Invalid cursor")
+
+    page = reranked[start_index : start_index + limit]
+    response: List[Dict[str, Any]] = []
+    for entry in page:
         cleaned = dict(entry)
         cleaned.pop("original_rank", None)
         cleaned.pop("vector", None)
         cleaned.pop("ann_rank", None)
         cleaned.pop("retrieval_score", None)
         response.append(cleaned)
-    return response
+
+    next_cursor = None
+    if start_index + limit < len(reranked):
+        next_cursor = _encode_cursor(start_index + limit)
+
+    payload: Dict[str, Any] = {"items": response}
+    if next_cursor:
+        payload["next_cursor"] = next_cursor
+    return payload
 
 
 def _apply_hybrid_boost(candidates: List[Dict[str, Any]]) -> None:
@@ -260,3 +279,27 @@ def _prefilter_allowed_ids(
             seen.add(value)
             ordered.append(value)
     return ordered
+
+
+def _encode_cursor(rank: int) -> str:
+    payload = json.dumps({"rank": rank}).encode("utf-8")
+    return base64.urlsafe_b64encode(payload).decode("utf-8").rstrip("=")
+
+
+def _decode_cursor(cursor: str | None) -> int:
+    if not cursor:
+        return 0
+    padding = "=" * (-len(cursor) % 4)
+    try:
+        decoded = base64.urlsafe_b64decode(cursor + padding)
+        payload = json.loads(decoded.decode("utf-8"))
+        rank = int(payload["rank"])
+        if rank < 0:
+            raise ValueError
+        return rank
+    except Exception as exc:  # pragma: no cover - defensive guard
+        raise HTTPException(status_code=400, detail="Invalid cursor") from exc
+
+
+def _empty_response() -> Dict[str, Any]:
+    return {"items": []}

@@ -61,7 +61,9 @@ def test_recommend_returns_empty_when_no_candidates(monkeypatch):
 
     app.dependency_overrides.clear()
     assert resp.status_code == 200
-    assert resp.json() == []
+    body = resp.json()
+    assert body["items"] == []
+    assert "next_cursor" not in body
     assert captured["user_id"] == "u1"
 
 
@@ -203,11 +205,96 @@ def test_recommend_includes_reranker_output(monkeypatch):
 
     # Now check the response
     assert resp.status_code == 200
-    payload = resp.json()
+    body = resp.json()
+    payload = body["items"]
     assert [item["id"] for item in payload] == [2, 1]
     assert payload[0]["explanation"] == "Because mysteries are trending."
     assert "original_rank" not in payload[0]
     assert captured["user_id"] == "u1"
+
+
+def test_recommend_paginates_with_cursor(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Alpha",
+            overview="Alpha saves the world.",
+            poster_url="alpha.jpg",
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Drama"}],
+            release_year=2020,
+        ),
+        SimpleNamespace(
+            id=2,
+            tmdb_id=202,
+            media_type="movie",
+            title="Beta",
+            overview="Beta uncovers a mystery.",
+            poster_url="beta.jpg",
+            runtime=90,
+            original_language="en",
+            genres=[{"name": "Drama"}],
+            release_year=2021,
+        ),
+    ]
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2],
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+
+    with TestClient(app) as client:
+        first = client.get(
+            "/recommend",
+            params={"user_id": "u1", "limit": 1, "diversify": "false"},
+        )
+        body = first.json()
+        assert [item["id"] for item in body["items"]] == [1]
+        cursor = body.get("next_cursor")
+        assert cursor
+
+        second = client.get(
+            "/recommend",
+            params={
+                "user_id": "u1",
+                "limit": 1,
+                "diversify": "false",
+                "cursor": cursor,
+            },
+        )
+        body2 = second.json()
+        assert [item["id"] for item in body2["items"]] == [2]
+        assert "next_cursor" not in body2
+
+    app.dependency_overrides.clear()
 
 
 def test_recommend_prefilter_passes_allowed_ids(monkeypatch):
@@ -365,7 +452,8 @@ def test_recommend_hybrid_boosts_trending_items(monkeypatch):
     app.dependency_overrides.clear()
 
     assert resp.status_code == 200
-    payload = resp.json()
+    body = resp.json()
+    payload = body["items"]
     assert [item["id"] for item in payload] == [1, 3, 2]
     assert all("ann_rank" not in item for item in payload)
     assert payload[1]["trending_rank"] == 1
@@ -404,7 +492,8 @@ def test_recommend_supports_profile_parameter(monkeypatch):
 
     app.dependency_overrides.clear()
     assert resp.status_code == 200
-    assert resp.json() == []
+    body = resp.json()
+    assert body["items"] == []
     assert captured["user_id"] == "u1::kids"
 
 
@@ -457,4 +546,5 @@ def test_recommend_filters_negative_items(monkeypatch):
 
     app.dependency_overrides.clear()
     assert resp.status_code == 200
-    assert resp.json() == []
+    body = resp.json()
+    assert body["items"] == []
