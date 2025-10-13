@@ -190,6 +190,101 @@ def test_recommend_includes_reranker_output(monkeypatch):
     assert captured["user_id"] == "u1"
 
 
+def test_recommend_hybrid_boosts_trending_items(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Alpha",
+            overview="Alpha saves the world.",
+            poster_url="alpha.jpg",
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Action"}],
+            release_year=2020,
+            popularity=10.0,
+            trending_rank=5,
+            popular_rank=3,
+        ),
+        SimpleNamespace(
+            id=2,
+            tmdb_id=202,
+            media_type="movie",
+            title="Beta",
+            overview="Beta uncovers a mystery.",
+            poster_url="beta.jpg",
+            runtime=90,
+            original_language="en",
+            genres=[{"name": "Mystery"}],
+            release_year=2022,
+            popularity=30.0,
+            trending_rank=None,
+            popular_rank=2,
+        ),
+        SimpleNamespace(
+            id=3,
+            tmdb_id=303,
+            media_type="movie",
+            title="Gamma",
+            overview="Gamma is the sleeper hit.",
+            poster_url="gamma.jpg",
+            runtime=110,
+            original_language="en",
+            genres=[{"name": "Drama"}],
+            release_year=2023,
+            popularity=5.0,
+            trending_rank=1,
+            popular_rank=4,
+        ),
+    ]
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides.clear()
+    app.dependency_overrides[get_db] = override_get_db
+
+    def fake_load_state(db, user_id):
+        return (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        )
+
+    monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_state)
+    monkeypatch.setattr(
+        recommend_routes, "ann_candidates", lambda db, vec, exclude, limit: [1, 2, 3]
+    )
+
+    def fake_rerank(items_payload, intent, query, user):
+        reranked = []
+        for item in items_payload:
+            copy = dict(item)
+            copy.setdefault("explanation", f"Hybrid base item {item['id']}.")
+            reranked.append(copy)
+        return reranked
+
+    monkeypatch.setattr(recommend_routes, "rerank_with_explanations", fake_rerank)
+
+    client = TestClient(app)
+    resp = client.get(
+        "/recommend", params={"user_id": "u1", "limit": 3, "diversify": "false"}
+    )
+    client.close()
+    session.close()
+    app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert [item["id"] for item in payload] == [1, 3, 2]
+    assert all("ann_rank" not in item for item in payload)
+    assert payload[1]["trending_rank"] == 1
+
+
 def test_recommend_supports_profile_parameter(monkeypatch):
     class DummySession:
         def execute(self, *_, **__):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Any, Dict, List
+import os
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
@@ -12,6 +13,23 @@ from api.core.intent_parser import parse_intent, item_matches_intent
 from api.core.reranker import rerank_with_explanations, diversify_with_mmr
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
+
+
+def _float_from_env(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    return value
+
+
+_HYBRID_ANN_WEIGHT = _float_from_env("HYBRID_ANN_WEIGHT", 0.5)
+_HYBRID_POPULARITY_WEIGHT = _float_from_env("HYBRID_POPULARITY_WEIGHT", 0.25)
+_HYBRID_TRENDING_WEIGHT = _float_from_env("HYBRID_TRENDING_WEIGHT", 0.4)
+_HYBRID_MIN_ANN_WEIGHT = 0.05
 
 
 @router.get("")
@@ -108,7 +126,15 @@ def recommend(
                     cleaned_options[0]["url"] if cleaned_options else None
                 ),  # For backward compatibility
                 "original_rank": len(ordered),
+                "ann_rank": len(ordered),
                 "vector": vec,
+                "popularity": getattr(it, "popularity", None),
+                "vote_average": getattr(it, "vote_average", None),
+                "vote_count": getattr(it, "vote_count", None),
+                "popular_rank": getattr(it, "popular_rank", None),
+                "trending_rank": getattr(it, "trending_rank", None),
+                "top_rated_rank": getattr(it, "top_rated_rank", None),
+                "retrieval_score": None,
             }
         )
         if len(ordered) >= max_candidates:
@@ -116,6 +142,8 @@ def recommend(
 
     if not ordered:
         return []
+
+    _apply_hybrid_boost(ordered)
 
     if diversify:
         ordered = diversify_with_mmr(ordered, limit=limit)
@@ -139,5 +167,47 @@ def recommend(
         cleaned = dict(entry)
         cleaned.pop("original_rank", None)
         cleaned.pop("vector", None)
+        cleaned.pop("ann_rank", None)
+        cleaned.pop("retrieval_score", None)
         response.append(cleaned)
     return response
+
+
+def _apply_hybrid_boost(candidates: List[Dict[str, Any]]) -> None:
+    if not candidates:
+        return
+
+    ann_weight = max(_HYBRID_MIN_ANN_WEIGHT, _HYBRID_ANN_WEIGHT)
+    popularity_weight = max(0.0, _HYBRID_POPULARITY_WEIGHT)
+    trending_weight = max(0.0, _HYBRID_TRENDING_WEIGHT)
+
+    max_popularity = max(float(item.get("popularity") or 0.0) for item in candidates)
+
+    for item in candidates:
+        ann_rank = float(item.get("ann_rank", item.get("original_rank", 0)))
+        ann_score = 1.0 / (1.0 + ann_rank)
+
+        pop_score = 0.0
+        if max_popularity > 0:
+            pop_score = float(item.get("popularity") or 0.0) / max_popularity
+
+        trending_rank = item.get("trending_rank")
+        trending_score = 0.0
+        if trending_rank and trending_rank > 0:
+            trending_score = 1.0 / float(trending_rank)
+
+        retrieval_score = (
+            ann_weight * ann_score
+            + popularity_weight * pop_score
+            + trending_weight * trending_score
+        )
+        item["retrieval_score"] = retrieval_score
+
+    candidates.sort(
+        key=lambda item: (
+            -(item.get("retrieval_score") or 0.0),
+            item.get("ann_rank", item.get("original_rank", 0)),
+        )
+    )
+    for idx, item in enumerate(candidates):
+        item["original_rank"] = idx
