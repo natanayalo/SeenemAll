@@ -110,39 +110,120 @@ def diversify_with_mmr(
         return []
 
     limit = limit or len(items)
-    unranked = list(items)
+    limit = max(1, min(limit, len(items)))
+
+    lambda_param = float(lambda_param)
+    if lambda_param < 0.0 or lambda_param > 1.0:
+        lambda_param = min(1.0, max(0.0, lambda_param))
+
+    prepared: List[Dict[str, Any]] = []
+    for idx, item in enumerate(items):
+        normalized = _normalized_vector(item.get("vector"))
+        if normalized is None:
+            continue
+        original_rank = int(item.get("original_rank", idx))
+        relevance = 1.0 / (1.0 + float(original_rank))
+        prepared.append(
+            {
+                "item": item,
+                "vector": normalized,
+                "original_rank": original_rank,
+                "relevance": relevance,
+            }
+        )
+
     ranked: List[Dict[str, Any]] = []
+    ranked_vectors: List[np.ndarray] = []
 
-    if unranked:
-        ranked.append(unranked.pop(0))
+    first_item = items[0]
+    ranked.append(first_item)
+    first_vector = _normalized_vector(first_item.get("vector"))
+    if first_vector is not None:
+        ranked_vectors.append(first_vector)
 
-    while unranked and len(ranked) < limit:
-        max_mmr = -np.inf
-        best_item = None
+    if len(ranked) >= limit:
+        return ranked[:limit]
 
-        for item in unranked:
-            relevance = 1 / (item["original_rank"] + 1)  # Use rank as relevance score
-            similarity_to_ranked = max(
-                [
-                    cosine_similarity(item["vector"], r_item["vector"])
-                    for r_item in ranked
-                ]
+    first_identity = _item_identity(first_item)
+    prepared = [
+        entry for entry in prepared if _item_identity(entry["item"]) != first_identity
+    ]
+
+    if not prepared:
+        for item in items[1:]:
+            ranked.append(item)
+            if len(ranked) >= limit:
+                break
+        return ranked[:limit]
+
+    prepared.sort(key=lambda entry: entry["original_rank"])
+
+    while prepared and len(ranked) < limit:
+        best_idx = None
+        best_score = -np.inf
+
+        for idx, candidate in enumerate(prepared):
+            if ranked_vectors:
+                similarity = max(
+                    float(np.dot(candidate["vector"], selected))
+                    for selected in ranked_vectors
+                )
+            else:
+                similarity = 0.0
+            mmr_score = (
+                lambda_param * candidate["relevance"]
+                - (1.0 - lambda_param) * similarity
             )
-            mmr = lambda_param * relevance - (1 - lambda_param) * similarity_to_ranked
+            if mmr_score > best_score:
+                best_idx = idx
+                best_score = mmr_score
 
-            if mmr > max_mmr:
-                max_mmr = mmr
-                best_item = item
+        if best_idx is None:
+            break
 
-        if best_item:
-            ranked.append(best_item)
-            unranked.remove(best_item)
+        chosen = prepared.pop(best_idx)
+        ranked.append(chosen["item"])
+        ranked_vectors.append(chosen["vector"])
 
-    return ranked
+    if len(ranked) >= limit:
+        return ranked[:limit]
+
+    seen_keys = {_item_identity(item) for item in ranked}
+    for item in items:
+        ident = _item_identity(item)
+        if ident in seen_keys:
+            continue
+        ranked.append(item)
+        seen_keys.add(ident)
+        if len(ranked) >= limit:
+            break
+
+    return ranked[:limit]
 
 
 def cosine_similarity(v1, v2):
-    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+    arr1 = np.asarray(v1, dtype=np.float32)
+    arr2 = np.asarray(v2, dtype=np.float32)
+    denom = float(np.linalg.norm(arr1) * np.linalg.norm(arr2))
+    if denom == 0.0 or not np.isfinite(denom):
+        return 0.0
+    return float(np.dot(arr1, arr2) / denom)
+
+
+def _normalized_vector(vector: Any) -> np.ndarray | None:
+    if vector is None:
+        return None
+    arr = np.asarray(vector, dtype=np.float32)
+    if arr.ndim == 0 or arr.size == 0:
+        return None
+    norm = float(np.linalg.norm(arr))
+    if norm == 0.0 or not np.isfinite(norm):
+        return None
+    return arr / norm
+
+
+def _item_identity(item: Dict[str, Any]) -> tuple[Any, int]:
+    return (item.get("id"), id(item))
 
 
 @lru_cache(maxsize=1)

@@ -412,6 +412,50 @@ def test_diversify_with_mmr_balances_similarity():
     assert 0.85 <= sim <= 1.0
 
 
+def test_diversify_with_mmr_appends_items_without_vectors_in_order():
+    items = [
+        {"id": 1, "original_rank": 0, "vector": [1.0, 0.0]},
+        {"id": 2, "original_rank": 1},
+        {"id": 3, "original_rank": 2, "vector": [0.0, 1.0]},
+        {"id": 4, "original_rank": 3},
+    ]
+
+    diversified = reranker.diversify_with_mmr(items, lambda_param=0.5, limit=4)
+    assert [item["id"] for item in diversified] == [1, 3, 2, 4]
+
+
+def test_diversify_with_mmr_keeps_first_item_without_vector():
+    items = [
+        {"id": 1, "original_rank": 0},
+        {"id": 2, "original_rank": 1, "vector": [1.0, 0.0]},
+        {"id": 3, "original_rank": 2, "vector": [0.0, 1.0]},
+    ]
+
+    diversified = reranker.diversify_with_mmr(items, lambda_param=0.5, limit=3)
+    assert [item["id"] for item in diversified] == [1, 2, 3]
+
+
+def test_diversify_with_mmr_handles_zero_vector():
+    items = [
+        {"id": 1, "original_rank": 0, "vector": [0.0, 0.0]},
+        {"id": 2, "original_rank": 1, "vector": [0.0, 1.0]},
+    ]
+
+    diversified = reranker.diversify_with_mmr(items, lambda_param=0.5, limit=2)
+    assert [item["id"] for item in diversified] == [1, 2]
+
+
+def test_diversify_with_mmr_clamps_lambda():
+    items = [
+        {"id": 1, "original_rank": 0, "vector": [1.0, 0.0]},
+        {"id": 2, "original_rank": 1, "vector": [0.9, 0.1]},
+        {"id": 3, "original_rank": 2, "vector": [0.0, 1.0]},
+    ]
+
+    diversified = reranker.diversify_with_mmr(items, lambda_param=2.0, limit=3)
+    assert [item["id"] for item in diversified] == [1, 2, 3]
+
+
 def test_default_explanation_uses_intent_filters():
     _reset_settings()
     filters = IntentFilters(
