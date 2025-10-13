@@ -6,7 +6,7 @@ from sqlalchemy import select, func
 from api.db.session import get_db
 from api.db.models import Item, ItemEmbedding, Availability
 from api.config import COUNTRY_DEFAULT
-from api.core.user_utils import load_user_state
+from api.core.user_utils import load_user_state, canonical_profile_id
 from api.core.candidate_gen import ann_candidates
 from api.core.intent_parser import parse_intent, item_matches_intent
 from api.core.reranker import rerank_with_explanations, diversify_with_mmr
@@ -23,9 +23,11 @@ def recommend(
         description="Optional natural-language intent (e.g. 'light sci-fi < 2h')",
     ),
     diversify: bool = Query(True, description="Whether to diversify recommendations."),
+    profile: str | None = Query(None, description="Optional profile identifier"),
     db: Session = Depends(get_db),
 ):
-    long_v, short_v, exclude = load_user_state(db, user_id)
+    canonical_id = canonical_profile_id(user_id, profile)
+    long_v, short_v, exclude, profile_meta = load_user_state(db, canonical_id)
     if short_v is None:
         raise HTTPException(
             status_code=400, detail="No user vector. POST /user/history first."
@@ -37,6 +39,9 @@ def recommend(
         candidate_limit = min(500, max(limit, limit * 3))
 
     ids: List[int] = ann_candidates(db, short_v, exclude, limit=candidate_limit)
+    negative_items = set(profile_meta.get("negative_items") or [])
+    if negative_items:
+        ids = [i for i in ids if i not in negative_items]
     if not ids:
         return []
 
@@ -119,7 +124,14 @@ def recommend(
         ordered,
         intent=intent,
         query=query,
-        user={"user_id": user_id},
+        user={
+            "user_id": canonical_id,
+            "base_user_id": user_id,
+            "profile": profile,
+            "genre_prefs": profile_meta.get("genre_prefs"),
+            "neighbors": profile_meta.get("neighbors"),
+            "negative_items": profile_meta.get("negative_items"),
+        },
     )
 
     response = []

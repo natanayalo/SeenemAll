@@ -97,9 +97,13 @@ def compare_versions(
 
     for item_a, item_b, expected in pairs:
         if item_a not in embeddings_a or item_b not in embeddings_a:
-            raise KeyError(f"Item {item_a} or {item_b} missing in embeddings for {version_a}")
+            raise KeyError(
+                f"Item {item_a} or {item_b} missing in embeddings for {version_a}"
+            )
         if item_a not in embeddings_b or item_b not in embeddings_b:
-            raise KeyError(f"Item {item_a} or {item_b} missing in embeddings for {version_b}")
+            raise KeyError(
+                f"Item {item_a} or {item_b} missing in embeddings for {version_b}"
+            )
 
         score_a = _cosine(embeddings_a[item_a], embeddings_a[item_b])
         score_b = _cosine(embeddings_b[item_a], embeddings_b[item_b])
@@ -144,9 +148,7 @@ def compare_versions(
     )
 
 
-def run_ab_test(
-    session: Session, version_a: str, version_b: str
-) -> ABReport:
+def run_ab_test(session: Session, version_a: str, version_b: str) -> ABReport:
     """Load embeddings and test pairs, then run the comparison."""
     pairs = load_test_pairs()
     item_ids = {item for pair in pairs for item in pair[:2]}

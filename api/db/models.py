@@ -86,6 +86,8 @@ class User(Base):
     user_id: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     long_vec: Mapped[Optional[List[float]]] = mapped_column(Vector(384), nullable=True)
     short_vec: Mapped[Optional[List[float]]] = mapped_column(Vector(384), nullable=True)
+    genre_prefs: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    neighbors: Mapped[Optional[List[dict]]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
+import api.core.user_profile as user_profile
 from api.core.user_profile import (
     DIM,
     _time_decay_weights,
@@ -19,33 +20,53 @@ def test_time_decay_weights_normalises_and_prefers_recent():
     assert weights[0] > weights[-1]
 
 
+def test_time_decay_weights_respects_config(monkeypatch):
+    monkeypatch.setattr(user_profile, "USER_PROFILE_DECAY_HALF_LIFE", 2.0)
+    fast_decay = _time_decay_weights(5)
+    monkeypatch.setattr(user_profile, "USER_PROFILE_DECAY_HALF_LIFE", 20.0)
+    slow_decay = _time_decay_weights(5)
+    fast_ratio = fast_decay[0] / fast_decay[-1]
+    slow_ratio = slow_decay[0] / slow_decay[-1]
+    assert fast_ratio > slow_ratio
+
+
 def test_compute_user_vector_returns_normalised_vectors():
     history_rows = [(101, 1.0), (202, 1.0)]
     embeddings = [
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
+        (101, [1.0, 0.0, 0.0]),
+        (202, [0.0, 1.0, 0.0]),
     ]
     session = FakeSession(history_rows=history_rows, embedding_vectors=embeddings)
 
-    long_vec, short_vec = compute_user_vector(session, "user-1")
+    long_vec, short_vec, genre_prefs, neighbors, negatives = compute_user_vector(
+        session, "user-1"
+    )
 
     assert long_vec is not None and short_vec is not None
     assert np.isclose(np.linalg.norm(long_vec), 1.0, atol=1e-6)
     assert np.isclose(np.linalg.norm(short_vec), 1.0, atol=1e-6)
     # short vector should lean towards the most recent embedding (index 0)
     assert short_vec[0] > short_vec[1]
+    assert genre_prefs is None
+    assert neighbors == []
+    assert negatives == []
 
 
 def test_compute_user_vector_with_no_history_returns_none():
     session = FakeSession(history_rows=[], embedding_vectors=[])
-    long_vec, short_vec = compute_user_vector(session, "empty-user")
-    assert long_vec is None and short_vec is None
+    long_vec, short_vec, genre_prefs, neighbors, negatives = compute_user_vector(
+        session, "empty-user"
+    )
+    assert long_vec is None and short_vec is None and genre_prefs is None
+    assert neighbors == []
+    assert negatives == []
 
 
 def test_upsert_user_vectors_creates_new_user():
     session = FakeSession(
         history_rows=[(10, 1.0)],
-        embedding_vectors=[[1.0] + [0.0] * (DIM - 1)],
+        embedding_vectors=[(10, [1.0] + [0.0] * (DIM - 1))],
+        item_rows=[(10, [{"name": "Action"}])],
         user=None,
     )
 
@@ -56,13 +77,16 @@ def test_upsert_user_vectors_creates_new_user():
     assert isinstance(created, User)
     assert created.user_id == "new-user"
     assert created.short_vec is not None
+    assert created.genre_prefs is not None
+    assert isinstance(created.neighbors, list)
 
 
 def test_upsert_user_vectors_updates_existing_user():
     existing = User(user_id="existing")
     session = FakeSession(
         history_rows=[(99, 1.0)],
-        embedding_vectors=[[0.0, 1.0] + [0.0] * (DIM - 2)],
+        embedding_vectors=[(99, [0.0, 1.0] + [0.0] * (DIM - 2))],
+        item_rows=[(99, [{"name": "Drama"}])],
         user=existing,
     )
 
@@ -71,3 +95,97 @@ def test_upsert_user_vectors_updates_existing_user():
     assert session.added == []
     assert existing.short_vec is not None
     assert existing.long_vec is not None
+    assert existing.genre_prefs is not None
+    assert isinstance(existing.neighbors, list)
+
+
+def test_explicit_feedback_has_higher_weight():
+    history_rows = [
+        (101, 1.0, "watched"),
+        (202, 5.0, "rated"),
+    ]
+    embeddings = [
+        (101, [1.0, 0.0, 0.0]),
+        (202, [0.0, 1.0, 0.0]),
+    ]
+    session = FakeSession(
+        history_rows=history_rows,
+        embedding_vectors=embeddings,
+        item_rows=[
+            (101, [{"name": "Action"}]),
+            (202, [{"name": "Drama"}]),
+        ],
+    )
+
+    long_vec, short_vec, genre_prefs, neighbors, negatives = compute_user_vector(
+        session, "user-1"
+    )
+
+    assert long_vec is not None and short_vec is not None
+    assert long_vec[1] > long_vec[0]
+    assert genre_prefs is not None
+    assert neighbors == []
+    assert negatives == []
+    assert "Drama" in genre_prefs and "Action" in genre_prefs
+    assert genre_prefs["Drama"] > genre_prefs["Action"]
+
+
+def test_negative_feedback_excluded_from_profiles():
+    history_rows = [
+        (301, 1.0, "not_interested"),
+        (302, 1.0, "watched"),
+    ]
+    embeddings = [
+        (301, [1.0, 0.0, 0.0]),
+        (302, [0.0, 1.0, 0.0]),
+    ]
+    session = FakeSession(
+        history_rows=history_rows,
+        embedding_vectors=embeddings,
+        item_rows=[
+            (301, [{"name": "Horror"}]),
+            (302, [{"name": "Comedy"}]),
+        ],
+    )
+
+    long_vec, short_vec, genre_prefs, neighbors, negatives = compute_user_vector(
+        session, "user-1"
+    )
+
+    assert negatives == [301]
+    assert np.isclose(short_vec[1], 1.0, atol=1e-6)
+    assert np.isclose(short_vec[0], 0.0, atol=1e-6)
+    assert np.isclose(long_vec[1], 1.0, atol=1e-6)
+    assert np.isclose(long_vec[0], 0.0, atol=1e-6)
+    assert genre_prefs == {"Comedy": 1.0}
+    assert neighbors == []
+
+
+def test_collaborative_vector_blends_into_long(monkeypatch):
+    history_rows = [(1, 1.0)]
+    embeddings = [
+        (1, [1.0, 0.0, 0.0]),
+    ]
+    session = FakeSession(
+        history_rows=history_rows,
+        embedding_vectors=embeddings,
+        item_rows=[(1, [{"name": "Action"}])],
+    )
+
+    def fake_collab(db, user_id, item_ids):
+        return np.array([0.0, 1.0, 0.0], dtype="float32"), []
+
+    monkeypatch.setattr(
+        "api.core.user_profile._collect_collaborative_vector", fake_collab
+    )
+
+    long_vec, short_vec, genre_prefs, neighbors, negatives = compute_user_vector(
+        session, "user-1"
+    )
+
+    assert long_vec is not None and short_vec is not None
+    assert long_vec[1] > 0.2  # collaborative signal pulls toward second dimension
+    assert np.isclose(short_vec[1], 0.0, atol=1e-6)  # short vector unaffected
+    assert genre_prefs is not None
+    assert neighbors == []
+    assert negatives == []
