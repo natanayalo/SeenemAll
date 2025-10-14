@@ -5,7 +5,7 @@ import logging
 import os
 from typing import Any, Dict, Iterable, List, Sequence
 
-from api.core.intent_parser import IntentFilters
+from api.core.legacy_intent_parser import IntentFilters
 
 logger = logging.getLogger(__name__)
 if logger.level == logging.NOTSET:

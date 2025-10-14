@@ -11,7 +11,7 @@ from typing import Any, Dict, Iterable, List, Sequence
 import httpx
 import numpy as np
 
-from api.core.intent_parser import IntentFilters
+from api.core.legacy_intent_parser import IntentFilters
 from api.core.prompt_eval import load_prompt_template
 
 logger = logging.getLogger(__name__)

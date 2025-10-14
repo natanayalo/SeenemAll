@@ -1,4 +1,5 @@
 import hashlib
+from threading import Lock
 from typing import Any, Dict, Tuple
 from pydantic import ValidationError
 from cachetools import TTLCache
@@ -13,11 +14,16 @@ CACHE_MAXSIZE = 1000
 CACHE_TTL_SECONDS = 300  # 5 minutes
 
 # Caches
-INTENT_CACHE = TTLCache(maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS)
-REWRITE_CACHE = TTLCache(maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS)
+INTENT_CACHE: TTLCache[Tuple[str, str], Intent] = TTLCache(
+    maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS
+)
+REWRITE_CACHE: TTLCache[str, Rewrite] = TTLCache(
+    maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS
+)
 
 # Metrics
 CACHE_METRICS = {"hits": 0, "misses": 0, "rewrite_hits": 0, "rewrite_misses": 0}
+METRICS_LOCK = Lock()
 
 
 def get_cache_key(query: str, user_context: Dict[str, Any]) -> Tuple[str, str]:
@@ -42,10 +48,12 @@ async def parse_intent(query: str, user_context: Dict[str, Any]) -> Intent:
 
     # Check cache
     if cache_key in INTENT_CACHE:
-        CACHE_METRICS["hits"] += 1
+        with METRICS_LOCK:
+            CACHE_METRICS["hits"] += 1
         return INTENT_CACHE[cache_key]
 
-    CACHE_METRICS["misses"] += 1
+    with METRICS_LOCK:
+        CACHE_METRICS["misses"] += 1
 
     try:
         llm_output = {}
@@ -79,10 +87,12 @@ async def rewrite_query(query: str, intent: Intent) -> Rewrite:
 
     # Check cache
     if cache_key in REWRITE_CACHE:
-        CACHE_METRICS["rewrite_hits"] += 1
+        with METRICS_LOCK:
+            CACHE_METRICS["rewrite_hits"] += 1
         return REWRITE_CACHE[cache_key]
 
-    CACHE_METRICS["rewrite_misses"] += 1
+    with METRICS_LOCK:
+        CACHE_METRICS["rewrite_misses"] += 1
 
     # For now, this is a mock implementation.
     if intent.include_genres and "sci-fi" in intent.include_genres:

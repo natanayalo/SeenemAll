@@ -11,7 +11,11 @@ from api.db.models import Item, ItemEmbedding, Availability
 from api.config import COUNTRY_DEFAULT
 from api.core.user_utils import load_user_state, canonical_profile_id
 from api.core.candidate_gen import ann_candidates
-from api.core.intent_parser import parse_intent, item_matches_intent, IntentFilters
+from api.core.legacy_intent_parser import (
+    parse_intent,
+    item_matches_intent,
+    IntentFilters,
+)
 from api.core.reranker import rerank_with_explanations, diversify_with_mmr
 from api.core.business_rules import apply_business_rules
 
