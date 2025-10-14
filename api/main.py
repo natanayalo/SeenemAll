@@ -1,6 +1,9 @@
 import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from api.routes.health import router as health_router
 from api.db.session import init_engine, get_sessionmaker, get_db
 from api.routes.user import router as user_router
@@ -21,7 +24,14 @@ logging.getLogger("urllib3").setLevel(logging.INFO)
 logging.getLogger("httpx").setLevel(logging.INFO)
 logging.getLogger("httpcore").setLevel(logging.INFO)
 
-app = FastAPI(title="Seen'emAll", version="0.1.0")
+
+@asynccontextmanager
+async def app_lifespan(app: FastAPI):
+    _initialise_application(app)
+    yield
+
+
+app = FastAPI(title="Seen'emAll", version="0.1.0", lifespan=app_lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,11 +51,15 @@ app.include_router(watch_router)
 app.include_router(feedback_router)
 
 
-@app.on_event("startup")
-def on_startup():
+def _initialise_application(app: FastAPI) -> None:
     # When tests override get_db we skip touching the real database.
     if get_db in app.dependency_overrides:
         return
     init_engine()
     # Ensure we can get a sessionmaker without error
     get_sessionmaker()
+
+
+def on_startup() -> None:
+    """Backward-compatible startup hook kept for existing tests."""
+    _initialise_application(app)

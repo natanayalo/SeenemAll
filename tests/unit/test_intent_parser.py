@@ -1,11 +1,9 @@
-import pytest
 from api.core.intent_parser import Intent
 from api.core.llm_parser import parse_intent, rewrite_query, DEFAULT_INTENT
 from api.core.rewrite import Rewrite
 
 
-@pytest.mark.asyncio
-async def test_parse_intent_fixtures():
+def test_parse_intent_fixtures():
     """
     Tests the parse_intent function with a set of predefined fixtures.
     """
@@ -34,12 +32,11 @@ async def test_parse_intent_fixtures():
 
     for query, expected_intent in test_cases:
         # The user_context is not used in the mock implementation, so we can pass an empty dict.
-        intent = await parse_intent(query, {})
+        intent = parse_intent(query, {})
         assert intent == expected_intent, f"Query: '{query}' failed"
 
 
-@pytest.mark.asyncio
-async def test_rewrite_query():
+def test_rewrite_query():
     """
     Tests the rewrite_query function with a set of predefined fixtures.
     """
@@ -55,5 +52,5 @@ async def test_rewrite_query():
     ]
 
     for intent, expected_rewrite in test_cases:
-        rewrite = await rewrite_query("some query", intent)
+        rewrite = rewrite_query("some query", intent)
         assert rewrite == expected_rewrite

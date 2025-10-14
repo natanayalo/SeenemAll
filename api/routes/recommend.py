@@ -1,18 +1,24 @@
 from __future__ import annotations
-from typing import Any, Dict, List
+
 import base64
 import json
 import os
+import logging
+from typing import Any, Dict, List
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_
+
 from api.db.session import get_db
 from api.db.models import Item, ItemEmbedding, Availability
 from api.config import COUNTRY_DEFAULT
 from api.core.user_utils import load_user_state, canonical_profile_id
 from api.core.candidate_gen import ann_candidates
+from api.core import llm_parser
+from api.core.intent_parser import Intent
 from api.core.legacy_intent_parser import (
-    parse_intent,
+    parse_intent as legacy_parse_intent,
     item_matches_intent,
     IntentFilters,
 )
@@ -20,6 +26,7 @@ from api.core.reranker import rerank_with_explanations, diversify_with_mmr
 from api.core.business_rules import apply_business_rules
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
+logger = logging.getLogger(__name__)
 
 
 def _float_from_env(name: str, default: float) -> float:
@@ -37,6 +44,57 @@ _HYBRID_ANN_WEIGHT = _float_from_env("HYBRID_ANN_WEIGHT", 0.5)
 _HYBRID_POPULARITY_WEIGHT = _float_from_env("HYBRID_POPULARITY_WEIGHT", 0.25)
 _HYBRID_TRENDING_WEIGHT = _float_from_env("HYBRID_TRENDING_WEIGHT", 0.4)
 _HYBRID_MIN_ANN_WEIGHT = 0.05
+
+
+def _parse_llm_intent(query: str | None, user_context: Dict[str, Any]) -> Intent:
+    if not query:
+        return llm_parser.default_intent()
+    try:
+        return llm_parser.parse_intent(query, user_context)
+    except Exception:
+        logger.exception("LLM intent parser failed; falling back to default intent.")
+        return llm_parser.default_intent()
+
+
+def _intent_filters_from_llm(query: str | None, llm_intent: Intent) -> IntentFilters:
+    genres = list(llm_intent.include_genres or [])
+    filters = IntentFilters(
+        raw_query=query or "",
+        genres=genres,
+        moods=[],
+        media_types=[],
+        min_runtime=llm_intent.runtime_minutes_min,
+        max_runtime=llm_intent.runtime_minutes_max,
+    )
+    return filters
+
+
+def _merge_with_legacy_filters(
+    primary: IntentFilters, fallback: IntentFilters | None
+) -> IntentFilters:
+    if not fallback:
+        return primary
+
+    # Merge genres with order preservation
+    seen_genres = {genre for genre in primary.genres}
+    for genre in fallback.genres:
+        if genre and genre not in seen_genres:
+            primary.genres.append(genre)
+            seen_genres.add(genre)
+
+    if not primary.moods and fallback.moods:
+        primary.moods = list(fallback.moods)
+
+    if not primary.media_types and fallback.media_types:
+        primary.media_types = list(fallback.media_types)
+
+    if primary.min_runtime is None and fallback.min_runtime is not None:
+        primary.min_runtime = fallback.min_runtime
+
+    if primary.max_runtime is None and fallback.max_runtime is not None:
+        primary.max_runtime = fallback.max_runtime
+
+    return primary
 
 
 @router.get("")
@@ -62,7 +120,11 @@ def recommend(
             status_code=400, detail="No user vector. POST /user/history first."
         )
 
-    intent = parse_intent(query)
+    llm_user_context = {"user_id": canonical_id, "profile_id": profile}
+    llm_intent = _parse_llm_intent(query, llm_user_context)
+    intent = _intent_filters_from_llm(query, llm_intent)
+    if query:
+        intent = _merge_with_legacy_filters(intent, legacy_parse_intent(query))
     candidate_limit = min(500, max(limit, limit * 3))
     if intent.has_filters():
         candidate_limit = min(500, max(candidate_limit, limit * 5))
