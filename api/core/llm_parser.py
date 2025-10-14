@@ -1,16 +1,22 @@
-import time
 import hashlib
 from typing import Any, Dict, Tuple
 from pydantic import ValidationError
+from cachetools import TTLCache
 from .intent_parser import Intent
 from .rewrite import Rewrite
 
 DEFAULT_INTENT = Intent()
 DEFAULT_REWRITE = Rewrite(rewritten_text="")
 
-INTENT_CACHE: Dict[Tuple[str, str], Tuple[Intent, float]] = {}
-REWRITE_CACHE: Dict[str, Tuple[Rewrite, float]] = {}
+# Cache configuration
+CACHE_MAXSIZE = 1000
 CACHE_TTL_SECONDS = 300  # 5 minutes
+
+# Caches
+INTENT_CACHE = TTLCache(maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS)
+REWRITE_CACHE = TTLCache(maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS)
+
+# Metrics
 CACHE_METRICS = {"hits": 0, "misses": 0, "rewrite_hits": 0, "rewrite_misses": 0}
 
 
@@ -36,10 +42,8 @@ async def parse_intent(query: str, user_context: Dict[str, Any]) -> Intent:
 
     # Check cache
     if cache_key in INTENT_CACHE:
-        intent, timestamp = INTENT_CACHE[cache_key]
-        if time.time() - timestamp < CACHE_TTL_SECONDS:
-            CACHE_METRICS["hits"] += 1
-            return intent
+        CACHE_METRICS["hits"] += 1
+        return INTENT_CACHE[cache_key]
 
     CACHE_METRICS["misses"] += 1
 
@@ -59,7 +63,7 @@ async def parse_intent(query: str, user_context: Dict[str, Any]) -> Intent:
 
         intent = Intent.model_validate(llm_output)
         # Store in cache
-        INTENT_CACHE[cache_key] = (intent, time.time())
+        INTENT_CACHE[cache_key] = intent
         return intent
     except ValidationError:
         # Fallback to a default intent if parsing or validation fails
@@ -75,10 +79,8 @@ async def rewrite_query(query: str, intent: Intent) -> Rewrite:
 
     # Check cache
     if cache_key in REWRITE_CACHE:
-        rewrite, timestamp = REWRITE_CACHE[cache_key]
-        if time.time() - timestamp < CACHE_TTL_SECONDS:
-            CACHE_METRICS["rewrite_hits"] += 1
-            return rewrite
+        CACHE_METRICS["rewrite_hits"] += 1
+        return REWRITE_CACHE[cache_key]
 
     CACHE_METRICS["rewrite_misses"] += 1
 
@@ -89,5 +91,5 @@ async def rewrite_query(query: str, intent: Intent) -> Rewrite:
         rewrite = DEFAULT_REWRITE
 
     # Store in cache
-    REWRITE_CACHE[cache_key] = (rewrite, time.time())
+    REWRITE_CACHE[cache_key] = rewrite
     return rewrite

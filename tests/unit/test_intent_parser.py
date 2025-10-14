@@ -1,6 +1,6 @@
 import pytest
 from api.core.intent_parser import Intent
-from api.core.llm_parser import parse_intent, rewrite_query
+from api.core.llm_parser import parse_intent, rewrite_query, DEFAULT_INTENT
 from api.core.rewrite import Rewrite
 
 
@@ -25,6 +25,10 @@ async def test_parse_intent_fixtures():
         (
             "something in french",
             Intent(languages=["fr"]),
+        ),
+        (
+            "bad query",
+            DEFAULT_INTENT,
         ),
     ]
 
