@@ -1,56 +1,39 @@
 {
-    "system_prompt": "You are Seen'emAll's intent parser. Extract structured filters from natural language queries about movies and TV shows.",
+    "system_prompt": "You are Seen'emAll's intent parser. Your task is to analyze the user's query and extract their preferences into a structured JSON object. The JSON object must conform to the following Pydantic schema:\n\n```json\n{\n    \"include_genres\": \"Optional[List[str]]\",\n    \"exclude_genres\": \"Optional[List[str]]\",\n    \"runtime_minutes_min\": \"Optional[int]\",\n    \"runtime_minutes_max\": \"Optional[int]\",\n    \"languages\": \"Optional[List[str]]\",\n    \"year_min\": \"Optional[int]\",\n    \"year_max\": \"Optional[int]\",\n    \"maturity_rating_max\": \"Optional[str]\",\n    \"boost_genres\": \"Optional[List[str]]\"\n}\n```\n\nReturn only the JSON object, without any additional text or explanations.",
     "examples": [
         {
-            "input": "light sci-fi movies under 2 hours",
+            "input": {
+                "query": "light sci-fi under 2 hours"
+            },
             "expected_output": {
-                "media_types": ["movie"],
-                "genres": ["Science Fiction"],
-                "max_runtime": 120,
-                "mood_keywords": ["light"]
+                "include_genres": ["Science Fiction"],
+                "runtime_minutes_max": 120
             }
         },
         {
-            "input": "dark mystery shows with complex plot",
+            "input": {
+                "query": "no gore"
+            },
             "expected_output": {
-                "media_types": ["tv"],
-                "genres": ["Mystery", "Drama"],
-                "mood_keywords": ["dark", "complex"]
+                "exclude_genres": ["Horror"]
             }
         },
         {
-            "input": "family animation from the 90s",
+            "input": {
+                "query": "movies from the 90s"
+            },
             "expected_output": {
-                "media_types": ["movie", "tv"],
-                "genres": ["Animation", "Family"],
-                "min_year": 1990,
-                "max_year": 1999
+                "year_min": 1990,
+                "year_max": 1999
+            }
+        },
+        {
+            "input": {
+                "query": "something in french"
+            },
+            "expected_output": {
+                "languages": ["fr"]
             }
         }
-    ],
-    "evaluation_metrics": {
-        "genre_accuracy": {
-            "description": "Correctly identifies relevant genres from query",
-            "threshold": 0.9
-        },
-        "media_type_accuracy": {
-            "description": "Correctly determines if query targets movies, TV shows, or both",
-            "threshold": 0.95
-        },
-        "temporal_accuracy": {
-            "description": "Correctly extracts year/decade references",
-            "threshold": 0.9
-        },
-        "runtime_accuracy": {
-            "description": "Correctly parses runtime constraints",
-            "threshold": 0.95
-        }
-    },
-    "genre_mapping": {
-        "scary": ["Horror", "Thriller"],
-        "funny": ["Comedy"],
-        "action-packed": ["Action", "Adventure"],
-        "thoughtful": ["Drama"],
-        "educational": ["Documentary"]
-    }
+    ]
 }

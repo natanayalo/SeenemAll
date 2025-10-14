@@ -12,6 +12,7 @@ from api.main import app
 from api.db.session import get_db
 from api.routes import recommend as recommend_routes
 from api.core import business_rules
+from api.core.legacy_intent_parser import IntentFilters
 
 
 @pytest.fixture(autouse=True)
@@ -548,3 +549,42 @@ def test_recommend_filters_negative_items(monkeypatch):
     assert resp.status_code == 200
     body = resp.json()
     assert body["items"] == []
+
+
+def test_cold_start_candidates_respects_allowlist(monkeypatch):
+    intent = IntentFilters(
+        raw_query="",
+        genres=["Comedy"],
+        moods=[],
+        media_types=["tv"],
+    )
+
+    class ColdSession:
+        def __init__(self, rows):
+            self._rows = rows
+            self.bind = SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+
+        def execute(self, statement, params=None):
+            return FakeResult([(row,) for row in self._rows])
+
+        def get_bind(self):  # pragma: no cover - compatibility shim
+            return self.bind
+
+    session = ColdSession([5, 6, 5])
+    result = recommend_routes._cold_start_candidates(
+        session, intent, limit=5, allowlist=[5, 6, 7]
+    )
+    assert result == [5, 6]
+
+    assert (
+        recommend_routes._cold_start_candidates(
+            ColdSession([1, 2, 3]), intent, limit=5, allowlist=[]
+        )
+        == []
+    )
+
+    session_no_allowlist = ColdSession([3, 4, 3])
+    result_no_allowlist = recommend_routes._cold_start_candidates(
+        session_no_allowlist, intent, limit=5, allowlist=None
+    )
+    assert result_no_allowlist == [3, 4]

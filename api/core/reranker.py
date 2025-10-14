@@ -239,7 +239,7 @@ def _get_settings() -> RerankerSettings:
         provider = raw_provider
 
     if provider == "gemini":
-        default_model = "gemini-2.0-flash-exp"
+        default_model = "gemini-2.0-flash-lite"
         default_endpoint = "https://generativelanguage.googleapis.com/v1beta/models"
     else:
         default_model = "gpt-4o-mini"

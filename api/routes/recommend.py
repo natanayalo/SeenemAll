@@ -4,11 +4,12 @@ import base64
 import json
 import os
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, cast
+from sqlalchemy.dialects.postgresql import JSONB
 
 from api.db.session import get_db
 from api.db.models import Item, ItemEmbedding, Availability
@@ -115,10 +116,7 @@ def recommend(
 ):
     canonical_id = canonical_profile_id(user_id, profile)
     long_v, short_v, exclude, profile_meta = load_user_state(db, canonical_id)
-    if short_v is None:
-        raise HTTPException(
-            status_code=400, detail="No user vector. POST /user/history first."
-        )
+    cold_start = short_v is None
 
     llm_user_context = {"user_id": canonical_id, "profile_id": profile}
     llm_intent = _parse_llm_intent(query, llm_user_context)
@@ -130,9 +128,12 @@ def recommend(
         candidate_limit = min(500, max(candidate_limit, limit * 5))
 
     allowlist = _prefilter_allowed_ids(db, intent, candidate_limit)
-    ids: List[int] = ann_candidates(
-        db, short_v, exclude, limit=candidate_limit, allowed_ids=allowlist
-    )
+    if cold_start:
+        ids = _cold_start_candidates(db, intent, candidate_limit, allowlist)
+    else:
+        ids = ann_candidates(
+            db, short_v, exclude, limit=candidate_limit, allowed_ids=allowlist
+        )
     negative_items = set(profile_meta.get("negative_items") or [])
     if negative_items:
         ids = [i for i in ids if i not in negative_items]
@@ -308,7 +309,7 @@ def _apply_hybrid_boost(candidates: List[Dict[str, Any]]) -> None:
 def _prefilter_allowed_ids(
     db: Session, intent: IntentFilters | None, limit: int
 ) -> List[int] | None:
-    if intent is None:
+    if intent is None or not intent.has_filters():
         return None
 
     media_types = intent.media_types or []
@@ -327,7 +328,7 @@ def _prefilter_allowed_ids(
         for genre in genres:
             if not genre:
                 continue
-            filters.append(Item.genres.contains([{"name": genre}]))
+            filters.append(_genre_contains_clause(db, genre))
         if filters:
             stmt = stmt.where(or_(*filters))
 
@@ -336,6 +337,69 @@ def _prefilter_allowed_ids(
     if not rows:
         return []
     # Preserve ordering but ensure uniqueness
+    seen: set[int] = set()
+    ordered: List[int] = []
+    for value in rows:
+        if value not in seen:
+            seen.add(value)
+            ordered.append(value)
+    return ordered
+
+
+def _genre_contains_clause(db: Session, genre: str):
+    bind = getattr(db, "bind", None)
+    if bind is None:
+        get_bind = getattr(db, "get_bind", None)
+        if callable(get_bind):
+            try:
+                bind = get_bind()
+            except Exception:
+                bind = None
+
+    dialect_name: Optional[str] = None
+    if bind is not None:
+        dialect = getattr(bind, "dialect", None)
+        if dialect is not None:
+            dialect_name = getattr(dialect, "name", None)
+
+    if dialect_name == "postgresql":
+        return cast(Item.genres, JSONB).contains([{"name": genre}])
+
+    # Fallback for other dialects used in tests (e.g., SQLite memory stubs)
+    return Item.genres.contains([{"name": genre}])
+
+
+def _cold_start_candidates(
+    db: Session,
+    intent: IntentFilters,
+    limit: int,
+    allowlist: List[int] | None,
+) -> List[int]:
+    stmt = select(Item.id).join(ItemEmbedding, ItemEmbedding.item_id == Item.id)
+
+    if allowlist is not None:
+        if not allowlist:
+            return []
+        stmt = stmt.where(Item.id.in_(allowlist))
+    else:
+        if intent.media_types:
+            stmt = stmt.where(Item.media_type.in_(intent.media_types))
+        genres = intent.effective_genres()
+        if genres:
+            genre_filters = [
+                _genre_contains_clause(db, genre) for genre in genres if genre
+            ]
+            if genre_filters:
+                stmt = stmt.where(or_(*genre_filters))
+
+    stmt = stmt.order_by(
+        Item.popular_rank.asc().nullslast(),
+        Item.trending_rank.asc().nullslast(),
+        Item.popularity.desc().nullslast(),
+        Item.id.asc(),
+    ).limit(limit)
+
+    rows = db.execute(stmt).scalars().all()
     seen: set[int] = set()
     ordered: List[int] = []
     for value in rows:

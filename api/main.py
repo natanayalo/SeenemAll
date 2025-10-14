@@ -21,7 +21,7 @@ logging.getLogger("api.core.intent_parser").setLevel(logging.DEBUG)
 # Reduce noise from other modules
 logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 logging.getLogger("urllib3").setLevel(logging.INFO)
-logging.getLogger("httpx").setLevel(logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.INFO)
 
 
