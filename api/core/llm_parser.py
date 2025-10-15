@@ -284,7 +284,7 @@ def _call_gemini_parser(
         raise IntentParserError("Gemini parser returned non-JSON content.") from exc
 
 
-def _build_prompt_text(query: str, user_context: Dict[str, Any]) -> str:
+def _build_prompt_text(query: str, user_context: Dict[str, Any]) -> Tuple[str, str]:
     prompt_config = load_prompt_template("intent_parser")
     system_prompt = prompt_config.get("system_prompt", "")
     examples = prompt_config.get("examples", [])
@@ -296,15 +296,19 @@ def _build_prompt_text(query: str, user_context: Dict[str, Any]) -> str:
 
     example_text = "\n".join(example_texts)
 
-    return f"{system_prompt}\n\n{example_text}\n\nQuery: {query}\nIntent:"
+    user_parts = []
+    if example_text:
+        user_parts.append(example_text)
+    user_parts.append(f"Query: {query}")
+    user_parts.append("Intent:")
+    user_prompt = "\n\n".join(user_parts)
+    return system_prompt, user_prompt
 
 
 def _build_llm_payload(
     settings: IntentParserSettings, query: str, user_context: Dict[str, Any]
 ) -> Dict[str, Any]:
-    prompt = _build_prompt_text(query, user_context)
-    prompt_config = load_prompt_template("intent_parser")
-    system_prompt = prompt_config.get("system_prompt", "")
+    system_prompt, user_prompt = _build_prompt_text(query, user_context)
 
     return {
         "model": settings.model,
@@ -313,7 +317,7 @@ def _build_llm_payload(
                 "role": "system",
                 "content": system_prompt,
             },
-            {"role": "user", "content": prompt},
+            {"role": "user", "content": user_prompt},
         ],
         "temperature": 0.2,
         "response_format": {"type": "json_object"},
@@ -323,13 +327,13 @@ def _build_llm_payload(
 def _build_gemini_payload(
     settings: IntentParserSettings, query: str, user_context: Dict[str, Any]
 ) -> Dict[str, Any]:
-    prompt = _build_prompt_text(query, user_context)
+    system_prompt, user_prompt = _build_prompt_text(query, user_context)
 
-    return {
+    payload: Dict[str, Any] = {
         "contents": [
             {
                 "role": "user",
-                "parts": [{"text": prompt}],
+                "parts": [{"text": user_prompt}],
             }
         ],
         "generationConfig": {
@@ -337,6 +341,12 @@ def _build_gemini_payload(
             "responseMimeType": "application/json",
         },
     }
+    if system_prompt:
+        payload["systemInstruction"] = {
+            "role": "system",
+            "parts": [{"text": system_prompt}],
+        }
+    return payload
 
 
 def _offline_intent_stub(query: str) -> Dict[str, Any]:
