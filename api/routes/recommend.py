@@ -6,7 +6,8 @@ import os
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import numpy as np
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_, cast
 from sqlalchemy.dialects.postgresql import JSONB
@@ -25,6 +26,9 @@ from api.core.legacy_intent_parser import (
 )
 from api.core.reranker import rerank_with_explanations, diversify_with_mmr
 from api.core.business_rules import apply_business_rules
+from api.core.entity_linker import EntityLinker
+from api.core.llm_parser import rewrite_query
+from api.core.embeddings import encode_texts
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
 logger = logging.getLogger(__name__)
@@ -47,11 +51,15 @@ _HYBRID_TRENDING_WEIGHT = _float_from_env("HYBRID_TRENDING_WEIGHT", 0.4)
 _HYBRID_MIN_ANN_WEIGHT = 0.05
 
 
-def _parse_llm_intent(query: str | None, user_context: Dict[str, Any]) -> Intent:
+def _parse_llm_intent(
+    query: str | None,
+    user_context: Dict[str, Any],
+    linked_entities: Dict[str, Any] | None = None,
+) -> Intent:
     if not query:
         return llm_parser.default_intent()
     try:
-        return llm_parser.parse_intent(query, user_context)
+        return llm_parser.parse_intent(query, user_context, linked_entities)
     except Exception:
         logger.exception("LLM intent parser failed; falling back to default intent.")
         return llm_parser.default_intent()
@@ -99,7 +107,8 @@ def _merge_with_legacy_filters(
 
 
 @router.get("")
-def recommend(
+async def recommend(
+    request: Request,
     user_id: str = Query(..., description="Seen'emAll user_id (e.g., 'u1')"),
     limit: int = Query(20, ge=1, le=100),
     query: str | None = Query(
@@ -118,8 +127,14 @@ def recommend(
     long_v, short_v, exclude, profile_meta = load_user_state(db, canonical_id)
     cold_start = short_v is None
 
+    tmdb_client = getattr(request.app.state, "tmdb_client", None)
+    linked_entities = None
+    if tmdb_client and query:
+        entity_linker = EntityLinker(tmdb_client)
+        linked_entities = await entity_linker.link_entities(query)
+
     llm_user_context = {"user_id": canonical_id, "profile_id": profile}
-    llm_intent = _parse_llm_intent(query, llm_user_context)
+    llm_intent = _parse_llm_intent(query, llm_user_context, linked_entities)
     intent = _intent_filters_from_llm(query, llm_intent)
     if query:
         intent = _merge_with_legacy_filters(intent, legacy_parse_intent(query))
@@ -129,10 +144,22 @@ def recommend(
 
     allowlist = _prefilter_allowed_ids(db, intent, candidate_limit)
     if cold_start:
+        logger.info("Using cold-start candidates for user %s", canonical_id)
         ids = _cold_start_candidates(db, intent, candidate_limit, allowlist)
     else:
+        logger.info("Using ANN candidates for user %s", canonical_id)
+        assert short_v is not None
+        rewrite = rewrite_query(query or "", llm_intent)
+        if rewrite.rewritten_text:
+            rewrite_vec = encode_texts([rewrite.rewritten_text])[0]
+            alpha = 0.5
+            q_vec = (alpha * short_v) + ((1 - alpha) * rewrite_vec)
+            q_vec = q_vec / np.linalg.norm(q_vec)
+        else:
+            q_vec = short_v
+
         ids = ann_candidates(
-            db, short_v, exclude, limit=candidate_limit, allowed_ids=allowlist
+            db, q_vec, exclude, limit=candidate_limit, allowed_ids=allowlist
         )
     negative_items = set(profile_meta.get("negative_items") or [])
     if negative_items:

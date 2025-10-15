@@ -52,5 +52,10 @@ class TMDBClient:
     async def details(self, media: str, tmdb_id: int) -> Dict[str, Any]:
         return await self._get(f"/{media}/{tmdb_id}", {"language": "en-US"})
 
+    async def search(self, query: str, media_type: str | None = None) -> Dict[str, Any]:
+        params = {"query": query}
+        path = f"/search/{media_type}" if media_type else "/search/multi"
+        return await self._get(path, params)
+
     async def aclose(self):
         await self._client.aclose()

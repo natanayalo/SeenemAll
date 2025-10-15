@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import logging
 import numpy as np
 from types import SimpleNamespace
 from typing import Any, Sequence
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx import AsyncClient, ASGITransport
 from tests.helpers import FakeResult
 
 from api.main import app
@@ -13,8 +15,28 @@ from api.db.session import get_db
 from api.routes import recommend as recommend_routes
 from api.core import business_rules
 from api.core.legacy_intent_parser import IntentFilters
+from api.core.entity_linker import ENTITY_LINKER_CACHE
 
 ORIGINAL_PREFILTER = recommend_routes._prefilter_allowed_ids
+
+
+@pytest.fixture(autouse=True)
+def _tmdb_client_stub():
+    previous = getattr(app.state, "tmdb_client", None)
+
+    class _StubClient:
+        async def search(self, query, media_type=None):
+            return {"results": []}
+
+        async def aclose(self):
+            return None
+
+    ENTITY_LINKER_CACHE.clear()
+    app.state.tmdb_client = _StubClient()
+    try:
+        yield
+    finally:
+        app.state.tmdb_client = previous
 
 
 @pytest.fixture(autouse=True)
@@ -641,3 +663,176 @@ def test_float_from_env_parses_values(monkeypatch):
     assert recommend_routes._float_from_env("FLOAT_ENV", 0.0) == 0.0
     monkeypatch.delenv("FLOAT_ENV", raising=False)
     assert recommend_routes._float_from_env("FLOAT_ENV", 2.5) == 2.5
+
+
+@pytest.mark.asyncio
+async def test_recommend_uses_entity_linker_and_blends_query_vector(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Alpha",
+            overview="Alpha saves the world.",
+            poster_url="alpha.jpg",
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Action"}],
+            release_year=2020,
+        ),
+        SimpleNamespace(
+            id=2,
+            tmdb_id=202,
+            media_type="movie",
+            title="Beta",
+            overview="Beta uncovers a mystery.",
+            poster_url="beta.jpg",
+            runtime=90,
+            original_language="en",
+            genres=[{"name": "Mystery"}],
+            release_year=2022,
+        ),
+    ]
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    short_v = np.ones(384, dtype="float32")
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            short_v,
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    recorded = {}
+
+    async def fake_link(self, query):
+        recorded["searched_query"] = query
+        return {"movie": [101], "person": []}
+
+    monkeypatch.setattr(recommend_routes.EntityLinker, "link_entities", fake_link)
+
+    previous_tmdb = app.state.tmdb_client
+    app.state.tmdb_client = object()
+
+    original_parse = recommend_routes._parse_llm_intent
+
+    def fake_parse(query, user_context, linked_entities=None):
+        recorded["linked_entities"] = linked_entities
+        return original_parse(query, user_context, linked_entities)
+
+    monkeypatch.setattr(recommend_routes, "_parse_llm_intent", fake_parse)
+
+    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+        recorded["allowed_ids"] = allowed_ids
+        recorded["q_vec"] = vec
+        return [1, 2]
+
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+    monkeypatch.setattr(
+        recommend_routes, "_prefilter_allowed_ids", lambda db, intent, limit: [1]
+    )
+
+    rewrite_vec = np.full(384, 0.5, dtype="float32")
+    monkeypatch.setattr(
+        recommend_routes,
+        "rewrite_query",
+        lambda query, intent: SimpleNamespace(rewritten_text="rewritten query"),
+    )
+    monkeypatch.setattr(recommend_routes, "encode_texts", lambda texts: [rewrite_vec])
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get(
+            "/recommend", params={"user_id": "u1", "query": "alpha movie"}
+        )
+
+    assert response.status_code == 200
+
+    app.dependency_overrides.clear()
+    app.state.tmdb_client = previous_tmdb
+    session.close()
+
+    assert recorded.get("linked_entities") == {"movie": [101], "person": []}
+    assert recorded.get("searched_query") == "alpha movie"
+    assert recorded["allowed_ids"] == [1]
+
+    alpha = 0.5
+    expected_q_vec = (alpha * short_v) + ((1 - alpha) * rewrite_vec)
+    expected_q_vec = expected_q_vec / np.linalg.norm(expected_q_vec)
+    assert np.allclose(recorded["q_vec"], expected_q_vec)
+
+
+def test_recommend_logs_cold_start_path(monkeypatch, caplog):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Alpha",
+            overview="Alpha saves the world.",
+            poster_url="alpha.jpg",
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Action"}],
+            release_year=2020,
+        ),
+    ]
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            None,
+            None,
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "_cold_start_candidates",
+        lambda db, intent, limit, allowlist: [1],
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+
+    with caplog.at_level(logging.INFO, logger=recommend_routes.logger.name):
+        with TestClient(app) as client:
+            client.get("/recommend", params={"user_id": "u1"})
+
+    app.dependency_overrides.clear()
+    session.close()
+
+    assert any(
+        "Using cold-start candidates for user u1" in message
+        for message in caplog.messages
+    )

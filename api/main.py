@@ -10,6 +10,8 @@ from api.routes.user import router as user_router
 from api.routes.recommend import router as recommend_router
 from api.routes.watch import router as watch_router
 from api.routes.feedback import router as feedback_router
+from api.config import TMDB_API_KEY
+from etl.tmdb_client import TMDBClient
 
 # Configure logging
 logging.basicConfig(
@@ -28,7 +30,13 @@ logging.getLogger("httpcore").setLevel(logging.INFO)
 @asynccontextmanager
 async def app_lifespan(app: FastAPI):
     _initialise_application(app)
+    tmdb_client = TMDBClient(TMDB_API_KEY) if TMDB_API_KEY else None
+    app.state.tmdb_client = tmdb_client
     yield
+    client = getattr(app.state, "tmdb_client", None)
+    if client is not None:
+        await client.aclose()
+        app.state.tmdb_client = None
 
 
 app = FastAPI(title="Seen'emAll", version="0.1.0", lifespan=app_lifespan)
@@ -58,6 +66,8 @@ def _initialise_application(app: FastAPI) -> None:
     init_engine()
     # Ensure we can get a sessionmaker without error
     get_sessionmaker()
+    if not hasattr(app.state, "tmdb_client"):
+        app.state.tmdb_client = None
 
 
 def on_startup() -> None:

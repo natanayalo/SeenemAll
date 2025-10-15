@@ -123,3 +123,39 @@ def test_details_delegates_to_get(monkeypatch):
         assert data["id"] == 9
 
     asyncio.run(scenario())
+
+
+def test_search_delegates_to_get(monkeypatch):
+    async def scenario():
+        client = TMDBClient("secret")
+
+        async def fake_get(path, params):
+            assert path == "/search/multi"
+            assert params == {"query": "test query"}
+            return {"results": [{"id": 1}]}
+
+        monkeypatch.setattr(client, "_get", fake_get)
+        data = await client.search("test query")
+        await client.aclose()
+
+        assert data["results"][0]["id"] == 1
+
+    asyncio.run(scenario())
+
+
+def test_search_with_media_type_delegates_to_get(monkeypatch):
+    async def scenario():
+        client = TMDBClient("secret")
+
+        async def fake_get(path, params):
+            assert path == "/search/movie"
+            assert params == {"query": "test query"}
+            return {"results": [{"id": 1}]}
+
+        monkeypatch.setattr(client, "_get", fake_get)
+        data = await client.search("test query", media_type="movie")
+        await client.aclose()
+
+        assert data["results"][0]["id"] == 1
+
+    asyncio.run(scenario())

@@ -1,6 +1,8 @@
 import json
 from types import SimpleNamespace
 
+import pytest
+
 from api.core.intent_parser import Intent
 from api.core import llm_parser
 from api.core.llm_parser import (
@@ -10,6 +12,25 @@ from api.core.llm_parser import (
     IntentParserSettings,
 )
 from api.core.rewrite import Rewrite
+
+
+@pytest.fixture(autouse=True)
+def _reset_llm_state(monkeypatch):
+    llm_parser.INTENT_CACHE.clear()
+    llm_parser.REWRITE_CACHE.clear()
+    for key in llm_parser.CACHE_METRICS:
+        llm_parser.CACHE_METRICS[key] = 0
+    monkeypatch.delenv("INTENT_API_KEY", raising=False)
+    monkeypatch.delenv("INTENT_ENABLED", raising=False)
+    original_get_settings = llm_parser._get_settings
+    if hasattr(original_get_settings, "cache_clear"):
+        original_get_settings.cache_clear()
+    yield
+    current_get_settings = getattr(llm_parser, "_get_settings", None)
+    if hasattr(current_get_settings, "cache_clear"):
+        current_get_settings.cache_clear()
+    elif hasattr(original_get_settings, "cache_clear"):
+        original_get_settings.cache_clear()
 
 
 def test_parse_intent_fixtures():
@@ -40,9 +61,10 @@ def test_parse_intent_fixtures():
     ]
 
     for query, expected_intent in test_cases:
-        # The user_context is not used in the mock implementation, so we can pass an empty dict.
         intent = parse_intent(query, {})
-        assert intent == expected_intent, f"Query: '{query}' failed"
+        assert (
+            intent.model_dump() == expected_intent.model_dump()
+        ), f"Query: '{query}' failed"
 
 
 def test_rewrite_query():
@@ -69,14 +91,7 @@ def test_rewrite_query():
         assert rewrite == expected_rewrite
 
 
-def _reset_llm_caches():
-    llm_parser.INTENT_CACHE.clear()
-    for key in llm_parser.CACHE_METRICS:
-        llm_parser.CACHE_METRICS[key] = 0
-
-
 def test_parse_intent_uses_cache(monkeypatch):
-    _reset_llm_caches()
     user_context = {"user_id": "u-test"}
     first = parse_intent("no gore", user_context)
     assert first.exclude_genres == ["Horror"]
@@ -89,9 +104,6 @@ def test_parse_intent_uses_cache(monkeypatch):
 
 
 def test_parse_intent_llm_failure_falls_back(monkeypatch):
-    _reset_llm_caches()
-    llm_parser._get_settings.cache_clear()
-
     settings = IntentParserSettings(
         provider="openai",
         api_key="test-key",
@@ -103,7 +115,7 @@ def test_parse_intent_llm_failure_falls_back(monkeypatch):
 
     monkeypatch.setattr(llm_parser, "_get_settings", lambda: settings)
 
-    def fake_call(settings, query, user_context):
+    def fake_call(settings, query, user_context, linked_entities):
         raise llm_parser.IntentParserError("boom")
 
     monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
@@ -113,9 +125,6 @@ def test_parse_intent_llm_failure_falls_back(monkeypatch):
 
 
 def test_parse_intent_llm_success(monkeypatch):
-    _reset_llm_caches()
-    llm_parser._get_settings.cache_clear()
-
     settings = IntentParserSettings(
         provider="openai",
         api_key="test-key",
@@ -127,13 +136,14 @@ def test_parse_intent_llm_success(monkeypatch):
 
     monkeypatch.setattr(llm_parser, "_get_settings", lambda: settings)
 
-    def fake_call(settings, query, user_context):
+    def fake_call(settings, query, user_context, linked_entities):
         assert query == "find drama"
+        assert linked_entities == {"movie": [101]}
         return {"include_genres": ["Drama"]}
 
     monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
 
-    intent = parse_intent("find drama", {"user_id": "u3"})
+    intent = parse_intent("find drama", {"user_id": "u3"}, {"movie": [101]})
     assert intent.include_genres == ["Drama"]
 
 
@@ -186,7 +196,7 @@ def test_call_openai_parser_returns_payload(monkeypatch):
 
     monkeypatch.setattr(llm_parser.httpx, "Client", lambda *a, **k: DummyClient())
 
-    payload = llm_parser._call_openai_parser(settings, "query", {})
+    payload = llm_parser._call_openai_parser(settings, "query", {}, None)
     assert payload == {"include_genres": ["Comedy"]}
 
 
@@ -234,7 +244,7 @@ def test_call_gemini_parser_returns_payload(monkeypatch):
 
     monkeypatch.setattr(llm_parser.httpx, "Client", lambda *a, **k: DummyClient())
 
-    payload = llm_parser._call_gemini_parser(settings, "query", {})
+    payload = llm_parser._call_gemini_parser(settings, "query", {}, None)
     assert payload == {"languages": ["fr"]}
 
 
