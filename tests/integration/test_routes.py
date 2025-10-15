@@ -208,8 +208,9 @@ def test_recommend_endpoint_returns_ranked_items(monkeypatch):
     assert items[0]["release_year"] == 2022
 
 
-def test_recommend_endpoint_requires_user_vector(monkeypatch):
-    session = _RecommendSession([])
+def test_recommend_endpoint_handles_cold_start(monkeypatch):
+    items = _make_items()
+    session = _RecommendSession(items)
 
     def override_get_db() -> Iterator[_RecommendSession]:
         yield session
@@ -227,13 +228,22 @@ def test_recommend_endpoint_requires_user_vector(monkeypatch):
 
     monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_user_state)
 
+    def fake_cold_start_candidates(db, intent, limit, allowlist):
+        assert limit >= 2
+        return [items[1].id, items[0].id]
+
+    monkeypatch.setattr(
+        recommend_routes, "_cold_start_candidates", fake_cold_start_candidates
+    )
+
     with TestClient(app) as client:
-        resp = client.get("/recommend", params={"user_id": "missing"})
+        resp = client.get("/recommend", params={"user_id": "missing", "limit": 2})
 
     app.dependency_overrides.clear()
 
-    assert resp.status_code == 400
-    assert resp.json()["detail"] == "No user vector. POST /user/history first."
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert [item["id"] for item in payload["items"]] == [200, 100]
 
 
 def test_recommend_endpoint_diversifies_items(monkeypatch):

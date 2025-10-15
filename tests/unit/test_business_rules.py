@@ -6,6 +6,7 @@ from typing import Dict, List
 import pytest
 
 from api.core import business_rules
+from api.core.legacy_intent_parser import IntentFilters
 
 
 def _make_item(
@@ -96,6 +97,122 @@ def test_apply_business_rules_respects_tmdb_boost(tmp_path, monkeypatch):
     result = business_rules.apply_business_rules(items, intent=None)
     assert [item["id"] for item in result] == [1, 2]
     assert result[0]["retrieval_score"] > result[1]["retrieval_score"]
+
+
+def test_apply_business_rules_with_intent_requirements(monkeypatch):
+    intent = IntentFilters(
+        raw_query="",
+        genres=["Comedy"],
+        moods=["light"],
+        media_types=["movie"],
+    )
+
+    rules = {
+        "filters": {
+            "require_intent_genres": True,
+            "include_genres": ["Comedy"],
+            "exclude_ids": ["3"],
+            "exclude_tmdb_ids": ["40"],
+            "max_release_year": 2025,
+        },
+        "boosts": {
+            "id_multipliers": {"1": 2.0},
+            "popularity_multiplier": {"threshold": 50, "factor": 1.5},
+        },
+    }
+
+    monkeypatch.setattr(business_rules, "load_rules", lambda: rules)
+
+    items = [
+        {
+            "id": 1,
+            "tmdb_id": 10,
+            "retrieval_score": 0.5,
+            "genres": [{"name": "Comedy"}],
+            "media_type": "movie",
+            "release_year": 2024,
+            "popularity": 100,
+        },
+        {
+            "id": 2,
+            "tmdb_id": 20,
+            "retrieval_score": 0.6,
+            "genres": [{"name": "Drama"}],
+            "media_type": "movie",
+            "release_year": 2024,
+            "popularity": 10,
+        },
+        {
+            "id": 3,
+            "tmdb_id": 30,
+            "retrieval_score": 0.7,
+            "genres": [{"name": "Comedy"}],
+            "media_type": "movie",
+            "release_year": 2024,
+            "popularity": 10,
+        },
+        {
+            "id": 4,
+            "tmdb_id": 40,
+            "retrieval_score": 0.8,
+            "genres": [{"name": "Comedy"}],
+            "media_type": "movie",
+            "release_year": 2026,
+            "popularity": 10,
+        },
+    ]
+
+    result = business_rules.apply_business_rules(items, intent=intent)
+    assert [item["id"] for item in result] == [1]
+    assert result[0]["retrieval_score"] > 0.5
+
+
+def test_load_rules_handles_missing_and_invalid_files(tmp_path, monkeypatch):
+    missing_path = tmp_path / "missing.json"
+    monkeypatch.setenv("BUSINESS_RULES_PATH", str(missing_path))
+    business_rules.clear_rules_cache()
+
+    rules = business_rules.load_rules()
+    assert rules == {}
+
+    bad_path = tmp_path / "bad.json"
+    bad_path.write_text("{not-json")
+    monkeypatch.setenv("BUSINESS_RULES_PATH", str(bad_path))
+    business_rules.clear_rules_cache()
+    rules = business_rules.load_rules()
+    assert rules == {}
+
+    good_path = tmp_path / "good.json"
+    good_path.write_text(json.dumps({"filters": {}}))
+    monkeypatch.setenv("BUSINESS_RULES_PATH", str(good_path))
+    business_rules.clear_rules_cache()
+    first = business_rules.load_rules()
+    assert first == {"filters": {}}
+    # Second call should hit cache and not re-read file
+    good_path.unlink()
+    second = business_rules.load_rules()
+    assert second == {}
+
+
+def test_helper_sanitizers_handle_edge_cases():
+    assert business_rules._safe_int(" 10 ") == 10
+    assert business_rules._safe_int("bad") is None
+    assert business_rules._safe_int(True) == 1
+    assert business_rules._safe_float(" 1.5 ") == 1.5
+    assert business_rules._safe_float("not-a-number") is None
+
+    item = {
+        "genres": [
+            {"name": "Comedy"},
+            {"name": "Drama"},
+        ]
+    }
+    assert list(business_rules._genre_names(item)) == ["Comedy", "Drama"]
+
+    multipliers = {"5": "2.0"}
+    boosted = business_rules._lookup_multiplier(multipliers, {"id": 5})
+    assert boosted == 2.0
+    assert business_rules._lookup_multiplier({}, {"id": 10}) == 1.0
 
 
 @pytest.fixture(autouse=True)

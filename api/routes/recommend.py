@@ -1,21 +1,33 @@
 from __future__ import annotations
-from typing import Any, Dict, List
+
 import base64
 import json
 import os
+import logging
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, cast
+from sqlalchemy.dialects.postgresql import JSONB
+
 from api.db.session import get_db
 from api.db.models import Item, ItemEmbedding, Availability
 from api.config import COUNTRY_DEFAULT
 from api.core.user_utils import load_user_state, canonical_profile_id
 from api.core.candidate_gen import ann_candidates
-from api.core.intent_parser import parse_intent, item_matches_intent, IntentFilters
+from api.core import llm_parser
+from api.core.intent_parser import Intent
+from api.core.legacy_intent_parser import (
+    parse_intent as legacy_parse_intent,
+    item_matches_intent,
+    IntentFilters,
+)
 from api.core.reranker import rerank_with_explanations, diversify_with_mmr
 from api.core.business_rules import apply_business_rules
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
+logger = logging.getLogger(__name__)
 
 
 def _float_from_env(name: str, default: float) -> float:
@@ -33,6 +45,57 @@ _HYBRID_ANN_WEIGHT = _float_from_env("HYBRID_ANN_WEIGHT", 0.5)
 _HYBRID_POPULARITY_WEIGHT = _float_from_env("HYBRID_POPULARITY_WEIGHT", 0.25)
 _HYBRID_TRENDING_WEIGHT = _float_from_env("HYBRID_TRENDING_WEIGHT", 0.4)
 _HYBRID_MIN_ANN_WEIGHT = 0.05
+
+
+def _parse_llm_intent(query: str | None, user_context: Dict[str, Any]) -> Intent:
+    if not query:
+        return llm_parser.default_intent()
+    try:
+        return llm_parser.parse_intent(query, user_context)
+    except Exception:
+        logger.exception("LLM intent parser failed; falling back to default intent.")
+        return llm_parser.default_intent()
+
+
+def _intent_filters_from_llm(query: str | None, llm_intent: Intent) -> IntentFilters:
+    genres = list(llm_intent.include_genres or [])
+    filters = IntentFilters(
+        raw_query=query or "",
+        genres=genres,
+        moods=[],
+        media_types=[],
+        min_runtime=llm_intent.runtime_minutes_min,
+        max_runtime=llm_intent.runtime_minutes_max,
+    )
+    return filters
+
+
+def _merge_with_legacy_filters(
+    primary: IntentFilters, fallback: IntentFilters | None
+) -> IntentFilters:
+    if not fallback:
+        return primary
+
+    # Merge genres with order preservation
+    seen_genres = {genre for genre in primary.genres}
+    for genre in fallback.genres:
+        if genre and genre not in seen_genres:
+            primary.genres.append(genre)
+            seen_genres.add(genre)
+
+    if not primary.moods and fallback.moods:
+        primary.moods = list(fallback.moods)
+
+    if not primary.media_types and fallback.media_types:
+        primary.media_types = list(fallback.media_types)
+
+    if primary.min_runtime is None and fallback.min_runtime is not None:
+        primary.min_runtime = fallback.min_runtime
+
+    if primary.max_runtime is None and fallback.max_runtime is not None:
+        primary.max_runtime = fallback.max_runtime
+
+    return primary
 
 
 @router.get("")
@@ -53,20 +116,24 @@ def recommend(
 ):
     canonical_id = canonical_profile_id(user_id, profile)
     long_v, short_v, exclude, profile_meta = load_user_state(db, canonical_id)
-    if short_v is None:
-        raise HTTPException(
-            status_code=400, detail="No user vector. POST /user/history first."
-        )
+    cold_start = short_v is None
 
-    intent = parse_intent(query)
+    llm_user_context = {"user_id": canonical_id, "profile_id": profile}
+    llm_intent = _parse_llm_intent(query, llm_user_context)
+    intent = _intent_filters_from_llm(query, llm_intent)
+    if query:
+        intent = _merge_with_legacy_filters(intent, legacy_parse_intent(query))
     candidate_limit = min(500, max(limit, limit * 3))
     if intent.has_filters():
         candidate_limit = min(500, max(candidate_limit, limit * 5))
 
     allowlist = _prefilter_allowed_ids(db, intent, candidate_limit)
-    ids: List[int] = ann_candidates(
-        db, short_v, exclude, limit=candidate_limit, allowed_ids=allowlist
-    )
+    if cold_start:
+        ids = _cold_start_candidates(db, intent, candidate_limit, allowlist)
+    else:
+        ids = ann_candidates(
+            db, short_v, exclude, limit=candidate_limit, allowed_ids=allowlist
+        )
     negative_items = set(profile_meta.get("negative_items") or [])
     if negative_items:
         ids = [i for i in ids if i not in negative_items]
@@ -242,7 +309,7 @@ def _apply_hybrid_boost(candidates: List[Dict[str, Any]]) -> None:
 def _prefilter_allowed_ids(
     db: Session, intent: IntentFilters | None, limit: int
 ) -> List[int] | None:
-    if intent is None:
+    if intent is None or not intent.has_filters():
         return None
 
     media_types = intent.media_types or []
@@ -261,7 +328,7 @@ def _prefilter_allowed_ids(
         for genre in genres:
             if not genre:
                 continue
-            filters.append(Item.genres.contains([{"name": genre}]))
+            filters.append(_genre_contains_clause(db, genre))
         if filters:
             stmt = stmt.where(or_(*filters))
 
@@ -270,6 +337,69 @@ def _prefilter_allowed_ids(
     if not rows:
         return []
     # Preserve ordering but ensure uniqueness
+    seen: set[int] = set()
+    ordered: List[int] = []
+    for value in rows:
+        if value not in seen:
+            seen.add(value)
+            ordered.append(value)
+    return ordered
+
+
+def _genre_contains_clause(db: Session, genre: str):
+    bind = getattr(db, "bind", None)
+    if bind is None:
+        get_bind = getattr(db, "get_bind", None)
+        if callable(get_bind):
+            try:
+                bind = get_bind()
+            except Exception:
+                bind = None
+
+    dialect_name: Optional[str] = None
+    if bind is not None:
+        dialect = getattr(bind, "dialect", None)
+        if dialect is not None:
+            dialect_name = getattr(dialect, "name", None)
+
+    if dialect_name == "postgresql":
+        return cast(Item.genres, JSONB).contains([{"name": genre}])
+
+    # Fallback for other dialects used in tests (e.g., SQLite memory stubs)
+    return Item.genres.contains([{"name": genre}])
+
+
+def _cold_start_candidates(
+    db: Session,
+    intent: IntentFilters,
+    limit: int,
+    allowlist: List[int] | None,
+) -> List[int]:
+    stmt = select(Item.id).join(ItemEmbedding, ItemEmbedding.item_id == Item.id)
+
+    if allowlist is not None:
+        if not allowlist:
+            return []
+        stmt = stmt.where(Item.id.in_(allowlist))
+    else:
+        if intent.media_types:
+            stmt = stmt.where(Item.media_type.in_(intent.media_types))
+        genres = intent.effective_genres()
+        if genres:
+            genre_filters = [
+                _genre_contains_clause(db, genre) for genre in genres if genre
+            ]
+            if genre_filters:
+                stmt = stmt.where(or_(*genre_filters))
+
+    stmt = stmt.order_by(
+        Item.popular_rank.asc().nullslast(),
+        Item.trending_rank.asc().nullslast(),
+        Item.popularity.desc().nullslast(),
+        Item.id.asc(),
+    ).limit(limit)
+
+    rows = db.execute(stmt).scalars().all()
     seen: set[int] = set()
     ordered: List[int] = []
     for value in rows:

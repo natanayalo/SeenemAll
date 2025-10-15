@@ -11,6 +11,7 @@ from api.core.user_profile import (
 )
 from api.db.models import User
 from tests.helpers import FakeSession
+from sqlalchemy.exc import SQLAlchemyError
 
 
 def test_time_decay_weights_normalises_and_prefers_recent():
@@ -189,3 +190,59 @@ def test_collaborative_vector_blends_into_long(monkeypatch):
     assert genre_prefs is not None
     assert neighbors == []
     assert negatives == []
+
+
+def test_collect_collaborative_vector_handles_sqlalchemy_error():
+    class BrokenSession:
+        def query(self, *args, **kwargs):
+            raise SQLAlchemyError("boom")
+
+    vec, neighbors = user_profile._collect_collaborative_vector(
+        BrokenSession(), "user", [1, 2]
+    )
+    assert vec is None and neighbors == []
+
+
+def test_collect_collaborative_vector_returns_neighbors():
+    class WeightQuery:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return self._rows
+
+    class UserQuery:
+        def __init__(self, users):
+            self._users = users
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return self._users
+
+    neighbor_user = User(user_id="neighbor", long_vec=[0.0, 1.0, 0.0])
+    neighbor_user.long_vec = [0.0, 1.0, 0.0]
+
+    class StubSession:
+        def __init__(self):
+            self.weights = [("neighbor", 2.0)]
+
+        def query(self, *entities):
+            if set(entities) == {
+                user_profile.UserHistory.user_id,
+                user_profile.UserHistory.weight,
+            }:
+                return WeightQuery(self.weights)
+            if len(entities) == 1 and entities[0] is User:
+                return UserQuery([neighbor_user])
+            raise AssertionError("Unexpected query")
+
+    vec, neighbors = user_profile._collect_collaborative_vector(
+        StubSession(), "user", [5]
+    )
+    assert vec is not None
+    assert neighbors and neighbors[0].user_id == "neighbor"

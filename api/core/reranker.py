@@ -11,7 +11,7 @@ from typing import Any, Dict, Iterable, List, Sequence
 import httpx
 import numpy as np
 
-from api.core.intent_parser import IntentFilters
+from api.core.legacy_intent_parser import IntentFilters
 from api.core.prompt_eval import load_prompt_template
 
 logger = logging.getLogger(__name__)
@@ -239,7 +239,7 @@ def _get_settings() -> RerankerSettings:
         provider = raw_provider
 
     if provider == "gemini":
-        default_model = "gemini-2.0-flash-exp"
+        default_model = "gemini-2.0-flash-lite"
         default_endpoint = "https://generativelanguage.googleapis.com/v1beta/models"
     else:
         default_model = "gpt-4o-mini"

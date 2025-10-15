@@ -38,7 +38,7 @@ def test_get_watch_link_redirects_to_deeplink(monkeypatch):
 
     with TestClient(app) as client:
         resp = client.get(
-            "/watch-link/123?service=nfx&country=US", allow_redirects=False
+            "/watch-link/123?service=nfx&country=US", follow_redirects=False
         )
 
     app.dependency_overrides.clear()
@@ -57,7 +57,7 @@ def test_get_watch_link_redirects_to_web_url_if_no_deeplink(monkeypatch):
 
     with TestClient(app) as client:
         resp = client.get(
-            "/watch-link/123?service=nfx&country=US", allow_redirects=False
+            "/watch-link/123?service=nfx&country=US", follow_redirects=False
         )
 
     app.dependency_overrides.clear()

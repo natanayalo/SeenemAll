@@ -9,7 +9,7 @@ import httpx
 import pytest
 
 from api.core import reranker
-from api.core.intent_parser import IntentFilters
+from api.core.legacy_intent_parser import IntentFilters
 
 
 def _reset_settings() -> None:

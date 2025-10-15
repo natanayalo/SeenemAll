@@ -1,120 +1,242 @@
-from __future__ import annotations
-
+import json
 from types import SimpleNamespace
 
-from api.core import intent_parser
-from api.core.intent_parser import parse_intent, item_matches_intent
+from api.core.intent_parser import Intent
+from api.core import llm_parser
+from api.core.llm_parser import (
+    parse_intent,
+    rewrite_query,
+    DEFAULT_INTENT,
+    IntentParserSettings,
+)
+from api.core.rewrite import Rewrite
 
 
-def test_parse_intent_extracts_genre_mood_and_runtime():
-    intent = parse_intent("light sci-fi < 2h")
-    assert "Science Fiction" in intent.genres
-    assert "light" in intent.moods
-    assert intent.max_runtime == 120
-    assert intent.min_runtime is None
-    assert intent.has_filters()
+def test_parse_intent_fixtures():
+    """
+    Tests the parse_intent function with a set of predefined fixtures.
+    """
+    test_cases = [
+        (
+            "light sci-fi <2h",
+            Intent(include_genres=["Science Fiction"], runtime_minutes_max=120),
+        ),
+        (
+            "no gore",
+            Intent(exclude_genres=["Horror"]),
+        ),
+        (
+            "movies from the 90s",
+            Intent(year_min=1990, year_max=1999),
+        ),
+        (
+            "something in french",
+            Intent(languages=["fr"]),
+        ),
+        (
+            "bad query",
+            DEFAULT_INTENT,
+        ),
+    ]
 
-    item = SimpleNamespace(
-        media_type="movie",
-        runtime=110,
-        genres=[{"name": "Science Fiction"}],
+    for query, expected_intent in test_cases:
+        # The user_context is not used in the mock implementation, so we can pass an empty dict.
+        intent = parse_intent(query, {})
+        assert intent == expected_intent, f"Query: '{query}' failed"
+
+
+def test_rewrite_query():
+    """
+    Tests the rewrite_query function with a set of predefined fixtures.
+    """
+    test_cases = [
+        (
+            Intent(include_genres=["sci-fi"], runtime_minutes_max=120),
+            Rewrite(rewritten_text="sci-fi movies"),
+        ),
+        (
+            Intent(include_genres=["Science Fiction"]),
+            Rewrite(rewritten_text="sci-fi movies"),
+        ),
+        (
+            Intent(exclude_genres=["horror"]),
+            Rewrite(rewritten_text=""),
+        ),
+    ]
+
+    for intent, expected_rewrite in test_cases:
+        rewrite = rewrite_query("some query", intent)
+        assert rewrite == expected_rewrite
+
+
+def _reset_llm_caches():
+    llm_parser.INTENT_CACHE.clear()
+    for key in llm_parser.CACHE_METRICS:
+        llm_parser.CACHE_METRICS[key] = 0
+
+
+def test_parse_intent_uses_cache(monkeypatch):
+    _reset_llm_caches()
+    user_context = {"user_id": "u-test"}
+    first = parse_intent("no gore", user_context)
+    assert first.exclude_genres == ["Horror"]
+
+    hits_before = llm_parser.CACHE_METRICS["hits"]
+    second = parse_intent("no gore", user_context)
+    assert second == first
+    assert second is not first
+    assert llm_parser.CACHE_METRICS["hits"] == hits_before + 1
+
+
+def test_parse_intent_llm_failure_falls_back(monkeypatch):
+    _reset_llm_caches()
+    llm_parser._get_settings.cache_clear()
+
+    settings = IntentParserSettings(
+        provider="openai",
+        api_key="test-key",
+        model="gpt-test",
+        endpoint="https://example.com",
+        enabled=True,
+        timeout=3.0,
     )
-    assert item_matches_intent(item, intent) is True
 
-    too_long = SimpleNamespace(
-        media_type="movie",
-        runtime=140,
-        genres=[{"name": "Science Fiction"}],
+    monkeypatch.setattr(llm_parser, "_get_settings", lambda: settings)
+
+    def fake_call(settings, query, user_context):
+        raise llm_parser.IntentParserError("boom")
+
+    monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
+
+    intent = parse_intent("no gore", {"user_id": "u2"})
+    assert intent.exclude_genres == ["Horror"]
+
+
+def test_parse_intent_llm_success(monkeypatch):
+    _reset_llm_caches()
+    llm_parser._get_settings.cache_clear()
+
+    settings = IntentParserSettings(
+        provider="openai",
+        api_key="test-key",
+        model="gpt-test",
+        endpoint="https://example.com",
+        enabled=True,
+        timeout=3.0,
     )
-    assert item_matches_intent(too_long, intent) is False
+
+    monkeypatch.setattr(llm_parser, "_get_settings", lambda: settings)
+
+    def fake_call(settings, query, user_context):
+        assert query == "find drama"
+        return {"include_genres": ["Drama"]}
+
+    monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
+
+    intent = parse_intent("find drama", {"user_id": "u3"})
+    assert intent.include_genres == ["Drama"]
 
 
-def test_parse_intent_supports_media_type_and_min_runtime():
-    intent = parse_intent("over 3 hours epic drama film")
-    assert intent.min_runtime == 180
-    assert intent.max_runtime is None
-    assert "Drama" in intent.genres
-    assert "movie" in intent.media_types
-    assert intent.has_filters()
+def test_get_settings_falls_back_to_openai(monkeypatch):
+    monkeypatch.setenv("INTENT_PROVIDER", "invalid")
+    monkeypatch.setenv("INTENT_API_KEY", "key")
+    llm_parser._get_settings.cache_clear()
+    settings = llm_parser._get_settings()
+    assert settings.provider == "openai"
+    assert settings.enabled is True
 
-    movie = SimpleNamespace(
-        media_type="movie",
-        runtime=200,
-        genres=[{"name": "Drama"}],
+
+def test_call_openai_parser_returns_payload(monkeypatch):
+    settings = IntentParserSettings(
+        provider="openai",
+        api_key="key",
+        model="gpt-test",
+        endpoint="https://example.com",
+        enabled=True,
+        timeout=2.0,
     )
-    assert item_matches_intent(movie, intent) is True
 
-    short_movie = SimpleNamespace(
-        media_type="movie",
-        runtime=150,
-        genres=[{"name": "Drama"}],
+    class DummyResponse:
+        status_code = 200
+
+        def __init__(self):
+            self.request = SimpleNamespace(
+                url=SimpleNamespace(copy_with=lambda **_: "https://example.com")
+            )
+
+        def json(self):
+            return {
+                "choices": [
+                    {"message": {"content": json.dumps({"include_genres": ["Comedy"]})}}
+                ]
+            }
+
+        def raise_for_status(self):
+            return None
+
+    class DummyClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def post(self, *args, **kwargs):
+            return DummyResponse()
+
+    monkeypatch.setattr(llm_parser.httpx, "Client", lambda *a, **k: DummyClient())
+
+    payload = llm_parser._call_openai_parser(settings, "query", {})
+    assert payload == {"include_genres": ["Comedy"]}
+
+
+def test_call_gemini_parser_returns_payload(monkeypatch):
+    settings = IntentParserSettings(
+        provider="gemini",
+        api_key="key",
+        model="gemini-model",
+        endpoint="https://example.com",
+        enabled=True,
+        timeout=2.0,
     )
-    assert item_matches_intent(short_movie, intent) is False
+
+    class DummyResponse:
+        status_code = 200
+
+        def __init__(self):
+            self.request = SimpleNamespace(
+                url=SimpleNamespace(copy_with=lambda **_: "https://example.com")
+            )
+
+        def json(self):
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [{"text": json.dumps({"languages": ["fr"]})}]
+                        }
+                    }
+                ]
+            }
+
+        def raise_for_status(self):
+            return None
+
+    class DummyClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def post(self, *args, **kwargs):
+            return DummyResponse()
+
+    monkeypatch.setattr(llm_parser.httpx, "Client", lambda *a, **k: DummyClient())
+
+    payload = llm_parser._call_gemini_parser(settings, "query", {})
+    assert payload == {"languages": ["fr"]}
 
 
-def test_mood_only_query_adds_fallback_genres():
-    intent = parse_intent("feel-good show")
-    # Should infer mood -> effective genres (Comedy/Family)
-    assert "light" in intent.moods
-    assert "tv" in intent.media_types
-    effective = intent.effective_genres()
-    assert "Comedy" in effective
-    assert intent.has_filters()
-
-
-def test_item_matches_intent_handles_media_types_and_varied_genre_structures():
-    intent = parse_intent("romantic comedy series under 45 minutes")
-    assert "tv" in intent.media_types
-    matcher = SimpleNamespace(
-        media_type="tv",
-        runtime=40,
-        genres=["Romance", "Comedy"],
-    )
-    assert item_matches_intent(matcher, intent) is True
-
-    wrong_media = SimpleNamespace(
-        media_type="movie",
-        runtime=40,
-        genres=["Romance"],
-    )
-    assert item_matches_intent(wrong_media, intent) is False
-
-    dict_genre = SimpleNamespace(
-        media_type="tv",
-        runtime=40,
-        genres={"name": "Drama"},
-    )
-    assert item_matches_intent(dict_genre, intent) is False
-
-    string_genre = SimpleNamespace(
-        media_type="tv",
-        runtime=40,
-        genres="Comedy",
-    )
-    assert item_matches_intent(string_genre, intent) is True
-
-
-def test_runtime_parsing_handles_between_and_inverted_bounds():
-    intent = parse_intent("between 1.5 hours and 2 hours")
-    assert intent.min_runtime == 90
-    assert intent.max_runtime == 120
-
-    inverted = parse_intent("over 120 minutes and under 90 minutes")
-    # swap occurs when bounds invert; the max bound should take precedence
-    assert inverted.min_runtime == 90
-    assert inverted.max_runtime == 120
-
-
-def test_invalid_runtime_tokens_are_ignored():
-    intent = parse_intent("under 0 minutes and minimum ninety minutes")
-    # 'under 0 minutes' is discarded because it results in None
-    assert intent.max_runtime is None
-    # 'minimum ninety minutes' cannot be parsed (non-numeric) so ignored
-    assert intent.min_runtime is None
-
-
-def test_helper_functions_handle_empty_inputs_and_invalid_minutes():
-    assert intent_parser._extract_genres("") == []
-    assert intent_parser._extract_moods("") == []
-    assert intent_parser._extract_media_types("") == []
-    assert intent_parser._to_minutes("not_a_number", "min") is None
+def test_offline_intent_stub_handles_unknown_query():
+    assert llm_parser._offline_intent_stub("unknown request") == {}
