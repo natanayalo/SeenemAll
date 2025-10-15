@@ -14,6 +14,8 @@ from api.routes import recommend as recommend_routes
 from api.core import business_rules
 from api.core.legacy_intent_parser import IntentFilters
 
+ORIGINAL_PREFILTER = recommend_routes._prefilter_allowed_ids
+
 
 @pytest.fixture(autouse=True)
 def _reset_prefilter(monkeypatch):
@@ -588,3 +590,54 @@ def test_cold_start_candidates_respects_allowlist(monkeypatch):
         session_no_allowlist, intent, limit=5, allowlist=None
     )
     assert result_no_allowlist == [3, 4]
+
+
+def test_genre_contains_clause_uses_jsonb_when_available():
+    class Dialect:
+        name = "postgresql"
+
+    class Bind:
+        dialect = Dialect()
+
+    session = SimpleNamespace(bind=Bind())
+    clause = recommend_routes._genre_contains_clause(session, "Comedy")
+    assert "genres" in str(clause)
+    assert "jsonb" in str(clause).lower()
+
+
+def test_prefilter_allowed_ids_short_circuits_without_filters():
+    intent = IntentFilters(raw_query="", genres=[], moods=[], media_types=[])
+    result = ORIGINAL_PREFILTER(object(), intent, limit=5)
+    assert result is None
+
+
+def test_prefilter_allowed_ids_returns_ordered_unique(monkeypatch):
+    class PrefilterSession:
+        def __init__(self, rows):
+            self.rows = rows
+            self.bind = SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+            self.last_statement = None
+
+        def execute(self, statement):
+            self.last_statement = statement
+            return FakeResult([(row,) for row in self.rows])
+
+    session = PrefilterSession([2, 1, 2])
+    intent = IntentFilters(
+        raw_query="",
+        genres=["Comedy"],
+        moods=[],
+        media_types=["movie"],
+    )
+    result = ORIGINAL_PREFILTER(session, intent, limit=10)
+    assert result == [2, 1]
+    assert session.last_statement is not None
+
+
+def test_float_from_env_parses_values(monkeypatch):
+    monkeypatch.setenv("FLOAT_ENV", "1.75")
+    assert recommend_routes._float_from_env("FLOAT_ENV", 0.0) == 1.75
+    monkeypatch.setenv("FLOAT_ENV", "not-a-number")
+    assert recommend_routes._float_from_env("FLOAT_ENV", 0.0) == 0.0
+    monkeypatch.delenv("FLOAT_ENV", raising=False)
+    assert recommend_routes._float_from_env("FLOAT_ENV", 2.5) == 2.5

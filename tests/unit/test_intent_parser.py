@@ -1,3 +1,6 @@
+import json
+from types import SimpleNamespace
+
 from api.core.intent_parser import Intent
 from api.core import llm_parser
 from api.core.llm_parser import (
@@ -132,3 +135,108 @@ def test_parse_intent_llm_success(monkeypatch):
 
     intent = parse_intent("find drama", {"user_id": "u3"})
     assert intent.include_genres == ["Drama"]
+
+
+def test_get_settings_falls_back_to_openai(monkeypatch):
+    monkeypatch.setenv("INTENT_PROVIDER", "invalid")
+    monkeypatch.setenv("INTENT_API_KEY", "key")
+    llm_parser._get_settings.cache_clear()
+    settings = llm_parser._get_settings()
+    assert settings.provider == "openai"
+    assert settings.enabled is True
+
+
+def test_call_openai_parser_returns_payload(monkeypatch):
+    settings = IntentParserSettings(
+        provider="openai",
+        api_key="key",
+        model="gpt-test",
+        endpoint="https://example.com",
+        enabled=True,
+        timeout=2.0,
+    )
+
+    class DummyResponse:
+        status_code = 200
+
+        def __init__(self):
+            self.request = SimpleNamespace(
+                url=SimpleNamespace(copy_with=lambda **_: "https://example.com")
+            )
+
+        def json(self):
+            return {
+                "choices": [
+                    {"message": {"content": json.dumps({"include_genres": ["Comedy"]})}}
+                ]
+            }
+
+        def raise_for_status(self):
+            return None
+
+    class DummyClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def post(self, *args, **kwargs):
+            return DummyResponse()
+
+    monkeypatch.setattr(llm_parser.httpx, "Client", lambda *a, **k: DummyClient())
+
+    payload = llm_parser._call_openai_parser(settings, "query", {})
+    assert payload == {"include_genres": ["Comedy"]}
+
+
+def test_call_gemini_parser_returns_payload(monkeypatch):
+    settings = IntentParserSettings(
+        provider="gemini",
+        api_key="key",
+        model="gemini-model",
+        endpoint="https://example.com",
+        enabled=True,
+        timeout=2.0,
+    )
+
+    class DummyResponse:
+        status_code = 200
+
+        def __init__(self):
+            self.request = SimpleNamespace(
+                url=SimpleNamespace(copy_with=lambda **_: "https://example.com")
+            )
+
+        def json(self):
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [{"text": json.dumps({"languages": ["fr"]})}]
+                        }
+                    }
+                ]
+            }
+
+        def raise_for_status(self):
+            return None
+
+    class DummyClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def post(self, *args, **kwargs):
+            return DummyResponse()
+
+    monkeypatch.setattr(llm_parser.httpx, "Client", lambda *a, **k: DummyClient())
+
+    payload = llm_parser._call_gemini_parser(settings, "query", {})
+    assert payload == {"languages": ["fr"]}
+
+
+def test_offline_intent_stub_handles_unknown_query():
+    assert llm_parser._offline_intent_stub("unknown request") == {}
