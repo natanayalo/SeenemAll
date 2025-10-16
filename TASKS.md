@@ -80,7 +80,7 @@
 | **6.4** Linker tests | ✅ | Queries like “like Interstellar”, “more from Villeneuve” |
 | **6.5** Blend query vector | ✅ | `qvec = normalize(α·short_vec + (1-α)·emb(rewrite))` |
 | **6.6** Cold-start fallbacks | ✅ | Handle missing vectors; log path taken |
-| **6.7** Collaborative recall | ⏳ | Neighbor-based recall from co-watch history |
+| **6.7** Collaborative recall | ✅ | Neighbor-based recall from co-watch history |
 | **6.8** Trending prior recall | ⏳ | Rolling CTR/popularity table |
 | **6.9** Mixer scoring | ⏳ | Weighted blend (content/CF/popularity) + novelty bonus |
 | **6.10** Mixer tests | ⏳ | Deterministic toy dataset validation |

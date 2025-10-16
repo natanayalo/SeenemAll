@@ -442,8 +442,6 @@ def _collaborative_candidates(
         if event_score <= 0:
             continue
         score = neighbor_weight * event_score
-        if score <= 0:
-            continue
         ts_value = 0.0
         if ts is not None:
             ts_value = float(ts.timestamp()) if hasattr(ts, "timestamp") else 0.0

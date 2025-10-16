@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from api.core.entity_linker import EntityLinker
 
@@ -13,9 +13,10 @@ def test_entity_linker_links_movies():
         ENTITY_LINKER_CACHE.clear()
 
         tmdb_client = Mock()
-        tmdb_client.search = Mock(return_value=asyncio.Future())
-        tmdb_client.search.return_value.set_result(
-            {"results": [{"id": 123, "title": "The Matrix", "media_type": "movie"}]}
+        tmdb_client.search = AsyncMock(
+            return_value={
+                "results": [{"id": 123, "title": "The Matrix", "media_type": "movie"}]
+            }
         )
 
         linker = EntityLinker(tmdb_client)
@@ -34,9 +35,10 @@ def test_entity_linker_caches_results():
         ENTITY_LINKER_CACHE.clear()
 
         tmdb_client = Mock()
-        tmdb_client.search = Mock(return_value=asyncio.Future())
-        tmdb_client.search.return_value.set_result(
-            {"results": [{"id": 123, "title": "The Matrix", "media_type": "movie"}]}
+        tmdb_client.search = AsyncMock(
+            return_value={
+                "results": [{"id": 123, "title": "The Matrix", "media_type": "movie"}]
+            }
         )
 
         linker = EntityLinker(tmdb_client)
@@ -58,9 +60,8 @@ def test_entity_linker_links_people():
         ENTITY_LINKER_CACHE.clear()
 
         tmdb_client = Mock()
-        tmdb_client.search = Mock(return_value=asyncio.Future())
-        tmdb_client.search.return_value.set_result(
-            {
+        tmdb_client.search = AsyncMock(
+            return_value={
                 "results": [
                     {"id": 123, "name": "Denis Villeneuve", "media_type": "person"}
                 ]
@@ -85,9 +86,8 @@ def test_entity_linker_handles_tv_and_empty_results():
         ENTITY_LINKER_CACHE.clear()
 
         tmdb_client = Mock()
-        tmdb_client.search = Mock(return_value=asyncio.Future())
-        tmdb_client.search.return_value.set_result(
-            {
+        tmdb_client.search = AsyncMock(
+            return_value={
                 "results": [
                     {"id": 55, "name": "Andor", "media_type": "tv"},
                     {"id": 99, "media_type": "episode"},
