@@ -27,7 +27,6 @@ from api.core.legacy_intent_parser import (
 )
 from api.core.reranker import rerank_with_explanations, diversify_with_mmr
 from api.core.business_rules import apply_business_rules
-from api.core.entity_linker import EntityLinker
 from api.core.llm_parser import rewrite_query
 from api.core.embeddings import encode_texts
 from api.core.user_profile import NEGATIVE_EVENT_TYPES, _event_weight
@@ -134,13 +133,9 @@ async def recommend(
     long_v, short_v, exclude, profile_meta = load_user_state(db, canonical_id)
     cold_start = short_v is None
 
-    tmdb_client = getattr(request.app.state, "tmdb_client", None)
     linked_entities = None
     if query:
         entity_linker = getattr(request.app.state, "entity_linker", None)
-        if entity_linker is None and tmdb_client:
-            entity_linker = EntityLinker(tmdb_client)
-            request.app.state.entity_linker = entity_linker
         if entity_linker:
             linked_entities = await entity_linker.link_entities(query)
 
@@ -272,8 +267,6 @@ async def recommend(
             continue
 
         sources = merged_scores.get(iid, {})
-        if iid in ann_scores and "ann" not in sources:
-            sources.setdefault("ann", ann_scores[iid])
 
         # Clean up watch_options - remove null entries and handle None case
         cleaned_options = []

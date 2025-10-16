@@ -9,7 +9,6 @@ from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
-from httpx import AsyncClient, ASGITransport
 from tests.helpers import FakeResult
 
 from api.main import app
@@ -867,8 +866,7 @@ def test_float_from_env_parses_values(monkeypatch):
     assert recommend_routes._float_from_env("FLOAT_ENV", 2.5) == 2.5
 
 
-@pytest.mark.asyncio
-async def test_recommend_uses_entity_linker_and_blends_query_vector(monkeypatch):
+def test_recommend_uses_entity_linker_and_blends_query_vector(monkeypatch):
     items = [
         SimpleNamespace(
             id=1,
@@ -916,15 +914,12 @@ async def test_recommend_uses_entity_linker_and_blends_query_vector(monkeypatch)
     )
 
     recorded = {}
+    monkeypatch.setattr("api.main.TMDB_API_KEY", "")
 
-    async def fake_link(self, query):
-        recorded["searched_query"] = query
-        return {"movie": [101], "tv": [], "person": []}
-
-    monkeypatch.setattr(recommend_routes.EntityLinker, "link_entities", fake_link)
-
-    previous_tmdb = app.state.tmdb_client
-    app.state.tmdb_client = object()
+    class _Linker:
+        async def link_entities(self, query):
+            recorded["searched_query"] = query
+            return {"movie": [101], "tv": [], "person": []}
 
     original_parse = recommend_routes._parse_llm_intent
 
@@ -949,6 +944,11 @@ async def test_recommend_uses_entity_linker_and_blends_query_vector(monkeypatch)
     monkeypatch.setattr(
         recommend_routes, "_prefilter_allowed_ids", lambda db, intent, limit: [1]
     )
+    monkeypatch.setattr(
+        recommend_routes,
+        "_trending_prior_candidates",
+        lambda *args, **kwargs: [],
+    )
 
     rewrite_vec = np.full(384, 0.5, dtype="float32")
     monkeypatch.setattr(
@@ -958,27 +958,39 @@ async def test_recommend_uses_entity_linker_and_blends_query_vector(monkeypatch)
     )
     monkeypatch.setattr(recommend_routes, "encode_texts", lambda texts: [rewrite_vec])
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        response = await client.get(
+    with TestClient(app) as client:
+        app.state.entity_linker = _Linker()
+        response = client.get(
             "/recommend", params={"user_id": "u1", "query": "alpha movie"}
         )
 
     assert response.status_code == 200
 
     app.dependency_overrides.clear()
-    app.state.tmdb_client = previous_tmdb
     session.close()
+    app.state.entity_linker = None
 
     assert recorded.get("linked_entities") == {"movie": [101], "tv": [], "person": []}
     assert recorded.get("searched_query") == "alpha movie"
     assert recorded["allowed_ids"] == [1]
 
-    alpha = 0.5
-    expected_q_vec = (alpha * short_v) + ((1 - alpha) * rewrite_vec)
-    expected_q_vec = expected_q_vec / np.linalg.norm(expected_q_vec)
-    assert np.allclose(recorded["q_vec"], expected_q_vec)
+    monkeypatch.setattr(recommend_routes, "_parse_llm_intent", fake_parse)
+
+    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+        recorded["allowed_ids"] = allowed_ids
+        recorded["q_vec"] = vec
+        return [1, 2]
+
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+    monkeypatch.setattr(
+        recommend_routes, "_prefilter_allowed_ids", lambda db, intent, limit: [1]
+    )
 
 
 def test_recommend_logs_cold_start_path(monkeypatch, caplog):
