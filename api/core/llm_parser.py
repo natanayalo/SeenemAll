@@ -122,7 +122,9 @@ def get_cache_key(
         or ""
     )
     linked_entities_hash = ""
-    if linked_entities:
+    if linked_entities and any(
+        linked_entities.get(key) for key in ("movie", "tv", "person")
+    ):
         linked_entities_hash = hashlib.sha256(
             json.dumps(linked_entities, sort_keys=True).encode()
         ).hexdigest()

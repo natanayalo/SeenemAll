@@ -45,18 +45,17 @@ class EntityLinker:
             movies: List[int] = []
             shows: List[int] = []
             persons: List[int] = []
+            media_map = {
+                "movie": movies,
+                "tv": shows,
+                "person": persons,
+            }
 
             for result in payload:
                 media_type = result.get("media_type")
                 tmdb_id = result.get("id")
-                if tmdb_id is None:
-                    continue
-                if media_type == "movie":
-                    movies.append(tmdb_id)
-                elif media_type == "tv":
-                    shows.append(tmdb_id)
-                elif media_type == "person":
-                    persons.append(tmdb_id)
+                if tmdb_id is not None and media_type in media_map:
+                    media_map[media_type].append(tmdb_id)
 
             linked_entities: Dict[str, Any] = {}
             if movies or shows or persons:
