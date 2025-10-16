@@ -6,6 +6,8 @@ from typing import Any, Dict, List
 
 from cachetools import TTLCache
 
+import httpx
+
 from etl.tmdb_client import TMDBClient
 
 logger = logging.getLogger(__name__)
@@ -34,7 +36,7 @@ class EntityLinker:
 
             try:
                 results = await self._tmdb.search(query, media_type="multi")
-            except Exception:  # pragma: no cover - network failure guard
+            except httpx.HTTPError:  # pragma: no cover - network failure guard
                 logger.warning("Entity linker failed to fetch results for %s", query)
                 ENTITY_LINKER_CACHE[query] = {}
                 return {}
