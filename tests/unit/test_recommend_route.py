@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 from types import SimpleNamespace
 from typing import Any, Dict, Sequence
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -54,6 +55,19 @@ def _reset_prefilter(monkeypatch):
 @pytest.fixture(autouse=True)
 def _clear_business_rules(monkeypatch):
     monkeypatch.setattr(business_rules, "load_rules", lambda: {})
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _disable_trending_prior(monkeypatch, request):
+    if request.node.get_closest_marker("enable_trending_helper"):
+        yield
+        return
+    monkeypatch.setattr(
+        recommend_routes,
+        "_trending_prior_candidates",
+        lambda *args, **kwargs: [],
+    )
     yield
 
 
@@ -185,17 +199,43 @@ def test_collaborative_candidates_scores_items():
         session, neighbors, exclude_ids=[20], limit=5, allowed_ids=None
     )
 
-    assert result == [10]
+    assert result[0][0] == 10
+    assert pytest.approx(result[0][1], rel=1e-6) == 1.0
 
     only_allowed = recommend_routes._collaborative_candidates(
         session, neighbors, exclude_ids=[], limit=5, allowed_ids=[20]
     )
-    assert only_allowed == [20]
+    assert only_allowed == [(20, 1.0)]
 
     blocked = recommend_routes._collaborative_candidates(
         session, neighbors, exclude_ids=[], limit=5, allowed_ids=[]
     )
     assert blocked == []
+
+
+@pytest.mark.enable_trending_helper
+def test_trending_prior_candidates_normalises_scores():
+    session = Mock()
+    session.execute = Mock(
+        return_value=FakeResult(
+            [
+                (1, 1, 3, 100.0),
+                (2, 2, None, 50.0),
+                (3, None, None, 10.0),
+            ]
+        )
+    )
+
+    results = recommend_routes._trending_prior_candidates(
+        session, None, exclude_ids=[], limit=3, allowed_ids=None
+    )
+
+    assert len(results) == 3
+    assert results[0][0] == 1
+    assert pytest.approx(results[0][1], rel=1e-6) == 1.0
+    assert results[1][0] == 2
+    assert results[2][0] == 3
+    assert results[2][1] >= 0.0
 
 
 def test_recommend_includes_reranker_output(monkeypatch):
@@ -505,7 +545,7 @@ def test_recommend_merges_collaborative_candidates(monkeypatch):
         recorded["exclude"] = list(exclude)
         recorded["limit"] = limit
         recorded["allowed"] = allowed_ids
-        return [2, 3]
+        return [(2, 1.0), (3, 0.8)]
 
     monkeypatch.setattr(recommend_routes, "_collaborative_candidates", fake_collab)
 
@@ -519,6 +559,12 @@ def test_recommend_merges_collaborative_candidates(monkeypatch):
         recommend_routes,
         "rewrite_query",
         lambda query, intent: SimpleNamespace(rewritten_text=""),
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "_trending_prior_candidates",
+        lambda db, intent, exclude, limit, allowed_ids=None: [(3, 0.6)],
     )
 
     monkeypatch.setattr(
@@ -543,7 +589,7 @@ def test_recommend_merges_collaborative_candidates(monkeypatch):
     assert recorded["neighbors"][0]["user_id"] == "ally"
 
 
-def test_recommend_hybrid_boosts_trending_items(monkeypatch):
+def test_recommend_mixer_scores_items(monkeypatch):
     items = [
         SimpleNamespace(
             id=1,
@@ -636,9 +682,8 @@ def test_recommend_hybrid_boosts_trending_items(monkeypatch):
     assert resp.status_code == 200
     body = resp.json()
     payload = body["items"]
-    assert [item["id"] for item in payload] == [1, 3, 2]
+    assert [item["id"] for item in payload] == [1, 2, 3]
     assert all("ann_rank" not in item for item in payload)
-    assert payload[1]["trending_rank"] == 1
 
 
 def test_recommend_supports_profile_parameter(monkeypatch):
