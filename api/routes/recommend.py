@@ -194,18 +194,20 @@ async def recommend(
         for iid, score in collab_scores.items():
             merged_scores.setdefault(iid, {})["collab"] = score / max_collab
 
-    trending_results = _trending_prior_candidates(
-        db,
-        intent,
-        exclude,
-        candidate_limit,
-        allowed_ids=allowlist,
-    )
-    trending_scores = {iid: score for iid, score in trending_results}
-    if trending_scores:
-        max_trending = max(trending_scores.values()) or 1.0
-        for iid, score in trending_scores.items():
-            merged_scores.setdefault(iid, {})["trending"] = score / max_trending
+    trending_results: List[Tuple[int, float]] = []
+    if cold_start or ann_scores or collab_scores:
+        trending_results = _trending_prior_candidates(
+            db,
+            intent,
+            exclude,
+            candidate_limit,
+            allowed_ids=allowlist,
+        )
+        trending_scores = {iid: score for iid, score in trending_results}
+        if trending_scores:
+            max_trending = max(trending_scores.values()) or 1.0
+            for iid, score in trending_scores.items():
+                merged_scores.setdefault(iid, {})["trending"] = score / max_trending
 
     collab_ids = [iid for iid, _ in collab_results]
     trending_ids = [iid for iid, _ in trending_results]
@@ -580,14 +582,58 @@ def _trending_prior_candidates(
         return []
 
     scored: List[Tuple[int, float, float]] = []
-    for item_id, trending_rank, popular_rank, popularity in rows:
+    for row in rows:
+        item_id: int | None = None
+        trending_rank = None
+        popular_rank = None
+        popularity = None
+        primary_item = None
+
+        if isinstance(row, (tuple, list)):
+            if len(row) >= 1:
+                candidate = row[0]
+                if hasattr(candidate, "id"):
+                    primary_item = candidate
+                else:
+                    item_id = candidate
+            if len(row) >= 2:
+                trending_rank = row[1]
+            if len(row) >= 3:
+                popular_rank = row[2]
+            if len(row) >= 4:
+                popularity = row[3]
+        else:
+            item_id = getattr(row, "id", None)
+            trending_rank = getattr(row, "trending_rank", None)
+            popular_rank = getattr(row, "popular_rank", None)
+            popularity = getattr(row, "popularity", None)
+
+        if item_id is None and primary_item is not None:
+            item_id = getattr(primary_item, "id", None)
+        if trending_rank is None and primary_item is not None:
+            trending_rank = getattr(primary_item, "trending_rank", None)
+        if popular_rank is None and primary_item is not None:
+            popular_rank = getattr(primary_item, "popular_rank", None)
+        if popularity is None and primary_item is not None:
+            popularity = getattr(primary_item, "popularity", None)
+
+        if item_id is None:
+            continue
+
+        if not isinstance(trending_rank, (int, float)):
+            trending_rank = None
+        if not isinstance(popular_rank, (int, float)):
+            popular_rank = None
+        if not isinstance(popularity, (int, float)):
+            popularity = None
+
         rank_score = 0.0
         if trending_rank and trending_rank > 0:
             rank_score += 1.0 / (1.0 + float(trending_rank))
         if popular_rank and popular_rank > 0:
             rank_score += 0.5 / (1.0 + float(popular_rank))
-        pop_score = float(popularity or 0.0)
-        scored.append((item_id, rank_score, pop_score))
+        pop_score = float(popularity) if popularity is not None else 0.0
+        scored.append((int(item_id), rank_score, pop_score))
 
     max_rank = max((entry[1] for entry in scored), default=0.0)
     max_pop = max((entry[2] for entry in scored), default=0.0)
