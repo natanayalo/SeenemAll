@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime, timedelta
 import numpy as np
 from types import SimpleNamespace
-from typing import Any, Sequence
+from typing import Any, Dict, Sequence
 
 import pytest
 from fastapi.testclient import TestClient
@@ -151,6 +152,50 @@ class CandidateSession:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+
+class CollabSession:
+    """Lightweight session for collaborative recall tests."""
+
+    def __init__(self, rows: Sequence[Any]):
+        self._rows = list(rows)
+
+    def execute(self, statement, *args, **kwargs):
+        return FakeResult(self._rows)
+
+
+def test_collaborative_candidates_scores_items():
+    now = datetime.now(UTC)
+    rows = [
+        (10, "ally", 1, "watched", now),
+        (10, "bob", 1, "liked", now - timedelta(minutes=5)),
+        (20, "ally", 1, "liked", now - timedelta(hours=1)),
+        (30, "bob", 1, "disliked", now),
+        (40, "ally", 1, "not_interested", now),
+        (50, "stranger", 1, "watched", now),
+    ]
+    session = CollabSession(rows)
+    neighbors = [
+        {"user_id": "ally", "weight": 0.5},
+        {"user_id": "bob", "weight": 1.5},
+        {"user_id": "zero", "weight": 0.0},
+    ]
+
+    result = recommend_routes._collaborative_candidates(
+        session, neighbors, exclude_ids=[20], limit=5, allowed_ids=None
+    )
+
+    assert result == [10]
+
+    only_allowed = recommend_routes._collaborative_candidates(
+        session, neighbors, exclude_ids=[], limit=5, allowed_ids=[20]
+    )
+    assert only_allowed == [20]
+
+    blocked = recommend_routes._collaborative_candidates(
+        session, neighbors, exclude_ids=[], limit=5, allowed_ids=[]
+    )
+    assert blocked == []
 
 
 def test_recommend_includes_reranker_output(monkeypatch):
@@ -387,6 +432,115 @@ def test_recommend_prefilter_passes_allowed_ids(monkeypatch):
     app.dependency_overrides.clear()
     session.close()
     assert recorded["allowed"] == [101, 202]
+
+
+def test_recommend_merges_collaborative_candidates(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Alpha",
+            overview="Alpha saves the world.",
+            poster_url="alpha.jpg",
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Action"}],
+            release_year=2020,
+        ),
+        SimpleNamespace(
+            id=2,
+            tmdb_id=202,
+            media_type="movie",
+            title="Beta",
+            overview="Beta uncovers a mystery.",
+            poster_url="beta.jpg",
+            runtime=90,
+            original_language="en",
+            genres=[{"name": "Mystery"}],
+            release_year=2022,
+        ),
+        SimpleNamespace(
+            id=3,
+            tmdb_id=303,
+            media_type="movie",
+            title="Gamma",
+            overview="Gamma surprises.",
+            poster_url="gamma.jpg",
+            runtime=95,
+            original_language="en",
+            genres=[{"name": "Drama"}],
+            release_year=2023,
+        ),
+    ]
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    short_v = np.ones(384, dtype="float32")
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            short_v,
+            [],
+            {
+                "genre_prefs": {},
+                "neighbors": [{"user_id": "ally", "weight": 0.7}],
+                "negative_items": [],
+            },
+        ),
+    )
+
+    recorded: Dict[str, Any] = {}
+
+    def fake_collab(db, neighbors, exclude, limit, allowed_ids=None):
+        recorded["neighbors"] = neighbors
+        recorded["exclude"] = list(exclude)
+        recorded["limit"] = limit
+        recorded["allowed"] = allowed_ids
+        return [2, 3]
+
+    monkeypatch.setattr(recommend_routes, "_collaborative_candidates", fake_collab)
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2],
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rewrite_query",
+        lambda query, intent: SimpleNamespace(rewritten_text=""),
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend", params={"user_id": "u1", "limit": 3, "diversify": "false"}
+        )
+
+    app.dependency_overrides.clear()
+    session.close()
+
+    assert resp.status_code == 200
+    body = resp.json()
+    payload_ids = [item["id"] for item in body["items"]]
+    assert payload_ids == [2, 3, 1]
+    assert recorded["limit"] == 9  # candidate_limit with limit=3
+    assert recorded["neighbors"][0]["user_id"] == "ally"
 
 
 def test_recommend_hybrid_boosts_trending_items(monkeypatch):
