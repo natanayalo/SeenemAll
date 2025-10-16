@@ -319,7 +319,9 @@ def _build_prompt_text(
     user_parts = []
     if example_text:
         user_parts.append(example_text)
-    if linked_entities:
+    if linked_entities and any(
+        linked_entities.get(key) for key in ("movie", "tv", "person")
+    ):
         user_parts.append(f"Linked Entities: {json.dumps(linked_entities)}")
     user_parts.append(f"Query: {query}")
     user_parts.append("Intent:")

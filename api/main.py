@@ -11,6 +11,7 @@ from api.routes.recommend import router as recommend_router
 from api.routes.watch import router as watch_router
 from api.routes.feedback import router as feedback_router
 from api.config import TMDB_API_KEY
+from api.core.entity_linker import EntityLinker
 from etl.tmdb_client import TMDBClient
 
 # Configure logging
@@ -32,11 +33,16 @@ async def app_lifespan(app: FastAPI):
     _initialise_application(app)
     tmdb_client = TMDBClient(TMDB_API_KEY) if TMDB_API_KEY else None
     app.state.tmdb_client = tmdb_client
+    if tmdb_client:
+        app.state.entity_linker = EntityLinker(tmdb_client)
+    else:
+        app.state.entity_linker = None
     yield
     client = getattr(app.state, "tmdb_client", None)
     if client is not None:
         await client.aclose()
         app.state.tmdb_client = None
+    app.state.entity_linker = None
 
 
 app = FastAPI(title="Seen'emAll", version="0.1.0", lifespan=app_lifespan)
@@ -68,6 +74,8 @@ def _initialise_application(app: FastAPI) -> None:
     get_sessionmaker()
     if not hasattr(app.state, "tmdb_client"):
         app.state.tmdb_client = None
+    if not hasattr(app.state, "entity_linker"):
+        app.state.entity_linker = None
 
 
 def on_startup() -> None:

@@ -23,6 +23,7 @@ ORIGINAL_PREFILTER = recommend_routes._prefilter_allowed_ids
 @pytest.fixture(autouse=True)
 def _tmdb_client_stub():
     previous = getattr(app.state, "tmdb_client", None)
+    previous_linker = getattr(app.state, "entity_linker", None)
 
     class _StubClient:
         async def search(self, query, media_type=None):
@@ -33,10 +34,12 @@ def _tmdb_client_stub():
 
     ENTITY_LINKER_CACHE.clear()
     app.state.tmdb_client = _StubClient()
+    app.state.entity_linker = None
     try:
         yield
     finally:
         app.state.tmdb_client = previous
+        app.state.entity_linker = previous_linker
 
 
 @pytest.fixture(autouse=True)
@@ -717,7 +720,7 @@ async def test_recommend_uses_entity_linker_and_blends_query_vector(monkeypatch)
 
     async def fake_link(self, query):
         recorded["searched_query"] = query
-        return {"movie": [101], "person": []}
+        return {"movie": [101], "tv": [], "person": []}
 
     monkeypatch.setattr(recommend_routes.EntityLinker, "link_entities", fake_link)
 
@@ -769,7 +772,7 @@ async def test_recommend_uses_entity_linker_and_blends_query_vector(monkeypatch)
     app.state.tmdb_client = previous_tmdb
     session.close()
 
-    assert recorded.get("linked_entities") == {"movie": [101], "person": []}
+    assert recorded.get("linked_entities") == {"movie": [101], "tv": [], "person": []}
     assert recorded.get("searched_query") == "alpha movie"
     assert recorded["allowed_ids"] == [1]
 

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from typing import Dict, Any
+import asyncio
+import logging
+from typing import Any, Dict, List
 
 from cachetools import TTLCache
 
 from etl.tmdb_client import TMDBClient
 
+logger = logging.getLogger(__name__)
+
 ENTITY_LINKER_CACHE: TTLCache[str, Dict[str, Any]] = TTLCache(maxsize=1000, ttl=300)
+_LINKER_CACHE_LOCK = asyncio.Lock()
 
 
 class EntityLinker:
@@ -15,20 +20,49 @@ class EntityLinker:
 
     async def link_entities(self, query: str) -> Dict[str, Any]:
         """Resolves entities in a query to TMDB IDs."""
-        if query in ENTITY_LINKER_CACHE:
-            return ENTITY_LINKER_CACHE[query]
-
-        results = await self._tmdb.search(query, media_type="multi")
-        if not results.get("results"):
+        if not query:
             return {}
 
-        linked_entities: Dict[str, Any] = {"movie": [], "person": []}
-        for result in results["results"]:
-            media_type = result.get("media_type")
-            if media_type == "movie":
-                linked_entities["movie"].append(result["id"])
-            elif media_type == "person":
-                linked_entities["person"].append(result["id"])
+        cached = ENTITY_LINKER_CACHE.get(query)
+        if cached is not None:
+            return cached
 
-        ENTITY_LINKER_CACHE[query] = linked_entities
-        return linked_entities
+        async with _LINKER_CACHE_LOCK:
+            cached = ENTITY_LINKER_CACHE.get(query)
+            if cached is not None:
+                return cached
+
+            try:
+                results = await self._tmdb.search(query, media_type="multi")
+            except Exception:  # pragma: no cover - network failure guard
+                logger.warning("Entity linker failed to fetch results for %s", query)
+                ENTITY_LINKER_CACHE[query] = {}
+                return {}
+
+            payload = results.get("results") or []
+            movies: List[int] = []
+            shows: List[int] = []
+            persons: List[int] = []
+
+            for result in payload:
+                media_type = result.get("media_type")
+                tmdb_id = result.get("id")
+                if tmdb_id is None:
+                    continue
+                if media_type == "movie":
+                    movies.append(tmdb_id)
+                elif media_type == "tv":
+                    shows.append(tmdb_id)
+                elif media_type == "person":
+                    persons.append(tmdb_id)
+
+            linked_entities: Dict[str, Any] = {}
+            if movies or shows or persons:
+                linked_entities = {
+                    "movie": movies,
+                    "tv": shows,
+                    "person": persons,
+                }
+
+            ENTITY_LINKER_CACHE[query] = linked_entities
+            return linked_entities

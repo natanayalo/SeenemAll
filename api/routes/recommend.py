@@ -49,6 +49,7 @@ _HYBRID_ANN_WEIGHT = _float_from_env("HYBRID_ANN_WEIGHT", 0.5)
 _HYBRID_POPULARITY_WEIGHT = _float_from_env("HYBRID_POPULARITY_WEIGHT", 0.25)
 _HYBRID_TRENDING_WEIGHT = _float_from_env("HYBRID_TRENDING_WEIGHT", 0.4)
 _HYBRID_MIN_ANN_WEIGHT = 0.05
+_REWRITE_BLEND_ALPHA = 0.5
 
 
 def _parse_llm_intent(
@@ -129,9 +130,13 @@ async def recommend(
 
     tmdb_client = getattr(request.app.state, "tmdb_client", None)
     linked_entities = None
-    if tmdb_client and query:
-        entity_linker = EntityLinker(tmdb_client)
-        linked_entities = await entity_linker.link_entities(query)
+    if query:
+        entity_linker = getattr(request.app.state, "entity_linker", None)
+        if entity_linker is None and tmdb_client:
+            entity_linker = EntityLinker(tmdb_client)
+            request.app.state.entity_linker = entity_linker
+        if entity_linker:
+            linked_entities = await entity_linker.link_entities(query)
 
     llm_user_context = {"user_id": canonical_id, "profile_id": profile}
     llm_intent = _parse_llm_intent(query, llm_user_context, linked_entities)
@@ -152,7 +157,7 @@ async def recommend(
         rewrite = rewrite_query(query or "", llm_intent)
         if rewrite.rewritten_text:
             rewrite_vec = encode_texts([rewrite.rewritten_text])[0]
-            alpha = 0.5
+            alpha = _REWRITE_BLEND_ALPHA
             q_vec = (alpha * short_v) + ((1 - alpha) * rewrite_vec)
             q_vec = q_vec / np.linalg.norm(q_vec)
         else:
