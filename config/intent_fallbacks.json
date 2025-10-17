@@ -46,7 +46,6 @@
   {
     "name": "no gore",
     "keywords": ["no gore", "not violent", "no violence"],
-    "exclude_genres": ["Horror", "Thriller"],
-    "maturity_rating_max": "PG-13"
+    "exclude_genres": ["Horror", "Thriller"]
   }
 ]

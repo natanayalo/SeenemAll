@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from threading import Lock
@@ -12,6 +13,7 @@ from cachetools import TTLCache
 from pydantic import ValidationError
 
 from .intent_parser import Intent
+from .legacy_intent_parser import parse_intent as legacy_parse_intent
 from .rewrite import Rewrite
 from api.core.prompt_eval import load_prompt_template
 
@@ -238,7 +240,8 @@ def _normalize_llm_output(
 
 
 def _augment_intent(intent: Intent, query: str) -> Intent:
-    tokens = set(query.replace("-", " ").lower().split())
+    normalized_query = query.lower()
+    tokens = set(normalized_query.replace("-", " ").split())
     include_genres = list(intent.include_genres or [])
     lower_includes = {genre.lower() for genre in include_genres}
     lower_excludes = {genre.lower() for genre in (intent.exclude_genres or [])}
@@ -247,7 +250,12 @@ def _augment_intent(intent: Intent, query: str) -> Intent:
     rules = _load_fallback_rules()
 
     for rule in rules:
-        if rule.keywords & tokens or rule.keywords & lower_includes:
+        keyword_hit = any(
+            keyword in tokens or keyword in normalized_query
+            for keyword in rule.keywords
+        )
+        include_hit = bool(rule.keywords & lower_includes)
+        if keyword_hit or include_hit:
             # Apply include genres
             if rule.include_genres:
                 for genre in rule.include_genres:
@@ -543,19 +551,121 @@ def _build_gemini_payload(
 
 
 def _offline_intent_stub(query: str) -> Dict[str, Any]:
-    normalized = query.strip().lower()
-    if not normalized:
+    stripped = (query or "").strip()
+    if not stripped:
         return {}
 
     intent = Intent()
-    intent = _augment_intent(intent, normalized)
-    return intent.model_dump(exclude_none=True)
+    intent = _augment_intent(intent, stripped.lower())
+
+    legacy_filters = legacy_parse_intent(query)
+    if legacy_filters.genres:
+        include_genres = list(intent.include_genres or [])
+        for genre in legacy_filters.genres:
+            if genre not in include_genres:
+                include_genres.append(genre)
+        if include_genres:
+            intent.include_genres = include_genres
+
+    if legacy_filters.min_runtime is not None and intent.runtime_minutes_min is None:
+        intent.runtime_minutes_min = legacy_filters.min_runtime
+
+    if legacy_filters.max_runtime is not None and intent.runtime_minutes_max is None:
+        intent.runtime_minutes_max = legacy_filters.max_runtime
+
+    if legacy_filters.maturity_rating_max and not intent.maturity_rating_max:
+        intent.maturity_rating_max = legacy_filters.maturity_rating_max
+
+    if intent.year_min is None and intent.year_max is None:
+        decade_range = _infer_year_range(stripped.lower())
+        if decade_range:
+            intent.year_min, intent.year_max = decade_range
+
+    if intent.languages is None:
+        detected_languages = _detect_languages(stripped.lower())
+        if detected_languages:
+            intent.languages = detected_languages
+
+    payload = intent.model_dump(exclude_none=True)
+    if legacy_filters.media_types:
+        payload.setdefault("media_types", list(legacy_filters.media_types))
+
+    return payload
+
+
+_DECADE_PATTERN = re.compile(r"\b(?:(?P<century>19|20)?(?P<decade>\d{2}))['’]?s\b")
+_GENRE_REWRITE_MAP = {
+    "science fiction": "sci-fi",
+    "sci fi": "sci-fi",
+    "sci-fi": "sci-fi",
+}
+_LANGUAGE_KEYWORDS = {
+    "french": "fr",
+    "spanish": "es",
+    "german": "de",
+    "italian": "it",
+    "japanese": "ja",
+    "korean": "ko",
+    "hindi": "hi",
+    "mandarin": "zh",
+    "chinese": "zh",
+    "portuguese": "pt",
+}
+
+
+def _infer_year_range(text: str) -> Optional[Tuple[int, int]]:
+    match = _DECADE_PATTERN.search(text)
+    if not match:
+        return None
+
+    century = match.group("century")
+    decade_str = match.group("decade")
+    if decade_str is None:
+        return None
+    decade = int(decade_str)
+
+    if century:
+        start_year = int(f"{century}{decade:02d}")
+    else:
+        base_century = 1900 if decade >= 50 else 2000
+        start_year = base_century + decade
+
+    start_year = (start_year // 10) * 10
+    end_year = start_year + 9
+    return start_year, end_year
+
+
+def _detect_languages(text: str) -> List[str]:
+    detected: List[str] = []
+    for keyword, code in _LANGUAGE_KEYWORDS.items():
+        if keyword in text and code not in detected:
+            detected.append(code)
+    return detected
+
+
+def _rewrite_from_intent(intent: Intent) -> Optional[str]:
+    include_genres = intent.include_genres or []
+    for genre in include_genres:
+        key = genre.lower()
+        phrase = _GENRE_REWRITE_MAP.get(key, key)
+        return f"{phrase} movies"
+
+    if intent.exclude_genres:
+        return ""
+
+    return None
+
+
+def _truncate_words(text: str, limit: int = 8) -> str:
+    words = text.split()
+    if len(words) <= limit:
+        return text
+    return " ".join(words[:limit])
 
 
 def rewrite_query(query: str, intent: Intent) -> Rewrite:
     """
     Rewrites the user's query into a concise, embeddable format.
-    Currently defers to the original query (no-op).
     """
     normalized_query = query or ""
     cache_key = get_rewrite_cache_key(normalized_query, intent)
@@ -567,7 +677,12 @@ def rewrite_query(query: str, intent: Intent) -> Rewrite:
 
     _log_metrics(_increment_metric("rewrite_misses"), cache="rewrite")
 
-    rewrite = Rewrite(rewritten_text=query)
+    rewritten_text = _rewrite_from_intent(intent)
+    if rewritten_text is None:
+        rewritten_text = normalized_query
+    rewritten_text = _truncate_words(rewritten_text)
+
+    rewrite = Rewrite(rewritten_text=rewritten_text)
 
     REWRITE_CACHE[cache_key] = _clone_rewrite(rewrite)
     _log_metrics(_snapshot_metrics(), cache="rewrite", event="store")

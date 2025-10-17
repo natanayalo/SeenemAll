@@ -30,6 +30,7 @@ from api.core.business_rules import apply_business_rules
 from api.core.llm_parser import rewrite_query
 from api.core.embeddings import encode_texts
 from api.core.user_profile import NEGATIVE_EVENT_TYPES, _event_weight
+from api.core.maturity import rating_level
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
 logger = logging.getLogger(__name__)
@@ -86,6 +87,7 @@ def _intent_filters_from_llm(query: str | None, llm_intent: Intent) -> IntentFil
         media_types=[],
         min_runtime=llm_intent.runtime_minutes_min,
         max_runtime=llm_intent.runtime_minutes_max,
+        maturity_rating_max=llm_intent.maturity_rating_max,
     )
     return filters
 
@@ -114,6 +116,17 @@ def _merge_with_legacy_filters(
 
     if primary.max_runtime is None and fallback.max_runtime is not None:
         primary.max_runtime = fallback.max_runtime
+
+    if fallback.maturity_rating_max:
+        if not primary.maturity_rating_max:
+            primary.maturity_rating_max = fallback.maturity_rating_max
+        else:
+            fallback_level = rating_level(fallback.maturity_rating_max)
+            primary_level = rating_level(primary.maturity_rating_max)
+            if fallback_level is not None and (
+                primary_level is None or fallback_level < primary_level
+            ):
+                primary.maturity_rating_max = fallback.maturity_rating_max
 
     return primary
 
@@ -401,6 +414,7 @@ async def recommend(
                 "release_year": it.release_year,
                 "collection_id": it.collection_id,
                 "collection_name": it.collection_name,
+                "maturity_rating": getattr(it, "maturity_rating", None),
                 "watch_options": cleaned_options,
                 "watch_url": (
                     cleaned_options[0]["url"] if cleaned_options else None

@@ -8,6 +8,7 @@ from api.db.session import get_engine, get_sessionmaker
 from api.db.models import Item
 from api.config import TMDB_API_KEY, TMDB_PAGE_LIMIT
 from etl.tmdb_client import TMDBClient
+from api.core.maturity import normalize_rating
 
 MEDIA_TYPES = ("movie", "tv")
 logger = logging.getLogger(__name__)
@@ -27,6 +28,64 @@ def _extract_release_year(data: Dict[str, Any]) -> Optional[int]:
             year_part = value[:4]
             if year_part.isdigit():
                 return int(year_part)
+    return None
+
+
+_PREFERRED_RATING_COUNTRIES = ("US", "CA", "GB", "AU")
+
+
+def _pick_rating(
+    entries: List[Dict[str, Any]],
+    value_iterator,
+) -> Optional[str]:
+    for country in _PREFERRED_RATING_COUNTRIES:
+        for entry in entries:
+            if entry.get("iso_3166_1") != country:
+                continue
+            for value in value_iterator(entry):
+                normalized = normalize_rating(value)
+                if normalized:
+                    return normalized
+    for entry in entries:
+        for value in value_iterator(entry):
+            normalized = normalize_rating(value)
+            if normalized:
+                return normalized
+    return None
+
+
+def _extract_movie_rating(data: Dict[str, Any]) -> Optional[str]:
+    payload = data.get("release_dates") or {}
+    results = payload.get("results") or []
+    if not isinstance(results, list):
+        return None
+
+    def iterator(entry: Dict[str, Any]):
+        release_dates = entry.get("release_dates") or []
+        if not isinstance(release_dates, list):
+            return []
+        return [rel.get("certification") for rel in release_dates]
+
+    return _pick_rating(results, iterator)
+
+
+def _extract_tv_rating(data: Dict[str, Any]) -> Optional[str]:
+    payload = data.get("content_ratings") or {}
+    results = payload.get("results") or []
+    if not isinstance(results, list):
+        return None
+
+    def iterator(entry: Dict[str, Any]):
+        return [entry.get("rating")]
+
+    return _pick_rating(results, iterator)
+
+
+def _extract_maturity_rating(media_type: str, data: Dict[str, Any]) -> Optional[str]:
+    if media_type == "movie":
+        return _extract_movie_rating(data)
+    if media_type == "tv":
+        return _extract_tv_rating(data)
     return None
 
 
@@ -89,6 +148,7 @@ def map_item_payload(d: Dict[str, Any]) -> Dict[str, Any]:
         genres=genres,
         poster_url=poster_url,
         release_year=_extract_release_year(d),
+        maturity_rating=_extract_maturity_rating(media_type, d),
         collection_id=collection_id,
         collection_name=collection_name,
         popularity=popularity,

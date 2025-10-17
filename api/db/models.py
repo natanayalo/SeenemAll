@@ -41,6 +41,7 @@ class Item(Base):
     release_year: Mapped[Optional[int]] = mapped_column(
         Integer, nullable=True, index=True
     )
+    maturity_rating: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     collection_id: Mapped[Optional[int]] = mapped_column(
         Integer, nullable=True, index=True
     )

@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Sequence, TYPE_CHECKING
 
 from api.core.prompt_eval import load_prompt_template
+from api.core.maturity import is_rating_within
 
 if TYPE_CHECKING:  # pragma: no cover - only used for typing
     from api.db.models import Item
@@ -151,6 +152,7 @@ class IntentFilters:
     media_types: List[str] = field(default_factory=list)
     min_runtime: Optional[int] = None
     max_runtime: Optional[int] = None
+    maturity_rating_max: Optional[str] = None
 
     def effective_genres(self) -> List[str]:
         seen: set[str] = set()
@@ -182,6 +184,7 @@ class IntentFilters:
             or self.min_runtime is not None
             or self.max_runtime is not None
             or self.effective_genres()
+            or self.maturity_rating_max
         )
 
 
@@ -247,6 +250,11 @@ def item_matches_intent(item: "Item | object", filters: IntentFilters | None) ->
             return False
     if filters.max_runtime is not None:
         if runtime is None or runtime > filters.max_runtime:
+            return False
+
+    if filters.maturity_rating_max:
+        item_rating = getattr(item, "maturity_rating", None)
+        if not is_rating_within(item_rating, filters.maturity_rating_max):
             return False
 
     effective_genres = {g.lower() for g in filters.effective_genres()}
