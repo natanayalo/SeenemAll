@@ -147,7 +147,7 @@ def test_parse_intent_merges_list_payload(monkeypatch):
 
     intent = parse_intent("kids show", {"user_id": "u3"})
     assert intent.maturity_rating_max == "PG"
-    assert intent.exclude_genres == ["Horror"]
+    assert set(intent.exclude_genres or []) == {"Horror", "Thriller"}
     assert set(intent.include_genres or []) == {"Family", "Animation"}
 
 

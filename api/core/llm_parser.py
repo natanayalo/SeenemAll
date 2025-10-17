@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache
 from threading import Lock
-from typing import Any, Dict, Tuple, List
+from typing import Any, Dict, Tuple, List, Optional
 
 import httpx
 from cachetools import TTLCache
@@ -48,6 +48,87 @@ class IntentParserSettings:
     endpoint: str
     enabled: bool
     timeout: float
+
+
+@dataclass(frozen=True)
+class IntentFallbackRule:
+    keywords: set[str]
+    include_genres: List[str]
+    exclude_genres: List[str]
+    maturity_rating_max: Optional[str] = None
+
+
+_DEFAULT_FALLBACK_RULES: Tuple[IntentFallbackRule, ...] = (
+    IntentFallbackRule(
+        keywords={
+            "kid",
+            "kids",
+            "child",
+            "children",
+            "toddler",
+            "toddlers",
+            "family",
+            "family-friendly",
+            "familyfriendly",
+            "cartoon",
+        },
+        include_genres=["Family", "Animation"],
+        exclude_genres=["Horror", "Thriller"],
+        maturity_rating_max="PG",
+    ),
+)
+
+
+@lru_cache(maxsize=1)
+def _load_fallback_rules() -> Tuple[IntentFallbackRule, ...]:
+    path = os.getenv("INTENT_FALLBACKS_PATH")
+    if not path:
+        return _DEFAULT_FALLBACK_RULES
+
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            raw_rules = json.load(handle)
+        if not isinstance(raw_rules, list):
+            raise ValueError("Fallback rules file must contain a list of rules")
+    except (OSError, ValueError, json.JSONDecodeError):
+        logger.warning("Failed to load fallback rules from %s; using defaults.", path)
+        return _DEFAULT_FALLBACK_RULES
+
+    rules: List[IntentFallbackRule] = []
+    for entry in raw_rules:
+        if not isinstance(entry, dict):
+            continue
+        raw_keywords = entry.get("keywords") or []
+        keywords = {
+            str(keyword).lower()
+            for keyword in raw_keywords
+            if isinstance(keyword, str) and keyword.strip()
+        }
+        if not keywords:
+            continue
+        include_genres = [
+            str(genre)
+            for genre in entry.get("include_genres", [])
+            if isinstance(genre, str)
+        ]
+        exclude_genres = [
+            str(genre)
+            for genre in entry.get("exclude_genres", [])
+            if isinstance(genre, str)
+        ]
+        maturity = entry.get("maturity_rating_max")
+        if maturity is not None:
+            maturity = str(maturity)
+        rules.append(
+            IntentFallbackRule(
+                keywords=keywords,
+                include_genres=include_genres,
+                exclude_genres=exclude_genres,
+                maturity_rating_max=maturity,
+            )
+        )
+
+    return tuple(rules) if rules else _DEFAULT_FALLBACK_RULES
 
 
 @lru_cache(maxsize=1)
@@ -175,32 +256,34 @@ def _normalize_llm_output(
 def _augment_intent(intent: Intent, query: str) -> Intent:
     tokens = set(query.replace("-", " ").lower().split())
     include_genres = list(intent.include_genres or [])
-    lower_genres = {genre.lower() for genre in include_genres}
-
-    kids_keywords = {
-        "kid",
-        "kids",
-        "child",
-        "children",
-        "toddler",
-        "toddlers",
-        "family",
-        "family-friendly",
-        "familyfriendly",
-        "cartoon",
-    }
-    is_kid_query = bool(tokens & kids_keywords)
-    is_kid_genre = "kids" in lower_genres
+    lower_includes = {genre.lower() for genre in include_genres}
+    lower_excludes = {genre.lower() for genre in (intent.exclude_genres or [])}
 
     updated = intent.model_copy(deep=True)
+    rules = _load_fallback_rules()
 
-    if is_kid_query or is_kid_genre:
-        if updated.maturity_rating_max is None:
-            updated.maturity_rating_max = "PG"
-        for genre in ("Family", "Animation"):
-            if genre not in include_genres:
-                include_genres.append(genre)
-        updated.include_genres = include_genres
+    for rule in rules:
+        if rule.keywords & tokens or rule.keywords & lower_includes:
+            # Apply include genres
+            if rule.include_genres:
+                for genre in rule.include_genres:
+                    if genre not in include_genres:
+                        include_genres.append(genre)
+                updated.include_genres = include_genres
+
+            # Apply exclude genres
+            if rule.exclude_genres:
+                exclude_genres = list(updated.exclude_genres or [])
+                lower_excludes = {genre.lower() for genre in exclude_genres}
+                for genre in rule.exclude_genres:
+                    if genre.lower() not in lower_excludes:
+                        exclude_genres.append(genre)
+                        lower_excludes.add(genre.lower())
+                updated.exclude_genres = exclude_genres
+
+            # Apply maturity constraint
+            if rule.maturity_rating_max and not updated.maturity_rating_max:
+                updated.maturity_rating_max = rule.maturity_rating_max
 
     return updated
 
