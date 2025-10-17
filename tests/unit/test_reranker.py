@@ -657,6 +657,60 @@ def test_heuristic_ranker_highlights_trending(monkeypatch):
     _reset_settings()
 
 
+def test_explanation_templates_override(monkeypatch):
+    _reset_settings()
+    monkeypatch.delenv("RERANK_API_KEY", raising=False)
+    monkeypatch.setenv("RERANK_ENABLED", "0")
+    reranker._get_settings.cache_clear()
+
+    custom_templates = {
+        "narrative": {
+            "genre_match": "Custom genre match for {genres}.",
+            "fallback": "Custom narrative fallback.",
+        },
+        "heuristic": {
+            "trending": "Custom trending #{rank}.",
+            "recent": "Custom fresh in {year}.",
+            "fallback": "Custom heuristic fallback.",
+        },
+    }
+
+    monkeypatch.setattr(
+        reranker, "_load_explanation_templates", lambda: custom_templates
+    )
+
+    filters = IntentFilters(
+        raw_query="thrilling ride",
+        genres=["Thriller"],
+        moods=[],
+        media_types=["movie"],
+        min_runtime=None,
+        max_runtime=None,
+    )
+
+    current_year = datetime.now().year
+    items = [
+        {
+            "id": 1,
+            "title": "Custom Template Test",
+            "overview": "Edge of your seat thriller.",
+            "genres": [{"name": "Thriller"}],
+            "media_type": "movie",
+            "retrieval_score": 0.4,
+            "popularity": 40.0,
+            "trending_rank": 2,
+            "release_year": current_year,
+        }
+    ]
+
+    result = reranker.rerank_with_explanations(items, intent=filters, query=None)
+    explanation = result[0]["explanation"]
+    assert "Custom genre match" in explanation
+    assert "Custom trending #2" in explanation
+    assert f"{current_year}" in explanation
+    _reset_settings()
+
+
 def test_rerank_with_explanations_uses_llm_decisions(monkeypatch):
     _reset_settings()
     monkeypatch.setenv("RERANK_API_KEY", "fake-key")

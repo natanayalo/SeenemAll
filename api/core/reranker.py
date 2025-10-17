@@ -28,6 +28,23 @@ if not logger.handlers:
 _DEFAULT_MAX_ITEMS_FOR_LLM = 25
 _DEFAULT_TIMEOUT_SECONDS = 12.0
 
+_DEFAULT_EXPLANATION_TEMPLATES = {
+    "narrative": {
+        "genre_match": "Dialed into your {genres} vibe.",
+        "media_type": "It's a {media_type} pick like you asked for.",
+        "runtime_match": "Runs about {runtime} minutes, matching your runtime window.",
+        "query_fallback": 'Aligns with "{query}".',
+        "fallback": "Popular with viewers who share your taste.",
+    },
+    "heuristic": {
+        "trending": "Trending now (#{rank}).",
+        "popular": "Top popular pick (#{rank}).",
+        "votes": "Rated {vote_average:.1f}/10 by {vote_count} fans.",
+        "recent": "Fresh release from {year}.",
+        "fallback": "Popular with viewers who share your taste.",
+    },
+}
+
 
 def _float_from_env(name: str, default: float) -> float:
     raw = os.getenv(name)
@@ -65,6 +82,58 @@ _MMR_POOL_MIN = max(0, _int_from_env("MMR_POOL_MIN", 25))
 _MMR_POOL_MAX = _optional_int_from_env("MMR_POOL_MAX")
 if _MMR_POOL_MAX is not None and _MMR_POOL_MAX <= 0:
     _MMR_POOL_MAX = None
+
+_EXPLANATION_TEMPLATES_CACHE: Dict[str, Any] = {
+    "path": None,
+    "mtime": None,
+    "templates": _DEFAULT_EXPLANATION_TEMPLATES,
+}
+
+
+def _get_templates_path() -> str:
+    env_path = os.getenv("EXPLANATION_TEMPLATES_PATH")
+    if env_path:
+        return env_path
+    return os.path.join(os.getcwd(), "config", "explanation_templates.json")
+
+
+def _load_explanation_templates() -> Dict[str, Any]:
+    path = _get_templates_path()
+    global _EXPLANATION_TEMPLATES_CACHE
+    try:
+        mtime = os.path.getmtime(path)
+    except FileNotFoundError:
+        _EXPLANATION_TEMPLATES_CACHE = {
+            "path": path,
+            "mtime": None,
+            "templates": _DEFAULT_EXPLANATION_TEMPLATES,
+        }
+        return _DEFAULT_EXPLANATION_TEMPLATES
+
+    cache_path = _EXPLANATION_TEMPLATES_CACHE.get("path")
+    cache_mtime = _EXPLANATION_TEMPLATES_CACHE.get("mtime")
+    cache_templates = _EXPLANATION_TEMPLATES_CACHE.get("templates")
+    if cache_path == path and cache_mtime == mtime and cache_templates is not None:
+        return cache_templates  # type: ignore[return-value]
+
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            templates = json.load(handle)
+        if not isinstance(templates, dict):
+            raise ValueError("Explanation template file must contain a JSON object.")
+    except (json.JSONDecodeError, ValueError):
+        logger.warning(
+            "Failed to parse explanation templates at %s; falling back to defaults.",
+            path,
+        )
+        templates = _DEFAULT_EXPLANATION_TEMPLATES
+
+    _EXPLANATION_TEMPLATES_CACHE = {
+        "path": path,
+        "mtime": mtime,
+        "templates": templates,
+    }
+    return templates
 
 
 def _get_prompt_config():
@@ -443,7 +512,18 @@ def _heuristic_score(
     return round(score, 4), heuristics
 
 
+def _safe_template(template: str | None, **kwargs: Any) -> str:
+    if not template or not isinstance(template, str):
+        return ""
+    try:
+        return template.format(**kwargs)
+    except Exception:
+        return template
+
+
 def _heuristic_summary(item: Dict[str, Any], heuristics: Dict[str, Any]) -> str:
+    templates = _load_explanation_templates()
+    heuristic_templates = templates.get("heuristic", {})
     reasons: List[str] = []
 
     trending_rank = heuristics.get("trending_rank")
@@ -452,21 +532,29 @@ def _heuristic_summary(item: Dict[str, Any], heuristics: Dict[str, Any]) -> str:
         and trending_rank > 0
         and trending_rank <= 20
     ):
-        reasons.append(f"Trending now (#{int(trending_rank)}).")
+        template = heuristic_templates.get("trending") or "Trending now (#{rank})."
+        reasons.append(_safe_template(template, rank=int(trending_rank)))
 
     release_reason = ""
     if heuristics.get("recent_bonus", 0.0) >= 0.5:
         release_year = heuristics.get("release_year")
         if isinstance(release_year, int) and release_year > 1900:
-            release_reason = f"Fresh release from {release_year}."
+            template = heuristic_templates.get("recent") or "Fresh release from {year}."
+            release_reason = _safe_template(template, year=release_year)
     else:
         for field in ("release_date", "release_year"):
             value = item.get(field)
             if isinstance(value, datetime):
-                release_reason = f"Fresh release from {value.year}."
+                template = (
+                    heuristic_templates.get("recent") or "Fresh release from {year}."
+                )
+                release_reason = _safe_template(template, year=value.year)
                 break
             if isinstance(value, int) and value > 1900:
-                release_reason = f"Fresh release from {value}."
+                template = (
+                    heuristic_templates.get("recent") or "Fresh release from {year}."
+                )
+                release_reason = _safe_template(template, year=value)
                 break
     if release_reason:
         reasons.append(release_reason)
@@ -477,16 +565,32 @@ def _heuristic_summary(item: Dict[str, Any], heuristics: Dict[str, Any]) -> str:
         and popular_rank > 0
         and popular_rank <= 20
     ):
-        reasons.append(f"Top popular pick (#{int(popular_rank)}).")
+        template = heuristic_templates.get("popular") or "Top popular pick (#{rank})."
+        reasons.append(_safe_template(template, rank=int(popular_rank)))
 
     vote_average = heuristics.get("vote_average") or 0.0
     vote_count = heuristics.get("vote_count") or 0
     if vote_average and vote_average >= 7.5 and vote_count >= 500:
+        template = (
+            heuristic_templates.get("votes")
+            or "Rated {vote_average:.1f}/10 by {vote_count} fans."
+        )
         formatted_votes = f"{vote_count:,}"
-        reasons.append(f"Rated {vote_average:.1f}/10 by {formatted_votes} fans.")
+        reasons.append(
+            _safe_template(
+                template,
+                vote_average=vote_average,
+                vote_count=formatted_votes,
+                votes=formatted_votes,
+            )
+        )
 
     if not reasons and heuristics.get("popularity_norm", 0.0) >= 0.7:
-        reasons.append("Popular with viewers who share your taste.")
+        fallback = (
+            heuristic_templates.get("fallback")
+            or _DEFAULT_EXPLANATION_TEMPLATES["heuristic"]["fallback"]
+        )
+        reasons.append(fallback)
 
     return " ".join(reasons[:2])
 
@@ -823,6 +927,8 @@ def _default_explanation(
     query: str | None,
     intent_genres: Sequence[str],
 ) -> str:
+    templates = _load_explanation_templates()
+    narrative_templates = templates.get("narrative", {})
     parts: List[str] = []
 
     item_genres = _extract_genre_names(item.get("genres"))
@@ -832,10 +938,23 @@ def _default_explanation(
     ]
     if matched_genres:
         pretty = ", ".join(matched_genres[:2])
-        parts.append(f"Fits the {pretty} vibe you asked for.")
+        template = (
+            narrative_templates.get("genre_match")
+            or _DEFAULT_EXPLANATION_TEMPLATES["narrative"]["genre_match"]
+        )
+        parts.append(_safe_template(template, genres=pretty))
 
     if intent and intent.media_types and item.get("media_type") in intent.media_types:
-        parts.append(f"It's a {item['media_type']} pick like you specified.")
+        template = (
+            narrative_templates.get("media_type")
+            or _DEFAULT_EXPLANATION_TEMPLATES["narrative"]["media_type"]
+        )
+        parts.append(
+            _safe_template(
+                template,
+                media_type=str(item.get("media_type")),
+            )
+        )
 
     runtime = item.get("runtime")
     if (
@@ -846,17 +965,29 @@ def _default_explanation(
             or (intent.max_runtime and runtime <= intent.max_runtime)
         )
     ):
-        parts.append(f"Runs about {runtime} minutes, matching your runtime preference.")
+        template = (
+            narrative_templates.get("runtime_match")
+            or _DEFAULT_EXPLANATION_TEMPLATES["narrative"]["runtime_match"]
+        )
+        parts.append(_safe_template(template, runtime=runtime))
 
     summary = _short_overview(item.get("overview"))
     if summary:
         parts.append(summary)
 
     if query and not parts:
-        parts.append(f"Aligns with '{query}'.")
+        template = (
+            narrative_templates.get("query_fallback")
+            or _DEFAULT_EXPLANATION_TEMPLATES["narrative"]["query_fallback"]
+        )
+        parts.append(_safe_template(template, query=query))
 
     if not parts:
-        parts.append("Popular with viewers who share your taste.")
+        fallback = (
+            narrative_templates.get("fallback")
+            or _DEFAULT_EXPLANATION_TEMPLATES["narrative"]["fallback"]
+        )
+        parts.append(fallback)
 
     return " ".join(parts)
 
