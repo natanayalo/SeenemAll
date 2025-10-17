@@ -631,7 +631,7 @@ def test_heuristic_ranker_highlights_trending(monkeypatch):
     monkeypatch.setenv("RERANK_ENABLED", "0")
     reranker._get_settings.cache_clear()
 
-    current_year = datetime.now().year
+    current_year = datetime.utcnow().year
     items = [
         {
             "id": 1,
@@ -688,7 +688,7 @@ def test_explanation_templates_override(monkeypatch):
         max_runtime=None,
     )
 
-    current_year = datetime.now().year
+    current_year = datetime.utcnow().year
     items = [
         {
             "id": 1,

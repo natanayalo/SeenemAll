@@ -83,6 +83,15 @@ _MMR_POOL_MAX = _optional_int_from_env("MMR_POOL_MAX")
 if _MMR_POOL_MAX is not None and _MMR_POOL_MAX <= 0:
     _MMR_POOL_MAX = None
 
+_HEURISTIC_POPULARITY_WEIGHT = _float_from_env("HEURISTIC_POPULARITY_WEIGHT", 0.3)
+_HEURISTIC_VOTE_QUALITY_WEIGHT = _float_from_env("HEURISTIC_VOTE_QUALITY_WEIGHT", 0.2)
+_HEURISTIC_VOTE_VOLUME_WEIGHT = _float_from_env("HEURISTIC_VOTE_VOLUME_WEIGHT", 0.1)
+_HEURISTIC_TRENDING_WEIGHT = _float_from_env("HEURISTIC_TRENDING_WEIGHT", 0.25)
+_HEURISTIC_POPULAR_WEIGHT = _float_from_env("HEURISTIC_POPULAR_WEIGHT", 0.15)
+_HEURISTIC_RECENT_WEIGHT = _float_from_env("HEURISTIC_RECENT_WEIGHT", 0.2)
+_HEURISTIC_POSITION_BASE = _float_from_env("HEURISTIC_POSITION_BASE", 0.05)
+_HEURISTIC_POSITION_DECAY = _float_from_env("HEURISTIC_POSITION_DECAY", 0.002)
+
 
 def _get_templates_path() -> str:
     env_path = os.getenv("EXPLANATION_TEMPLATES_PATH")
@@ -454,13 +463,13 @@ def _heuristic_score(
 
     base_score = retrieval
     score = base_score
-    score += 0.3 * popularity_norm
-    score += 0.2 * vote_quality
-    score += 0.1 * vote_volume
-    score += 0.25 * trending_bonus
-    score += 0.15 * popular_bonus
-    score += 0.2 * recent_bonus
-    score += max(0.0, 0.05 - position * 0.002)
+    score += _HEURISTIC_POPULARITY_WEIGHT * popularity_norm
+    score += _HEURISTIC_VOTE_QUALITY_WEIGHT * vote_quality
+    score += _HEURISTIC_VOTE_VOLUME_WEIGHT * vote_volume
+    score += _HEURISTIC_TRENDING_WEIGHT * trending_bonus
+    score += _HEURISTIC_POPULAR_WEIGHT * popular_bonus
+    score += _HEURISTIC_RECENT_WEIGHT * recent_bonus
+    score += max(0.0, _HEURISTIC_POSITION_BASE - position * _HEURISTIC_POSITION_DECAY)
 
     heuristics = {
         "popularity_norm": popularity_norm,
@@ -499,21 +508,13 @@ def _heuristic_summary(item: Dict[str, Any], heuristics: Dict[str, Any]) -> str:
         template = heuristic_templates.get("trending") or "Trending now (#{rank})."
         reasons.append(_safe_template(template, rank=int(trending_rank)))
 
-    release_year_value: int | None = None
     if heuristics.get("recent_bonus", 0.0) >= 0.5:
         candidate_year = heuristics.get("release_year")
-        if isinstance(candidate_year, int):
-            release_year_value = candidate_year
-    if release_year_value is None:
-        raw_year = item.get("release_year")
-        if isinstance(raw_year, int):
-            release_year_value = raw_year
-
-    if release_year_value and release_year_value > 1900:
-        template = heuristic_templates.get("recent") or "Fresh release from {year}."
-        release_reason = _safe_template(template, year=release_year_value)
-        if release_reason:
-            reasons.append(release_reason)
+        if isinstance(candidate_year, int) and candidate_year > 1900:
+            template = heuristic_templates.get("recent") or "Fresh release from {year}."
+            release_reason = _safe_template(template, year=candidate_year)
+            if release_reason:
+                reasons.append(release_reason)
 
     popular_rank = heuristics.get("popular_rank")
     if (

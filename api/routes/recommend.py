@@ -174,6 +174,12 @@ def _apply_serendipity_slot(
     if len(existing_long_tail) >= target:
         return current
 
+    short_tail_candidates = [
+        idx for idx, item in enumerate(top_section) if not _is_long_tail(item, limit)
+    ]
+    if not short_tail_candidates:
+        return current
+
     top_ids = {item.get("id") for item in top_section if item.get("id") is not None}
 
     replacement_pool: List[Dict[str, Any]] = []
@@ -193,69 +199,23 @@ def _apply_serendipity_slot(
     if needed <= 0:
         return current
 
-    replacement_iter = iter(replacement_pool)
-    new_top: List[Dict[str, Any]] = []
-    used_ids: set[int] = set()
-    remaining_needed = needed
+    short_tail_candidates = short_tail_candidates[-needed:]
+    replacements = replacement_pool[:needed]
 
-    for item in top_section:
-        ident = item.get("id")
-        if ident is not None and _is_long_tail(item, limit):
-            if ident not in used_ids:
-                new_top.append(item)
-                used_ids.add(ident)
-            continue
+    new_top = top_section
+    for idx, replacement in zip(short_tail_candidates, replacements):
+        new_top[idx] = replacement
 
-        if remaining_needed > 0:
-            replacement = None
-            while True:
-                try:
-                    candidate = next(replacement_iter)
-                except StopIteration:
-                    candidate = None
-                if candidate is None:
-                    break
-                cand_id = candidate.get("id")
-                if cand_id is not None and cand_id not in used_ids:
-                    replacement = candidate
-                    break
-            if replacement is not None:
-                rep_id = replacement.get("id")
-                if rep_id is not None:
-                    new_top.append(replacement)
-                    used_ids.add(rep_id)
-                    remaining_needed -= 1
-                    continue
-
-        if ident is None:
-            new_top.append(item)
-        elif ident not in used_ids:
-            new_top.append(item)
-            used_ids.add(ident)
-
-    final_list: List[Dict[str, Any]] = []
+    deduped: List[Dict[str, Any]] = []
     seen_ids: set[int] = set()
-    for item in new_top:
+    for item in new_top + list(current):
         ident = item.get("id")
-        if ident is None:
-            final_list.append(item)
-            continue
-        if ident in seen_ids:
-            continue
-        final_list.append(item)
-        seen_ids.add(ident)
+        if ident is None or ident not in seen_ids:
+            if ident is not None:
+                seen_ids.add(ident)
+            deduped.append(item)
 
-    for item in current:
-        ident = item.get("id")
-        if ident is None:
-            final_list.append(item)
-            continue
-        if ident in seen_ids:
-            continue
-        final_list.append(item)
-        seen_ids.add(ident)
-
-    return final_list
+    return deduped
 
 
 @router.get("")
