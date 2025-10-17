@@ -58,32 +58,16 @@ class IntentFallbackRule:
     maturity_rating_max: Optional[str] = None
 
 
-_DEFAULT_FALLBACK_RULES: Tuple[IntentFallbackRule, ...] = (
-    IntentFallbackRule(
-        keywords={
-            "kid",
-            "kids",
-            "child",
-            "children",
-            "toddler",
-            "toddlers",
-            "family",
-            "family-friendly",
-            "familyfriendly",
-            "cartoon",
-        },
-        include_genres=["Family", "Animation"],
-        exclude_genres=["Horror", "Thriller"],
-        maturity_rating_max="PG",
-    ),
-)
+_DEFAULT_FALLBACK_RULES: Tuple[IntentFallbackRule, ...] = tuple()
 
 
 @lru_cache(maxsize=1)
 def _load_fallback_rules() -> Tuple[IntentFallbackRule, ...]:
     path = os.getenv("INTENT_FALLBACKS_PATH")
     if not path:
-        return _DEFAULT_FALLBACK_RULES
+        path = os.path.join(os.getcwd(), "config", "intent_fallbacks.json")
+        if not os.path.exists(path):
+            return _DEFAULT_FALLBACK_RULES
 
     try:
         with open(path, "r", encoding="utf-8") as handle:
