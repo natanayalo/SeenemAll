@@ -72,6 +72,13 @@ def map_item_payload(d: Dict[str, Any]) -> Dict[str, Any]:
 
     list_ranks = d.pop("_list_ranks", None) or {}
 
+    collection = d.get("belongs_to_collection")
+    collection_id = None
+    collection_name = None
+    if collection and isinstance(collection, dict):
+        collection_id = collection.get("id")
+        collection_name = collection.get("name")
+
     return dict(
         tmdb_id=int(d["id"]),
         media_type=media_type,
@@ -82,6 +89,8 @@ def map_item_payload(d: Dict[str, Any]) -> Dict[str, Any]:
         genres=genres,
         poster_url=poster_url,
         release_year=_extract_release_year(d),
+        collection_id=collection_id,
+        collection_name=collection_name,
         popularity=popularity,
         vote_average=vote_average,
         vote_count=vote_count,

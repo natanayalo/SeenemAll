@@ -112,6 +112,29 @@ def _merge_with_legacy_filters(
     return primary
 
 
+def _apply_franchise_cap(
+    candidates: List[Dict[str, Any]], cap: int = 2
+) -> List[Dict[str, Any]]:
+    if not candidates or cap <= 0:
+        return candidates
+
+    franchise_counts: Dict[int, int] = {}
+    filtered_candidates: List[Dict[str, Any]] = []
+
+    for item in candidates:
+        collection_id = item.get("collection_id")
+        if collection_id is None:
+            filtered_candidates.append(item)
+            continue
+
+        count = franchise_counts.get(collection_id, 0)
+        if count < cap:
+            filtered_candidates.append(item)
+            franchise_counts[collection_id] = count + 1
+
+    return filtered_candidates
+
+
 @router.get("")
 async def recommend(
     request: Request,
@@ -141,6 +164,8 @@ async def recommend(
 
     llm_user_context = {"user_id": canonical_id, "profile_id": profile}
     llm_intent = _parse_llm_intent(query, llm_user_context, linked_entities)
+    logger.info(f"LLM Intent: {llm_intent}")
+    logger.info(f"Linked Entities: {linked_entities}")
     intent = _intent_filters_from_llm(query, llm_intent)
     if query:
         intent = _merge_with_legacy_filters(intent, legacy_parse_intent(query))
@@ -291,6 +316,8 @@ async def recommend(
                 "original_language": it.original_language,
                 "genres": it.genres,
                 "release_year": it.release_year,
+                "collection_id": it.collection_id,
+                "collection_name": it.collection_name,
                 "watch_options": cleaned_options,
                 "watch_url": (
                     cleaned_options[0]["url"] if cleaned_options else None
@@ -314,6 +341,8 @@ async def recommend(
     if not ordered:
         return _empty_response()
 
+    if diversify:
+        ordered = _apply_franchise_cap(ordered)
     _apply_mixer_scores(ordered)
     ordered = apply_business_rules(ordered, intent=intent)
     if not ordered:

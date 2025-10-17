@@ -479,8 +479,14 @@ def _call_gemini_reranker(
     return _parse_decisions_json(parsed)
 
 
-def _parse_decisions_json(payload: Dict[str, Any]) -> List[LLMDecision]:
-    raw_items = payload.get("items")
+def _parse_decisions_json(payload: Dict[str, Any] | List) -> List[LLMDecision]:
+    if isinstance(payload, dict):
+        raw_items = payload.get("items")
+    elif isinstance(payload, list):
+        raw_items = payload
+    else:
+        return []
+
     if not isinstance(raw_items, list):
         return []
 

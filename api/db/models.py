@@ -41,6 +41,10 @@ class Item(Base):
     release_year: Mapped[Optional[int]] = mapped_column(
         Integer, nullable=True, index=True
     )
+    collection_id: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, index=True
+    )
+    collection_name: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     popularity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     vote_average: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     vote_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
