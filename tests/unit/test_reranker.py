@@ -412,6 +412,20 @@ def test_diversify_with_mmr_balances_similarity():
     assert 0.85 <= sim <= 1.0
 
 
+def test_diversify_with_mmr_respects_pool_override():
+    items = []
+    for idx in range(8):
+        vec = [0.0, 0.0, 0.0, 0.0]
+        vec[idx % 4] = 1.0
+        items.append({"id": idx, "original_rank": idx, "vector": vec.copy()})
+
+    diversified = reranker.diversify_with_mmr(
+        items, lambda_param=0.6, limit=3, pool_size=4
+    )
+    assert len(diversified) == 3
+    assert all(entry["id"] < 4 for entry in diversified)
+
+
 def test_diversify_with_mmr_appends_items_without_vectors_in_order():
     items = [
         {"id": 1, "original_rank": 0, "vector": [1.0, 0.0]},
@@ -454,6 +468,15 @@ def test_diversify_with_mmr_clamps_lambda():
 
     diversified = reranker.diversify_with_mmr(items, lambda_param=2.0, limit=3)
     assert [item["id"] for item in diversified] == [1, 2, 3]
+
+
+def test_resolve_mmr_pool_size_honours_multiplier(monkeypatch):
+    monkeypatch.setattr(reranker, "_MMR_POOL_MULTIPLIER", 2, raising=False)
+    monkeypatch.setattr(reranker, "_MMR_POOL_MIN", 0, raising=False)
+    monkeypatch.setattr(reranker, "_MMR_POOL_MAX", None, raising=False)
+
+    pool = reranker._resolve_mmr_pool_size(5, 40, override=None)
+    assert pool == 10
 
 
 def test_default_explanation_uses_intent_filters():

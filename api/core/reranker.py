@@ -28,6 +28,44 @@ _DEFAULT_MAX_ITEMS_FOR_LLM = 25
 _DEFAULT_TIMEOUT_SECONDS = 12.0
 
 
+def _float_from_env(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _int_from_env(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _optional_int_from_env(name: str) -> int | None:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+_MMR_LAMBDA_DEFAULT = _float_from_env("MMR_LAMBDA", 0.7)
+_MMR_POOL_MULTIPLIER = max(1, _int_from_env("MMR_POOL_MULTIPLIER", 3))
+_MMR_POOL_MIN = max(0, _int_from_env("MMR_POOL_MIN", 25))
+_MMR_POOL_MAX = _optional_int_from_env("MMR_POOL_MAX")
+if _MMR_POOL_MAX is not None and _MMR_POOL_MAX <= 0:
+    _MMR_POOL_MAX = None
+
+
 def _get_prompt_config():
     config = load_prompt_template("reranker")
     return config
@@ -104,7 +142,10 @@ def rerank_with_explanations(
 
 
 def diversify_with_mmr(
-    items: List[Dict[str, Any]], lambda_param: float = 0.7, limit: int | None = None
+    items: List[Dict[str, Any]],
+    lambda_param: float | None = None,
+    limit: int | None = None,
+    pool_size: int | None = None,
 ) -> List[Dict[str, Any]]:
     if not items:
         return []
@@ -112,12 +153,94 @@ def diversify_with_mmr(
     limit = limit or len(items)
     limit = max(1, min(limit, len(items)))
 
-    lambda_param = float(lambda_param)
-    if lambda_param < 0.0 or lambda_param > 1.0:
-        lambda_param = min(1.0, max(0.0, lambda_param))
+    lambda_value = (
+        float(lambda_param) if lambda_param is not None else float(_MMR_LAMBDA_DEFAULT)
+    )
+    if lambda_value < 0.0 or lambda_value > 1.0:
+        lambda_value = min(1.0, max(0.0, lambda_value))
+
+    pool = _resolve_mmr_pool_size(limit, len(items), pool_size)
+    head = items[:pool]
+    tail = items[pool:]
+
+    ranked = _mmr_rank_subset(head, lambda_value, limit)
+    seen_keys = {_item_identity(item) for item in ranked}
+
+    if len(ranked) < limit:
+        for item in head:
+            ident = _item_identity(item)
+            if ident in seen_keys:
+                continue
+            ranked.append(item)
+            seen_keys.add(ident)
+            if len(ranked) >= limit:
+                break
+
+    if len(ranked) < limit:
+        for item in tail:
+            ident = _item_identity(item)
+            if ident in seen_keys:
+                continue
+            ranked.append(item)
+            seen_keys.add(ident)
+            if len(ranked) >= limit:
+                break
+
+    if len(ranked) < limit:
+        for item in items:
+            ident = _item_identity(item)
+            if ident in seen_keys:
+                continue
+            ranked.append(item)
+            seen_keys.add(ident)
+            if len(ranked) >= limit:
+                break
+
+    return ranked[:limit]
+
+
+def _resolve_mmr_pool_size(
+    requested_limit: int, total_items: int, override: int | None
+) -> int:
+    if total_items <= 0:
+        return 0
+    if override is not None:
+        return max(1, min(total_items, override))
+
+    baseline = max(1, min(requested_limit, total_items))
+    pool = baseline
+    if _MMR_POOL_MULTIPLIER > 1:
+        pool = max(pool, baseline * _MMR_POOL_MULTIPLIER)
+    if _MMR_POOL_MIN > 0:
+        pool = max(pool, _MMR_POOL_MIN)
+    if _MMR_POOL_MAX is not None:
+        pool = min(pool, _MMR_POOL_MAX)
+    pool = min(pool, total_items)
+    return max(1, pool)
+
+
+def _mmr_rank_subset(
+    subset: Sequence[Dict[str, Any]],
+    lambda_value: float,
+    limit: int,
+) -> List[Dict[str, Any]]:
+    if not subset:
+        return []
+
+    ranked: List[Dict[str, Any]] = []
+    ranked_vectors: List[np.ndarray] = []
+
+    first_item = subset[0]
+    ranked.append(first_item)
+    first_vector = _normalized_vector(first_item.get("vector"))
+    if first_vector is not None:
+        ranked_vectors.append(first_vector)
+
+    if len(ranked) >= limit:
+        return ranked[:limit]
 
     prepared: List[Dict[str, Any]] = []
-    for idx, item in enumerate(items):
+    for idx, item in enumerate(subset):
         normalized = _normalized_vector(item.get("vector"))
         if normalized is None:
             continue
@@ -132,29 +255,13 @@ def diversify_with_mmr(
             }
         )
 
-    ranked: List[Dict[str, Any]] = []
-    ranked_vectors: List[np.ndarray] = []
-
-    first_item = items[0]
-    ranked.append(first_item)
-    first_vector = _normalized_vector(first_item.get("vector"))
-    if first_vector is not None:
-        ranked_vectors.append(first_vector)
-
-    if len(ranked) >= limit:
-        return ranked[:limit]
-
     first_identity = _item_identity(first_item)
     prepared = [
         entry for entry in prepared if _item_identity(entry["item"]) != first_identity
     ]
 
     if not prepared:
-        for item in items[1:]:
-            ranked.append(item)
-            if len(ranked) >= limit:
-                break
-        return ranked[:limit]
+        return ranked
 
     prepared.sort(key=lambda entry: entry["original_rank"])
 
@@ -171,8 +278,8 @@ def diversify_with_mmr(
             else:
                 similarity = 0.0
             mmr_score = (
-                lambda_param * candidate["relevance"]
-                - (1.0 - lambda_param) * similarity
+                lambda_value * candidate["relevance"]
+                - (1.0 - lambda_value) * similarity
             )
             if mmr_score > best_score:
                 best_idx = idx
@@ -185,20 +292,7 @@ def diversify_with_mmr(
         ranked.append(chosen["item"])
         ranked_vectors.append(chosen["vector"])
 
-    if len(ranked) >= limit:
-        return ranked[:limit]
-
-    seen_keys = {_item_identity(item) for item in ranked}
-    for item in items:
-        ident = _item_identity(item)
-        if ident in seen_keys:
-            continue
-        ranked.append(item)
-        seen_keys.add(ident)
-        if len(ranked) >= limit:
-            break
-
-    return ranked[:limit]
+    return ranked
 
 
 def cosine_similarity(v1, v2):
