@@ -23,7 +23,7 @@ CACHE_MAXSIZE = 1000
 CACHE_TTL_SECONDS = 300  # 5 minutes
 
 # Caches
-INTENT_CACHE: TTLCache[Tuple[str, str, str], Intent] = TTLCache(
+INTENT_CACHE: TTLCache[Tuple[str, str, str, str], Intent] = TTLCache(
     maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS
 )
 REWRITE_CACHE: TTLCache[str, Rewrite] = TTLCache(
@@ -110,7 +110,9 @@ def default_rewrite() -> Rewrite:
     return _clone_rewrite(DEFAULT_REWRITE)
 
 
-def get_cache_key(query: str, user_context: Dict[str, Any]) -> Tuple[str, str, str]:
+def get_cache_key(
+    query: str, user_context: Dict[str, Any], linked_entities: Dict[str, Any] | None
+) -> Tuple[str, str, str, str]:
     """Creates a cache key from the query and user context."""
     user_id = str(user_context.get("user_id", ""))
     profile_id = str(
@@ -119,7 +121,15 @@ def get_cache_key(query: str, user_context: Dict[str, Any]) -> Tuple[str, str, s
         or user_context.get("profile_name")
         or ""
     )
-    return (query, user_id, profile_id)
+    linked_entities_hash = ""
+    if linked_entities and any(
+        linked_entities.get(key) for key in ("movie", "tv", "person")
+    ):
+        linked_entities_hash = hashlib.sha256(
+            json.dumps(linked_entities, sort_keys=True).encode()
+        ).hexdigest()
+
+    return (query, user_id, profile_id, linked_entities_hash)
 
 
 def get_rewrite_cache_key(query: str, intent: Intent) -> str:
@@ -128,14 +138,18 @@ def get_rewrite_cache_key(query: str, intent: Intent) -> str:
     return f"{query}:{intent_hash}"
 
 
-def parse_intent(query: str, user_context: Dict[str, Any]) -> Intent:
+def parse_intent(
+    query: str,
+    user_context: Dict[str, Any],
+    linked_entities: Dict[str, Any] | None = None,
+) -> Intent:
     """
     Parses the user's query and returns an Intent object.
     Includes guardrails to handle validation errors and provide a fallback.
     Caches results for a short period.
     """
     normalized_query = query or ""
-    cache_key = get_cache_key(normalized_query, user_context)
+    cache_key = get_cache_key(normalized_query, user_context, linked_entities)
 
     cached_intent = INTENT_CACHE.get(cache_key)
     if cached_intent is not None:
@@ -152,11 +166,11 @@ def parse_intent(query: str, user_context: Dict[str, Any]) -> Intent:
         try:
             if settings.provider == "openai":
                 llm_output = _call_openai_parser(
-                    settings, normalized_query, user_context
+                    settings, normalized_query, user_context, linked_entities
                 )
             elif settings.provider == "gemini":
                 llm_output = _call_gemini_parser(
-                    settings, normalized_query, user_context
+                    settings, normalized_query, user_context, linked_entities
                 )
             else:  # pragma: no cover - defensive guardrail
                 raise IntentParserError(f"Unsupported provider '{settings.provider}'")
@@ -182,12 +196,15 @@ def parse_intent(query: str, user_context: Dict[str, Any]) -> Intent:
 
 
 def _call_openai_parser(
-    settings: IntentParserSettings, query: str, user_context: Dict[str, Any]
+    settings: IntentParserSettings,
+    query: str,
+    user_context: Dict[str, Any],
+    linked_entities: Dict[str, Any] | None,
 ) -> Dict[str, Any]:
     if not settings.api_key:
         raise IntentParserError("Missing API key for intent parser provider.")
 
-    payload = _build_llm_payload(settings, query, user_context)
+    payload = _build_llm_payload(settings, query, user_context, linked_entities)
     headers = {
         "Authorization": f"Bearer {settings.api_key}",
         "Content-Type": "application/json",
@@ -212,12 +229,15 @@ def _call_openai_parser(
 
 
 def _call_gemini_parser(
-    settings: IntentParserSettings, query: str, user_context: Dict[str, Any]
+    settings: IntentParserSettings,
+    query: str,
+    user_context: Dict[str, Any],
+    linked_entities: Dict[str, Any] | None,
 ) -> Dict[str, Any]:
     if not settings.api_key:
         raise IntentParserError("Missing API key for intent parser provider.")
 
-    payload = _build_gemini_payload(settings, query, user_context)
+    payload = _build_gemini_payload(settings, query, user_context, linked_entities)
 
     endpoint = settings.endpoint.rstrip("/")
     if endpoint.endswith(":generateContent"):
@@ -284,7 +304,9 @@ def _call_gemini_parser(
         raise IntentParserError("Gemini parser returned non-JSON content.") from exc
 
 
-def _build_prompt_text(query: str, user_context: Dict[str, Any]) -> Tuple[str, str]:
+def _build_prompt_text(
+    query: str, user_context: Dict[str, Any], linked_entities: Dict[str, Any] | None
+) -> Tuple[str, str]:
     prompt_config = load_prompt_template("intent_parser")
     system_prompt = prompt_config.get("system_prompt", "")
     examples = prompt_config.get("examples", [])
@@ -299,6 +321,10 @@ def _build_prompt_text(query: str, user_context: Dict[str, Any]) -> Tuple[str, s
     user_parts = []
     if example_text:
         user_parts.append(example_text)
+    if linked_entities and any(
+        linked_entities.get(key) for key in ("movie", "tv", "person")
+    ):
+        user_parts.append(f"Linked Entities: {json.dumps(linked_entities)}")
     user_parts.append(f"Query: {query}")
     user_parts.append("Intent:")
     user_prompt = "\n\n".join(user_parts)
@@ -306,9 +332,14 @@ def _build_prompt_text(query: str, user_context: Dict[str, Any]) -> Tuple[str, s
 
 
 def _build_llm_payload(
-    settings: IntentParserSettings, query: str, user_context: Dict[str, Any]
+    settings: IntentParserSettings,
+    query: str,
+    user_context: Dict[str, Any],
+    linked_entities: Dict[str, Any] | None,
 ) -> Dict[str, Any]:
-    system_prompt, user_prompt = _build_prompt_text(query, user_context)
+    system_prompt, user_prompt = _build_prompt_text(
+        query, user_context, linked_entities
+    )
 
     return {
         "model": settings.model,
@@ -325,9 +356,14 @@ def _build_llm_payload(
 
 
 def _build_gemini_payload(
-    settings: IntentParserSettings, query: str, user_context: Dict[str, Any]
+    settings: IntentParserSettings,
+    query: str,
+    user_context: Dict[str, Any],
+    linked_entities: Dict[str, Any] | None,
 ) -> Dict[str, Any]:
-    system_prompt, user_prompt = _build_prompt_text(query, user_context)
+    system_prompt, user_prompt = _build_prompt_text(
+        query, user_context, linked_entities
+    )
 
     payload: Dict[str, Any] = {
         "contents": [

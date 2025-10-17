@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
+from datetime import UTC, datetime, timedelta
 import numpy as np
 from types import SimpleNamespace
-from typing import Any, Sequence
+from typing import Any, Dict, Sequence
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,8 +16,31 @@ from api.db.session import get_db
 from api.routes import recommend as recommend_routes
 from api.core import business_rules
 from api.core.legacy_intent_parser import IntentFilters
+from api.core.entity_linker import ENTITY_LINKER_CACHE
 
 ORIGINAL_PREFILTER = recommend_routes._prefilter_allowed_ids
+
+
+@pytest.fixture(autouse=True)
+def _tmdb_client_stub():
+    previous = getattr(app.state, "tmdb_client", None)
+    previous_linker = getattr(app.state, "entity_linker", None)
+
+    class _StubClient:
+        async def search(self, query, media_type=None):
+            return {"results": []}
+
+        async def aclose(self):
+            return None
+
+    ENTITY_LINKER_CACHE.clear()
+    app.state.tmdb_client = _StubClient()
+    app.state.entity_linker = None
+    try:
+        yield
+    finally:
+        app.state.tmdb_client = previous
+        app.state.entity_linker = previous_linker
 
 
 @pytest.fixture(autouse=True)
@@ -28,6 +54,19 @@ def _reset_prefilter(monkeypatch):
 @pytest.fixture(autouse=True)
 def _clear_business_rules(monkeypatch):
     monkeypatch.setattr(business_rules, "load_rules", lambda: {})
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _disable_trending_prior(monkeypatch, request):
+    if request.node.get_closest_marker("enable_trending_helper"):
+        yield
+        return
+    monkeypatch.setattr(
+        recommend_routes,
+        "_trending_prior_candidates",
+        lambda *args, **kwargs: [],
+    )
     yield
 
 
@@ -126,6 +165,76 @@ class CandidateSession:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+
+class CollabSession:
+    """Lightweight session for collaborative recall tests."""
+
+    def __init__(self, rows: Sequence[Any]):
+        self._rows = list(rows)
+
+    def execute(self, statement, *args, **kwargs):
+        return FakeResult(self._rows)
+
+
+def test_collaborative_candidates_scores_items():
+    now = datetime.now(UTC)
+    rows = [
+        (10, "ally", 1, "watched", now),
+        (10, "bob", 1, "liked", now - timedelta(minutes=5)),
+        (20, "ally", 1, "liked", now - timedelta(hours=1)),
+        (30, "bob", 1, "disliked", now),
+        (40, "ally", 1, "not_interested", now),
+        (50, "stranger", 1, "watched", now),
+    ]
+    session = CollabSession(rows)
+    neighbors = [
+        {"user_id": "ally", "weight": 0.5},
+        {"user_id": "bob", "weight": 1.5},
+        {"user_id": "zero", "weight": 0.0},
+    ]
+
+    result = recommend_routes._collaborative_candidates(
+        session, neighbors, exclude_ids=[20], limit=5, allowed_ids=None
+    )
+
+    assert result[0][0] == 10
+    assert pytest.approx(result[0][1], rel=1e-6) == 1.0
+
+    only_allowed = recommend_routes._collaborative_candidates(
+        session, neighbors, exclude_ids=[], limit=5, allowed_ids=[20]
+    )
+    assert only_allowed == [(20, 1.0)]
+
+    blocked = recommend_routes._collaborative_candidates(
+        session, neighbors, exclude_ids=[], limit=5, allowed_ids=[]
+    )
+    assert blocked == []
+
+
+@pytest.mark.enable_trending_helper
+def test_trending_prior_candidates_normalises_scores():
+    session = Mock()
+    session.execute = Mock(
+        return_value=FakeResult(
+            [
+                (1, 1, 3, 100.0),
+                (2, 2, None, 50.0),
+                (3, None, None, 10.0),
+            ]
+        )
+    )
+
+    results = recommend_routes._trending_prior_candidates(
+        session, None, exclude_ids=[], limit=3, allowed_ids=None
+    )
+
+    assert len(results) == 3
+    assert results[0][0] == 1
+    assert pytest.approx(results[0][1], rel=1e-6) == 1.0
+    assert results[1][0] == 2
+    assert results[2][0] == 3
+    assert results[2][1] >= 0.0
 
 
 def test_recommend_includes_reranker_output(monkeypatch):
@@ -364,7 +473,122 @@ def test_recommend_prefilter_passes_allowed_ids(monkeypatch):
     assert recorded["allowed"] == [101, 202]
 
 
-def test_recommend_hybrid_boosts_trending_items(monkeypatch):
+def test_recommend_merges_collaborative_candidates(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Alpha",
+            overview="Alpha saves the world.",
+            poster_url="alpha.jpg",
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Action"}],
+            release_year=2020,
+        ),
+        SimpleNamespace(
+            id=2,
+            tmdb_id=202,
+            media_type="movie",
+            title="Beta",
+            overview="Beta uncovers a mystery.",
+            poster_url="beta.jpg",
+            runtime=90,
+            original_language="en",
+            genres=[{"name": "Mystery"}],
+            release_year=2022,
+        ),
+        SimpleNamespace(
+            id=3,
+            tmdb_id=303,
+            media_type="movie",
+            title="Gamma",
+            overview="Gamma surprises.",
+            poster_url="gamma.jpg",
+            runtime=95,
+            original_language="en",
+            genres=[{"name": "Drama"}],
+            release_year=2023,
+        ),
+    ]
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    short_v = np.ones(384, dtype="float32")
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            short_v,
+            [],
+            {
+                "genre_prefs": {},
+                "neighbors": [{"user_id": "ally", "weight": 0.7}],
+                "negative_items": [],
+            },
+        ),
+    )
+
+    recorded: Dict[str, Any] = {}
+
+    def fake_collab(db, neighbors, exclude, limit, allowed_ids=None):
+        recorded["neighbors"] = neighbors
+        recorded["exclude"] = list(exclude)
+        recorded["limit"] = limit
+        recorded["allowed"] = allowed_ids
+        return [(2, 1.0), (3, 0.8)]
+
+    monkeypatch.setattr(recommend_routes, "_collaborative_candidates", fake_collab)
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2],
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rewrite_query",
+        lambda query, intent: SimpleNamespace(rewritten_text=""),
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "_trending_prior_candidates",
+        lambda db, intent, exclude, limit, allowed_ids=None: [(3, 0.6)],
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend", params={"user_id": "u1", "limit": 3, "diversify": "false"}
+        )
+
+    app.dependency_overrides.clear()
+    session.close()
+
+    assert resp.status_code == 200
+    body = resp.json()
+    payload_ids = [item["id"] for item in body["items"]]
+    assert payload_ids == [2, 3, 1]
+    assert recorded["limit"] == 9  # candidate_limit with limit=3
+    assert recorded["neighbors"][0]["user_id"] == "ally"
+
+
+def test_recommend_mixer_scores_items(monkeypatch):
     items = [
         SimpleNamespace(
             id=1,
@@ -457,9 +681,8 @@ def test_recommend_hybrid_boosts_trending_items(monkeypatch):
     assert resp.status_code == 200
     body = resp.json()
     payload = body["items"]
-    assert [item["id"] for item in payload] == [1, 3, 2]
+    assert [item["id"] for item in payload] == [1, 2, 3]
     assert all("ann_rank" not in item for item in payload)
-    assert payload[1]["trending_rank"] == 1
 
 
 def test_recommend_supports_profile_parameter(monkeypatch):
@@ -641,3 +864,189 @@ def test_float_from_env_parses_values(monkeypatch):
     assert recommend_routes._float_from_env("FLOAT_ENV", 0.0) == 0.0
     monkeypatch.delenv("FLOAT_ENV", raising=False)
     assert recommend_routes._float_from_env("FLOAT_ENV", 2.5) == 2.5
+
+
+def test_recommend_uses_entity_linker_and_blends_query_vector(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Alpha",
+            overview="Alpha saves the world.",
+            poster_url="alpha.jpg",
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Action"}],
+            release_year=2020,
+        ),
+        SimpleNamespace(
+            id=2,
+            tmdb_id=202,
+            media_type="movie",
+            title="Beta",
+            overview="Beta uncovers a mystery.",
+            poster_url="beta.jpg",
+            runtime=90,
+            original_language="en",
+            genres=[{"name": "Mystery"}],
+            release_year=2022,
+        ),
+    ]
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    short_v = np.ones(384, dtype="float32")
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            short_v,
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    recorded = {}
+    monkeypatch.setattr("api.main.TMDB_API_KEY", "")
+
+    class _Linker:
+        async def link_entities(self, query):
+            recorded["searched_query"] = query
+            return {"movie": [101], "tv": [], "person": []}
+
+    original_parse = recommend_routes._parse_llm_intent
+
+    def fake_parse(query, user_context, linked_entities=None):
+        recorded["linked_entities"] = linked_entities
+        return original_parse(query, user_context, linked_entities)
+
+    monkeypatch.setattr(recommend_routes, "_parse_llm_intent", fake_parse)
+
+    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+        recorded["allowed_ids"] = allowed_ids
+        recorded["q_vec"] = vec
+        return [1, 2]
+
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+    monkeypatch.setattr(
+        recommend_routes, "_prefilter_allowed_ids", lambda db, intent, limit: [1]
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "_trending_prior_candidates",
+        lambda *args, **kwargs: [],
+    )
+
+    rewrite_vec = np.full(384, 0.5, dtype="float32")
+    monkeypatch.setattr(
+        recommend_routes,
+        "rewrite_query",
+        lambda query, intent: SimpleNamespace(rewritten_text="rewritten query"),
+    )
+    monkeypatch.setattr(recommend_routes, "encode_texts", lambda texts: [rewrite_vec])
+
+    with TestClient(app) as client:
+        app.state.entity_linker = _Linker()
+        response = client.get(
+            "/recommend", params={"user_id": "u1", "query": "alpha movie"}
+        )
+
+    assert response.status_code == 200
+
+    app.dependency_overrides.clear()
+    session.close()
+    app.state.entity_linker = None
+
+    assert recorded.get("linked_entities") == {"movie": [101], "tv": [], "person": []}
+    assert recorded.get("searched_query") == "alpha movie"
+    assert recorded["allowed_ids"] == [1]
+
+    monkeypatch.setattr(recommend_routes, "_parse_llm_intent", fake_parse)
+
+    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+        recorded["allowed_ids"] = allowed_ids
+        recorded["q_vec"] = vec
+        return [1, 2]
+
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+    monkeypatch.setattr(
+        recommend_routes, "_prefilter_allowed_ids", lambda db, intent, limit: [1]
+    )
+
+
+def test_recommend_logs_cold_start_path(monkeypatch, caplog):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Alpha",
+            overview="Alpha saves the world.",
+            poster_url="alpha.jpg",
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Action"}],
+            release_year=2020,
+        ),
+    ]
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            None,
+            None,
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "_cold_start_candidates",
+        lambda db, intent, limit, allowlist: [1],
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+
+    with caplog.at_level(logging.INFO, logger=recommend_routes.logger.name):
+        with TestClient(app) as client:
+            client.get("/recommend", params={"user_id": "u1"})
+
+    app.dependency_overrides.clear()
+    session.close()
+
+    assert any(
+        "Using cold-start candidates for user u1" in message
+        for message in caplog.messages
+    )
