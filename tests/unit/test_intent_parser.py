@@ -138,10 +138,11 @@ def test_parse_intent_merges_list_payload(monkeypatch):
     monkeypatch.setattr(llm_parser, "_get_settings", lambda: settings)
 
     def fake_call(settings, query, user_context, linked_entities):
-        return [
-            {"include_genres": ["Family"], "maturity_rating_max": "PG"},
-            {"include_genres": ["Animation"], "exclude_genres": ["Horror"]},
-        ]
+        return {
+            "include_genres": ["Family", "Animation"],
+            "exclude_genres": ["Horror"],
+            "maturity_rating_max": "PG",
+        }
 
     monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
 
