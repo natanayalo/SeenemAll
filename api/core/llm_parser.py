@@ -76,8 +76,12 @@ def _load_fallback_rules() -> Tuple[IntentFallbackRule, ...]:
             raw_rules = json.load(handle)
         if not isinstance(raw_rules, list):
             raise ValueError("Fallback rules file must contain a list of rules")
-    except (OSError, ValueError, json.JSONDecodeError):
-        logger.warning("Failed to load fallback rules from %s; using defaults.", path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        logger.warning(
+            "Failed to load fallback rules from %s; using defaults. error=%s",
+            path,
+            exc,
+        )
         return _DEFAULT_FALLBACK_RULES
 
     rules: List[IntentFallbackRule] = []
@@ -226,12 +230,17 @@ def _normalize_llm_output(
             if isinstance(value, list):
                 if not value:
                     continue
-                if not isinstance(existing, list):
-                    existing = []
-                combined = list(existing) if existing else []
+                if isinstance(existing, list):
+                    combined = list(existing)
+                elif existing is None:
+                    combined = []
+                else:
+                    combined = [existing]
+                seen = {entry for entry in combined}
                 for entry in value:
-                    if entry not in combined:
+                    if entry not in seen:
                         combined.append(entry)
+                        seen.add(entry)
                 merged[key] = combined
             else:
                 if existing in (None, []):

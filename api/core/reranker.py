@@ -405,6 +405,10 @@ def _get_settings() -> RerankerSettings:
     )
 
 
+def _current_year() -> int:
+    return datetime.utcnow().year
+
+
 def _with_default_explanations(
     items: Sequence[Dict[str, Any]],
     intent: IntentFilters | None,
@@ -412,7 +416,7 @@ def _with_default_explanations(
 ) -> List[Dict[str, Any]]:
     enriched: List[Dict[str, Any]] = []
     intent_genres: List[str] = intent.effective_genres() if intent else []
-    current_year = datetime.utcnow().year
+    current_year = _current_year()
     for idx, item in enumerate(items):
         copy_item = dict(item)
         copy_item.setdefault("original_rank", idx)
@@ -491,7 +495,7 @@ def _safe_template(template: str | None, **kwargs: Any) -> str:
         return ""
     try:
         return template.format(**kwargs)
-    except Exception:
+    except (KeyError, IndexError, ValueError):
         return template
 
 
