@@ -83,12 +83,6 @@ _MMR_POOL_MAX = _optional_int_from_env("MMR_POOL_MAX")
 if _MMR_POOL_MAX is not None and _MMR_POOL_MAX <= 0:
     _MMR_POOL_MAX = None
 
-_EXPLANATION_TEMPLATES_CACHE: Dict[str, Any] = {
-    "path": None,
-    "mtime": None,
-    "templates": _DEFAULT_EXPLANATION_TEMPLATES,
-}
-
 
 def _get_templates_path() -> str:
     env_path = os.getenv("EXPLANATION_TEMPLATES_PATH")
@@ -97,43 +91,34 @@ def _get_templates_path() -> str:
     return os.path.join(os.getcwd(), "config", "explanation_templates.json")
 
 
-def _load_explanation_templates() -> Dict[str, Any]:
-    path = _get_templates_path()
-    global _EXPLANATION_TEMPLATES_CACHE
-    try:
-        mtime = os.path.getmtime(path)
-    except FileNotFoundError:
-        _EXPLANATION_TEMPLATES_CACHE = {
-            "path": path,
-            "mtime": None,
-            "templates": _DEFAULT_EXPLANATION_TEMPLATES,
-        }
+@lru_cache(maxsize=32)
+def _load_explanation_templates_cached(
+    path: str, mtime: float | None
+) -> Dict[str, Any]:
+    if path == "__defaults__":
         return _DEFAULT_EXPLANATION_TEMPLATES
-
-    cache_path = _EXPLANATION_TEMPLATES_CACHE.get("path")
-    cache_mtime = _EXPLANATION_TEMPLATES_CACHE.get("mtime")
-    cache_templates = _EXPLANATION_TEMPLATES_CACHE.get("templates")
-    if cache_path == path and cache_mtime == mtime and cache_templates is not None:
-        return cache_templates  # type: ignore[return-value]
 
     try:
         with open(path, "r", encoding="utf-8") as handle:
             templates = json.load(handle)
         if not isinstance(templates, dict):
             raise ValueError("Explanation template file must contain a JSON object.")
-    except (json.JSONDecodeError, ValueError):
+        return templates
+    except (OSError, json.JSONDecodeError, ValueError):
         logger.warning(
             "Failed to parse explanation templates at %s; falling back to defaults.",
             path,
         )
-        templates = _DEFAULT_EXPLANATION_TEMPLATES
+        return _DEFAULT_EXPLANATION_TEMPLATES
 
-    _EXPLANATION_TEMPLATES_CACHE = {
-        "path": path,
-        "mtime": mtime,
-        "templates": templates,
-    }
-    return templates
+
+def _load_explanation_templates() -> Dict[str, Any]:
+    path = _get_templates_path()
+    try:
+        mtime = os.path.getmtime(path)
+    except FileNotFoundError:
+        return _load_explanation_templates_cached("__defaults__", None)
+    return _load_explanation_templates_cached(path, mtime)
 
 
 def _get_prompt_config():
@@ -231,40 +216,19 @@ def diversify_with_mmr(
 
     pool = _resolve_mmr_pool_size(limit, len(items), pool_size)
     head = items[:pool]
-    tail = items[pool:]
 
     ranked = _mmr_rank_subset(head, lambda_value, limit)
     seen_keys = {_item_identity(item) for item in ranked}
 
     if len(ranked) < limit:
-        for item in head:
-            ident = _item_identity(item)
-            if ident in seen_keys:
-                continue
-            ranked.append(item)
-            seen_keys.add(ident)
-            if len(ranked) >= limit:
-                break
-
-    if len(ranked) < limit:
-        for item in tail:
-            ident = _item_identity(item)
-            if ident in seen_keys:
-                continue
-            ranked.append(item)
-            seen_keys.add(ident)
-            if len(ranked) >= limit:
-                break
-
-    if len(ranked) < limit:
         for item in items:
+            if len(ranked) >= limit:
+                break
             ident = _item_identity(item)
             if ident in seen_keys:
                 continue
             ranked.append(item)
             seen_keys.add(ident)
-            if len(ranked) >= limit:
-                break
 
     return ranked[:limit]
 
@@ -535,29 +499,21 @@ def _heuristic_summary(item: Dict[str, Any], heuristics: Dict[str, Any]) -> str:
         template = heuristic_templates.get("trending") or "Trending now (#{rank})."
         reasons.append(_safe_template(template, rank=int(trending_rank)))
 
-    release_reason = ""
+    release_year_value: int | None = None
     if heuristics.get("recent_bonus", 0.0) >= 0.5:
-        release_year = heuristics.get("release_year")
-        if isinstance(release_year, int) and release_year > 1900:
-            template = heuristic_templates.get("recent") or "Fresh release from {year}."
-            release_reason = _safe_template(template, year=release_year)
-    else:
-        for field in ("release_date", "release_year"):
-            value = item.get(field)
-            if isinstance(value, datetime):
-                template = (
-                    heuristic_templates.get("recent") or "Fresh release from {year}."
-                )
-                release_reason = _safe_template(template, year=value.year)
-                break
-            if isinstance(value, int) and value > 1900:
-                template = (
-                    heuristic_templates.get("recent") or "Fresh release from {year}."
-                )
-                release_reason = _safe_template(template, year=value)
-                break
-    if release_reason:
-        reasons.append(release_reason)
+        candidate_year = heuristics.get("release_year")
+        if isinstance(candidate_year, int):
+            release_year_value = candidate_year
+    if release_year_value is None:
+        raw_year = item.get("release_year")
+        if isinstance(raw_year, int):
+            release_year_value = raw_year
+
+    if release_year_value and release_year_value > 1900:
+        template = heuristic_templates.get("recent") or "Fresh release from {year}."
+        release_reason = _safe_template(template, year=release_year_value)
+        if release_reason:
+            reasons.append(release_reason)
 
     popular_rank = heuristics.get("popular_rank")
     if (
