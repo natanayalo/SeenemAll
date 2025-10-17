@@ -124,6 +124,33 @@ def test_parse_intent_llm_failure_falls_back(monkeypatch):
     assert intent.exclude_genres == ["Horror", "Thriller"]
 
 
+def test_parse_intent_merges_list_payload(monkeypatch):
+    llm_parser.INTENT_CACHE.clear()
+    settings = IntentParserSettings(
+        provider="openai",
+        api_key="test-key",
+        model="gpt-test",
+        endpoint="https://example.com",
+        enabled=True,
+        timeout=3.0,
+    )
+
+    monkeypatch.setattr(llm_parser, "_get_settings", lambda: settings)
+
+    def fake_call(settings, query, user_context, linked_entities):
+        return [
+            {"include_genres": ["Family"], "maturity_rating_max": "PG"},
+            {"include_genres": ["Animation"], "exclude_genres": ["Horror"]},
+        ]
+
+    monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
+
+    intent = parse_intent("kids show", {"user_id": "u3"})
+    assert intent.maturity_rating_max == "PG"
+    assert intent.exclude_genres == ["Horror"]
+    assert set(intent.include_genres or []) == {"Family", "Animation"}
+
+
 def test_parse_intent_llm_success(monkeypatch):
     settings = IntentParserSettings(
         provider="openai",

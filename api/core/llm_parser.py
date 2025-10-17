@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache
 from threading import Lock
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, List
 
 import httpx
 from cachetools import TTLCache
@@ -138,6 +138,40 @@ def get_rewrite_cache_key(query: str, intent: Intent) -> str:
     return f"{query}:{intent_hash}"
 
 
+def _normalize_llm_output(
+    payload: Dict[str, Any] | List[Any] | None
+) -> Dict[str, Any] | None:
+    if payload is None:
+        return None
+    if isinstance(payload, dict):
+        return payload
+    if not isinstance(payload, list):
+        return None
+
+    merged: Dict[str, Any] = {}
+    for fragment in payload:
+        if not isinstance(fragment, dict):
+            continue
+        for key, value in fragment.items():
+            if value is None:
+                continue
+            existing = merged.get(key)
+            if isinstance(value, list):
+                if not value:
+                    continue
+                if not isinstance(existing, list):
+                    existing = []
+                combined = list(existing) if existing else []
+                for entry in value:
+                    if entry not in combined:
+                        combined.append(entry)
+                merged[key] = combined
+            else:
+                if existing in (None, []):
+                    merged[key] = value
+    return merged or None
+
+
 def parse_intent(
     query: str,
     user_context: Dict[str, Any],
@@ -192,6 +226,8 @@ def parse_intent(
             logger.debug("Offline intent stub returned empty intent payload.")
     else:
         logger.debug("LLM intent payload: %s", llm_output)
+
+    llm_output = _normalize_llm_output(llm_output)
 
     if not llm_output:
         logger.info(
