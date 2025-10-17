@@ -547,84 +547,9 @@ def _offline_intent_stub(query: str) -> Dict[str, Any]:
     if not normalized:
         return {}
 
-    def _append(container: Dict[str, Any], key: str, values: Any) -> None:
-        if not values:
-            return
-        existing = container.setdefault(key, [])
-        if not isinstance(existing, list):
-            return
-        if isinstance(values, (list, tuple, set)):
-            for value in values:
-                if value not in existing:
-                    existing.append(value)
-        else:
-            if values not in existing:
-                existing.append(values)
-
-    tokens = set(normalized.replace("-", " ").split())
-    payload: Dict[str, Any] = {}
-
-    kids_keywords = {
-        "kid",
-        "kids",
-        "child",
-        "children",
-        "toddler",
-        "toddlers",
-        "family",
-        "family-friendly",
-        "familyfriendly",
-        "cartoon",
-    }
-    if tokens & kids_keywords or "family friendly" in normalized:
-        _append(payload, "include_genres", ["Family", "Animation"])
-        payload.setdefault("maturity_rating_max", "PG")
-        if "show" in tokens or "series" in tokens:
-            _append(payload, "media_types", "tv")
-        if "movie" in tokens or "film" in tokens:
-            _append(payload, "media_types", "movie")
-
-    if "animated" in tokens or "cartoon" in tokens:
-        _append(payload, "include_genres", "Animation")
-
-    if "teen" in tokens and "maturity_rating_max" not in payload:
-        payload["maturity_rating_max"] = "PG-13"
-
-    if "no" in tokens and "gore" in tokens:
-        _append(payload, "exclude_genres", ["Horror", "Thriller"])
-
-    language_keywords = {
-        "french": "fr",
-        "spanish": "es",
-        "german": "de",
-        "japanese": "ja",
-        "korean": "ko",
-        "hindi": "hi",
-    }
-    for word, code in language_keywords.items():
-        if word in tokens:
-            _append(payload, "languages", code)
-
-    if payload:
-        return payload
-
-    fixtures: Dict[str, Dict[str, Any]] = {
-        "light sci-fi <2h": {
-            "include_genres": ["Science Fiction"],
-            "runtime_minutes_max": 120,
-        },
-        "no gore": {"exclude_genres": ["Horror"]},
-        "movies from the 90s": {"year_min": 1990, "year_max": 1999},
-        "something in french": {"languages": ["fr"]},
-    }
-
-    if normalized in fixtures:
-        return fixtures[normalized]
-
-    if "bad" in normalized:
-        return {"include_genres": "not-a-list"}
-
-    return {}
+    intent = Intent()
+    intent = _augment_intent(intent, normalized)
+    return intent.model_dump(exclude_none=True)
 
 
 def rewrite_query(query: str, intent: Intent) -> Rewrite:
