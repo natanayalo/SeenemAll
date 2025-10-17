@@ -5,8 +5,9 @@ import logging
 import os
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from functools import lru_cache
-from typing import Any, Dict, Iterable, List, Sequence
+from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 import httpx
 import numpy as np
@@ -372,12 +373,122 @@ def _with_default_explanations(
     for idx, item in enumerate(items):
         copy_item = dict(item)
         copy_item.setdefault("original_rank", idx)
-        copy_item["score"] = max(0.0, 1.0 - idx * 0.05)
-        copy_item["explanation"] = _default_explanation(
-            copy_item, intent, query, intent_genres
-        )
+        score, heuristics = _heuristic_score(copy_item, idx)
+        copy_item["score"] = score
+        narrative = _default_explanation(copy_item, intent, query, intent_genres)
+        heuristic_summary = _heuristic_summary(copy_item, heuristics)
+        explanation_parts = [narrative, heuristic_summary]
+        copy_item["explanation"] = " ".join(
+            part for part in explanation_parts if part
+        ).strip()
         enriched.append(copy_item)
     return enriched
+
+
+def _heuristic_score(
+    item: Dict[str, Any],
+    position: int,
+) -> Tuple[float, Dict[str, Any]]:
+    retrieval = float(item.get("retrieval_score") or 0.0)
+    popularity = float(item.get("popularity") or 0.0)
+    vote_average = float(item.get("vote_average") or 0.0)
+    vote_count = float(item.get("vote_count") or 0.0)
+    trending_rank = item.get("trending_rank")
+    popular_rank = item.get("popular_rank")
+    release_year = item.get("release_year")
+
+    popularity_norm = min(popularity / 100.0, 1.0)
+    vote_quality = max((vote_average - 6.5) / 3.5, 0.0)
+    vote_quality = min(vote_quality, 1.0)
+    vote_volume = min(vote_count / 5000.0, 1.0)
+
+    trending_bonus = 0.0
+    if isinstance(trending_rank, (int, float)) and trending_rank > 0:
+        trending_bonus = max(0.0, 1.0 - min(trending_rank - 1, 50) / 50.0)
+
+    popular_bonus = 0.0
+    if isinstance(popular_rank, (int, float)) and popular_rank > 0:
+        popular_bonus = max(0.0, 1.0 - min(popular_rank - 1, 100) / 100.0)
+
+    recent_bonus = 0.0
+    current_year = datetime.utcnow().year
+    if isinstance(release_year, int):
+        age = max(0, current_year - release_year)
+        if age <= 2:
+            recent_bonus = 1.0
+        elif age <= 5:
+            recent_bonus = 0.5
+
+    base_score = retrieval
+    score = base_score
+    score += 0.3 * popularity_norm
+    score += 0.2 * vote_quality
+    score += 0.1 * vote_volume
+    score += 0.25 * trending_bonus
+    score += 0.15 * popular_bonus
+    score += 0.2 * recent_bonus
+    score += max(0.0, 0.05 - position * 0.002)
+
+    heuristics = {
+        "popularity_norm": popularity_norm,
+        "vote_quality": vote_quality,
+        "vote_volume": vote_volume,
+        "trending_rank": trending_rank,
+        "popular_rank": popular_rank,
+        "recent_bonus": recent_bonus,
+        "vote_average": vote_average,
+        "vote_count": int(vote_count) if vote_count else 0,
+        "release_year": release_year,
+    }
+    return round(score, 4), heuristics
+
+
+def _heuristic_summary(item: Dict[str, Any], heuristics: Dict[str, Any]) -> str:
+    reasons: List[str] = []
+
+    trending_rank = heuristics.get("trending_rank")
+    if (
+        isinstance(trending_rank, (int, float))
+        and trending_rank > 0
+        and trending_rank <= 20
+    ):
+        reasons.append(f"Trending now (#{int(trending_rank)}).")
+
+    release_reason = ""
+    if heuristics.get("recent_bonus", 0.0) >= 0.5:
+        release_year = heuristics.get("release_year")
+        if isinstance(release_year, int) and release_year > 1900:
+            release_reason = f"Fresh release from {release_year}."
+    else:
+        for field in ("release_date", "release_year"):
+            value = item.get(field)
+            if isinstance(value, datetime):
+                release_reason = f"Fresh release from {value.year}."
+                break
+            if isinstance(value, int) and value > 1900:
+                release_reason = f"Fresh release from {value}."
+                break
+    if release_reason:
+        reasons.append(release_reason)
+
+    popular_rank = heuristics.get("popular_rank")
+    if (
+        isinstance(popular_rank, (int, float))
+        and popular_rank > 0
+        and popular_rank <= 20
+    ):
+        reasons.append(f"Top popular pick (#{int(popular_rank)}).")
+
+    vote_average = heuristics.get("vote_average") or 0.0
+    vote_count = heuristics.get("vote_count") or 0
+    if vote_average and vote_average >= 7.5 and vote_count >= 500:
+        formatted_votes = f"{vote_count:,}"
+        reasons.append(f"Rated {vote_average:.1f}/10 by {formatted_votes} fans.")
+
+    if not reasons and heuristics.get("popularity_norm", 0.0) >= 0.7:
+        reasons.append("Popular with viewers who share your taste.")
+
+    return " ".join(reasons[:2])
 
 
 def _merge_with_base(

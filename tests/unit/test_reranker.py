@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from datetime import datetime
 from typing import List
 
 import httpx
@@ -622,6 +623,38 @@ def test_default_explanation_covers_runtime_branch():
     explanation = reranker._default_explanation(item, filters, "long drama", ["Drama"])
     assert "Drama" in explanation
     assert "150" in explanation
+
+
+def test_heuristic_ranker_highlights_trending(monkeypatch):
+    _reset_settings()
+    monkeypatch.delenv("RERANK_API_KEY", raising=False)
+    monkeypatch.setenv("RERANK_ENABLED", "0")
+    reranker._get_settings.cache_clear()
+
+    current_year = datetime.now().year
+    items = [
+        {
+            "id": 1,
+            "title": "Now Trending",
+            "overview": "A gripping new release taking off.",
+            "genres": [{"name": "Thriller"}],
+            "media_type": "movie",
+            "retrieval_score": 0.6,
+            "popularity": 95.0,
+            "vote_average": 8.2,
+            "vote_count": 1200,
+            "trending_rank": 3,
+            "popular_rank": 5,
+            "release_year": current_year,
+        }
+    ]
+
+    result = reranker.rerank_with_explanations(items, intent=None, query=None)
+    assert result[0]["score"] >= 0.6
+    explanation = result[0]["explanation"]
+    assert "Trending" in explanation or "trending" in explanation.lower()
+    assert str(current_year) in explanation
+    _reset_settings()
 
 
 def test_rerank_with_explanations_uses_llm_decisions(monkeypatch):

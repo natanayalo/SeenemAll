@@ -93,7 +93,7 @@
 | **7.2** Franchise cap | ✅ | Limit 1–2 per franchise/series |
 | **7.3** Serendipity slot | ✅ | Force 10–20% long-tail inclusion |
 | **7.4** Diversity tests | ✅ | Verify caps and serendipity behaviour |
-| **7.5** Heuristic ranker | ⏳ | Deterministic boosts + template system |
+| **7.5** Heuristic ranker | ✅ | Deterministic boosts + template system |
 | **7.6** Explanation templates | ⏳ | Config-driven messaging with smoke tests |
 
 ### 8. Optional LLM Reranker (Priority: High)
