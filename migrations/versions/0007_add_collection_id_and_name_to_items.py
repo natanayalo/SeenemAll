@@ -1,6 +1,6 @@
 """Add collection metadata columns to items.
 
-Revision ID: 845594aa89de
+Revision ID: 0007_add_collection_id_and_name_to_items
 Revises: 0006_add_item_embedding_version
 Create Date: 2025-10-17 10:47:16.045843
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = "845594aa89de"
+revision = "0007_add_collection_id_and_name_to_items"
 down_revision = "0006_add_item_embedding_version"
 branch_labels = None
 depends_on = None
