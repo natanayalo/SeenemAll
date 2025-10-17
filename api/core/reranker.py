@@ -5,7 +5,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
@@ -47,6 +47,7 @@ _DEFAULT_EXPLANATION_TEMPLATES = {
 
 
 def _float_from_env(name: str, default: float) -> float:
+    """Read a float override from the environment, falling back to *default*."""
     raw = os.getenv(name)
     if raw is None:
         return default
@@ -57,6 +58,7 @@ def _float_from_env(name: str, default: float) -> float:
 
 
 def _int_from_env(name: str, default: int) -> int:
+    """Read an integer override from the environment, falling back to *default*."""
     raw = os.getenv(name)
     if raw is None:
         return default
@@ -217,11 +219,7 @@ def diversify_with_mmr(
     limit = limit or len(items)
     limit = max(1, min(limit, len(items)))
 
-    lambda_value = (
-        float(lambda_param) if lambda_param is not None else float(_MMR_LAMBDA_DEFAULT)
-    )
-    if lambda_value < 0.0 or lambda_value > 1.0:
-        lambda_value = min(1.0, max(0.0, lambda_value))
+    lambda_value = _resolve_lambda_value(lambda_param)
 
     pool = _resolve_mmr_pool_size(limit, len(items), pool_size)
     head = items[:pool]
@@ -260,6 +258,18 @@ def _resolve_mmr_pool_size(
         pool = min(pool, _MMR_POOL_MAX)
     pool = min(pool, total_items)
     return max(1, pool)
+
+
+def _resolve_lambda_value(lambda_param: float | None) -> float:
+    try:
+        value = (
+            float(lambda_param)
+            if lambda_param is not None
+            else float(_MMR_LAMBDA_DEFAULT)
+        )
+    except (TypeError, ValueError):
+        value = float(_MMR_LAMBDA_DEFAULT)
+    return min(1.0, max(0.0, value))
 
 
 def _mmr_rank_subset(
@@ -406,7 +416,7 @@ def _get_settings() -> RerankerSettings:
 
 
 def _current_year() -> int:
-    return datetime.utcnow().year
+    return datetime.now(UTC).year
 
 
 def _with_default_explanations(
@@ -496,7 +506,7 @@ def _safe_template(template: str | None, **kwargs: Any) -> str:
     try:
         return template.format(**kwargs)
     except (KeyError, IndexError, ValueError):
-        return template
+        return template or ""
 
 
 def _heuristic_summary(item: Dict[str, Any], heuristics: Dict[str, Any]) -> str:
@@ -649,15 +659,63 @@ def _call_openai_reranker(
         "Authorization": f"Bearer {settings.api_key}",
         "Content-Type": "application/json",
     }
+    project = os.getenv("OPENAI_PROJECT")
+    if project:
+        headers["OpenAI-Project"] = project
+
+    endpoint = settings.endpoint
+    body = payload
+    using_responses_api = bool(project) or endpoint.endswith("/responses")
+    if using_responses_api:
+        endpoint = endpoint.rstrip("/")
+        if not endpoint.endswith("/responses"):
+            endpoint = f"{endpoint}/responses"
+
+        messages = payload.get("messages", [])
+
+        def _as_response_input(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            converted: List[Dict[str, Any]] = []
+            for message in messages:
+                text = message.get("content")
+                if text is None:
+                    continue
+                converted.append(
+                    {
+                        "role": message.get("role", "user"),
+                        "content": [{"type": "text", "text": str(text)}],
+                    }
+                )
+            return converted
+
+        body = {
+            "model": settings.model,
+            "input": _as_response_input(messages),
+            "max_output_tokens": 2048,
+        }
+
     with httpx.Client(timeout=settings.timeout) as client:
-        response = client.post(settings.endpoint, headers=headers, json=payload)
+        response = client.post(endpoint, headers=headers, json=body)
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:  # pragma: no cover - network failure path
             raise RerankerError(
                 f"OpenAI API responded with status {exc.response.status_code}"
             ) from exc
+
     data = response.json()
+    if using_responses_api:
+        try:
+            first_block = data["output"][0]["content"][0]["text"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise RerankerError(
+                "Unexpected response structure from Responses API."
+            ) from exc
+        try:
+            parsed = json.loads(first_block)
+        except json.JSONDecodeError as exc:
+            raise RerankerError("Reranker returned non-JSON content.") from exc
+        return _parse_decisions_json(parsed)
+
     try:
         content = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError) as exc:
@@ -751,14 +809,8 @@ def _call_gemini_reranker(
 
 
 def _parse_decisions_json(payload: Dict[str, Any] | List) -> List[LLMDecision]:
-    if isinstance(payload, dict):
-        raw_items = payload.get("items")
-    elif isinstance(payload, list):
-        raw_items = payload
-    else:
-        return []
-
-    if not isinstance(raw_items, list):
+    raw_items = _decision_items(payload)
+    if not raw_items:
         return []
 
     decisions: List[LLMDecision] = []
@@ -784,6 +836,15 @@ def _parse_decisions_json(payload: Dict[str, Any] | List) -> List[LLMDecision]:
             LLMDecision(item_id=iid, score=score_val, explanation=explanation)
         )
     return decisions
+
+
+def _decision_items(payload: Dict[str, Any] | List[Any] | None) -> List[Any]:
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        items = payload.get("items")
+        return items if isinstance(items, list) else []
+    return []
 
 
 def _build_prompt_text(

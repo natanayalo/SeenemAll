@@ -5,6 +5,7 @@ import logging
 import os
 from datetime import datetime
 from typing import List
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -111,6 +112,7 @@ def test_get_settings_fallback_provider(monkeypatch):
 
 def test_call_openai_reranker_parses_payload(monkeypatch):
     _reset_settings()
+    monkeypatch.setenv("OPENAI_PROJECT", "proj-test")
     monkeypatch.setenv("RERANK_API_KEY", "fake")
     settings = reranker._get_settings()
 
@@ -119,16 +121,15 @@ def test_call_openai_reranker_parses_payload(monkeypatch):
     class DummyResponse:
         status_code = 200
 
+        def __init__(self, url):
+            self.request = SimpleNamespace(url=url)
+
         def raise_for_status(self):
             return None
 
         def json(self):
             payload = {"items": [{"id": 42, "score": 0.8, "explanation": "Ranked"}]}
-            return {
-                "choices": [
-                    {"message": {"content": json.dumps(payload)}},
-                ]
-            }
+            return {"output": [{"content": [{"text": json.dumps(payload)}]}]}
 
     class DummyClient:
         def __init__(self, *args, **kwargs):
@@ -144,7 +145,7 @@ def test_call_openai_reranker_parses_payload(monkeypatch):
             captured_request["endpoint"] = endpoint
             captured_request["headers"] = headers
             captured_request["payload"] = json
-            return DummyResponse()
+            return DummyResponse(SimpleNamespace(copy_with=lambda **_: endpoint))
 
     monkeypatch.setattr(reranker.httpx, "Client", DummyClient)
 
@@ -158,6 +159,9 @@ def test_call_openai_reranker_parses_payload(monkeypatch):
 
     assert decisions and decisions[0].item_id == 42
     assert decisions[0].explanation == "Ranked"
+    assert captured_request["endpoint"].endswith("/responses")
+    assert captured_request["payload"]["model"] == settings.model
+    assert captured_request["payload"]["input"][0]["content"][0]["type"] == "text"
     assert "Authorization" in captured_request["headers"]
     assert captured_request["payload"]["model"] == settings.model
     _reset_settings()

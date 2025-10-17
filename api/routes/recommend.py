@@ -117,18 +117,27 @@ def _merge_with_legacy_filters(
     if primary.max_runtime is None and fallback.max_runtime is not None:
         primary.max_runtime = fallback.max_runtime
 
-    if fallback.maturity_rating_max:
-        if not primary.maturity_rating_max:
-            primary.maturity_rating_max = fallback.maturity_rating_max
-        else:
-            fallback_level = rating_level(fallback.maturity_rating_max)
-            primary_level = rating_level(primary.maturity_rating_max)
-            if fallback_level is not None and (
-                primary_level is None or fallback_level < primary_level
-            ):
-                primary.maturity_rating_max = fallback.maturity_rating_max
+    _merge_maturity_rating(primary, fallback)
 
     return primary
+
+
+def _merge_maturity_rating(primary: IntentFilters, fallback: IntentFilters) -> None:
+    """Merge maturity caps, keeping the stricter (lower) rating."""
+    fallback_cap = getattr(fallback, "maturity_rating_max", None)
+    if not fallback_cap:
+        return
+
+    if not primary.maturity_rating_max:
+        primary.maturity_rating_max = fallback_cap
+        return
+
+    fallback_level = rating_level(fallback_cap)
+    primary_level = rating_level(primary.maturity_rating_max)
+    if fallback_level is None:
+        return
+    if primary_level is None or fallback_level < primary_level:
+        primary.maturity_rating_max = fallback_cap
 
 
 def _apply_franchise_cap(
@@ -162,7 +171,13 @@ def _is_long_tail(item: Dict[str, Any], limit: int) -> bool:
 
 
 def _serendipity_target(limit: int) -> int:
-    if _SERENDIPITY_RATIO <= 0.0 or limit <= 0 or limit <= 2:
+    """
+    Determine how many serendipity slots to allocate.
+
+    We skip serendipity when the limit is very small (<=2) because swapping
+    long-tail items into a list that short tends to degrade perceived quality.
+    """
+    if _SERENDIPITY_RATIO <= 0.0 or limit <= 2:
         return 0
     target = round(limit * _SERENDIPITY_RATIO)
     target = max(1, target)
@@ -260,8 +275,19 @@ async def recommend(
 
     llm_user_context = {"user_id": canonical_id, "profile_id": profile}
     llm_intent = _parse_llm_intent(query, llm_user_context, linked_entities)
-    logger.info(f"LLM Intent: {llm_intent}")
-    logger.info(f"Linked Entities: {linked_entities}")
+    if logger.isEnabledFor(logging.DEBUG):
+        intent_snapshot = {
+            key: value
+            for key, value in llm_intent.model_dump(exclude_none=True).items()
+            if key in {"include_genres", "exclude_genres", "maturity_rating_max"}
+        }
+        logger.debug("LLM intent parsed for user %s: %s", canonical_id, intent_snapshot)
+        if linked_entities:
+            entity_counts = {
+                key: len(value) if isinstance(value, list) else 0
+                for key, value in linked_entities.items()
+            }
+            logger.debug("Linked entity counts: %s", entity_counts)
     intent = _intent_filters_from_llm(query, llm_intent)
     if query:
         intent = _merge_with_legacy_filters(intent, legacy_parse_intent(query))

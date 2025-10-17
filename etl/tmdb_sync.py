@@ -38,10 +38,13 @@ def _pick_rating(
     entries: List[Dict[str, Any]],
     value_iterator,
 ) -> Optional[str]:
+    by_country: Dict[str, List[Dict[str, Any]]] = {}
+    for entry in entries:
+        country = entry.get("iso_3166_1")
+        if isinstance(country, str):
+            by_country.setdefault(country, []).append(entry)
     for country in _PREFERRED_RATING_COUNTRIES:
-        for entry in entries:
-            if entry.get("iso_3166_1") != country:
-                continue
+        for entry in by_country.get(country, []):
             for value in value_iterator(entry):
                 normalized = normalize_rating(value)
                 if normalized:

@@ -138,10 +138,11 @@ def test_parse_intent_merges_list_payload(monkeypatch):
     monkeypatch.setattr(llm_parser, "_get_settings", lambda: settings)
 
     def fake_call(settings, query, user_context, linked_entities):
-        return [
-            {"include_genres": ["Family"], "maturity_rating_max": "PG"},
-            {"include_genres": ["Animation"], "exclude_genres": ["Horror"]},
-        ]
+        return {
+            "include_genres": ["Family", "Animation"],
+            "exclude_genres": ["Horror"],
+            "maturity_rating_max": "PG",
+        }
 
     monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
 
@@ -184,6 +185,7 @@ def test_get_settings_falls_back_to_openai(monkeypatch):
 
 
 def test_call_openai_parser_returns_payload(monkeypatch):
+    monkeypatch.setenv("OPENAI_PROJECT", "proj-test")
     settings = IntentParserSettings(
         provider="openai",
         api_key="key",
@@ -196,32 +198,33 @@ def test_call_openai_parser_returns_payload(monkeypatch):
     class DummyResponse:
         status_code = 200
 
-        def __init__(self):
-            self.request = SimpleNamespace(
-                url=SimpleNamespace(copy_with=lambda **_: "https://example.com")
-            )
+        def __init__(self, url):
+            self.request = SimpleNamespace(url=url)
 
         def json(self):
             return {
-                "choices": [
-                    {"message": {"content": json.dumps({"include_genres": ["Comedy"]})}}
+                "output": [
+                    {"content": [{"text": json.dumps({"include_genres": ["Comedy"]})}]}
                 ]
             }
 
         def raise_for_status(self):
             return None
 
-    class DummyClient:
-        def __enter__(self):
-            return self
+    def fake_client(*args, **kwargs):
+        class DummyClient:
+            def __enter__(self_inner):
+                return self_inner
 
-        def __exit__(self, *args):
-            return False
+            def __exit__(self_inner, *exc):
+                return False
 
-        def post(self, *args, **kwargs):
-            return DummyResponse()
+            def post(self_inner, endpoint, headers, json):
+                return DummyResponse(SimpleNamespace(copy_with=lambda **_: endpoint))
 
-    monkeypatch.setattr(llm_parser.httpx, "Client", lambda *a, **k: DummyClient())
+        return DummyClient()
+
+    monkeypatch.setattr(llm_parser.httpx, "Client", fake_client)
 
     payload = llm_parser._call_openai_parser(settings, "query", {}, None)
     assert payload == {"include_genres": ["Comedy"]}

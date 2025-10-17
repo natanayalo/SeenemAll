@@ -219,6 +219,21 @@ def _normalize_llm_output(
     if not isinstance(payload, list):
         return None
 
+    def _merge_list(existing: Any, values: List[Any]) -> List[Any]:
+        combined: List[Any]
+        if isinstance(existing, list):
+            combined = list(existing)
+        elif existing is None:
+            combined = []
+        else:
+            combined = [existing]
+        seen = set(combined)
+        for entry in values:
+            if entry not in seen:
+                combined.append(entry)
+                seen.add(entry)
+        return combined
+
     merged: Dict[str, Any] = {}
     for fragment in payload:
         if not isinstance(fragment, dict):
@@ -230,18 +245,7 @@ def _normalize_llm_output(
             if isinstance(value, list):
                 if not value:
                     continue
-                if isinstance(existing, list):
-                    combined = list(existing)
-                elif existing is None:
-                    combined = []
-                else:
-                    combined = [existing]
-                seen = {entry for entry in combined}
-                for entry in value:
-                    if entry not in seen:
-                        combined.append(entry)
-                        seen.add(entry)
-                merged[key] = combined
+                merged[key] = _merge_list(existing, value)
             else:
                 if existing in (None, []):
                     merged[key] = value
@@ -262,11 +266,13 @@ def _augment_intent(intent: Intent, query: str) -> Intent:
     include_modified = False
     exclude_modified = False
 
+    # Include both individual tokens and the full normalized query so that
+    # multi-word keywords like "no gore" from the fallback rules still match.
+    phrase_matches = set(tokens)
+    phrase_matches.add(normalized_query)
+
     for rule in rules:
-        keyword_hit = any(
-            keyword in tokens or keyword in normalized_query
-            for keyword in rule.keywords
-        )
+        keyword_hit = any(keyword in phrase_matches for keyword in rule.keywords)
         include_hit = bool(rule.keywords & lower_includes)
         if not (keyword_hit or include_hit):
             continue
@@ -344,14 +350,14 @@ def parse_intent(
             normalized_query,
         )
 
+    logger.debug("LLM intent raw payload: %s", llm_output)
+
     if not llm_output:
         llm_output = _offline_intent_stub(normalized_query)
         if llm_output:
             logger.debug("Offline intent stub produced intent: %s", llm_output)
         else:
             logger.debug("Offline intent stub returned empty intent payload.")
-    else:
-        logger.debug("LLM intent payload: %s", llm_output)
 
     llm_output = _normalize_llm_output(llm_output)
 
@@ -392,15 +398,63 @@ def _call_openai_parser(
         "Authorization": f"Bearer {settings.api_key}",
         "Content-Type": "application/json",
     }
+    project = os.getenv("OPENAI_PROJECT")
+    if project:
+        headers["OpenAI-Project"] = project
+
+    # Use Responses API when a project id is provided.
+    endpoint = settings.endpoint
+    body = payload
+    using_responses_api = bool(project) or endpoint.endswith("/responses")
+    if using_responses_api:
+        endpoint = endpoint.rstrip("/")
+        if not endpoint.endswith("/responses"):
+            endpoint = f"{endpoint}/responses"
+
+        messages = payload.get("messages", [])
+
+        def _as_response_input(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            converted: List[Dict[str, Any]] = []
+            for message in messages:
+                text = message.get("content")
+                if text is None:
+                    continue
+                converted.append(
+                    {
+                        "role": message.get("role", "user"),
+                        "content": [{"type": "text", "text": str(text)}],
+                    }
+                )
+            return converted
+
+        body = {
+            "model": settings.model,
+            "input": _as_response_input(messages),
+            "max_output_tokens": 512,
+        }
+
     with httpx.Client(timeout=settings.timeout) as client:
-        response = client.post(settings.endpoint, headers=headers, json=payload)
+        response = client.post(endpoint, headers=headers, json=body)
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             raise IntentParserError(
                 f"OpenAI API responded with status {exc.response.status_code}"
             ) from exc
+
     data = response.json()
+    if using_responses_api:
+        try:
+            first_block = data["output"][0]["content"][0]["text"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise IntentParserError(
+                "Unexpected response structure from Responses API."
+            ) from exc
+        try:
+            return json.loads(first_block)
+        except json.JSONDecodeError as exc:
+            raise IntentParserError("Parser returned non-JSON content.") from exc
+
     try:
         content = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError) as exc:
