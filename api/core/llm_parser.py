@@ -162,7 +162,9 @@ def parse_intent(
 
     llm_output: Dict[str, Any] | None = None
     if settings.enabled:
-        logger.info("Intent parser(%s) parsing query.", settings.provider)
+        logger.info(
+            "Intent parser(%s) parsing query '%s'.", settings.provider, normalized_query
+        )
         try:
             if settings.provider == "openai":
                 llm_output = _call_openai_parser(
@@ -176,17 +178,31 @@ def parse_intent(
                 raise IntentParserError(f"Unsupported provider '{settings.provider}'")
         except IntentParserError:
             logger.exception("LLM intent parser failed; falling back to offline stub.")
+    else:
+        logger.info(
+            "Intent parser disabled (no API key or INTENT_ENABLED=0); using offline stub for query '%s'.",
+            normalized_query,
+        )
 
     if not llm_output:
         llm_output = _offline_intent_stub(normalized_query)
+        if llm_output:
+            logger.debug("Offline intent stub produced intent: %s", llm_output)
+        else:
+            logger.debug("Offline intent stub returned empty intent payload.")
 
     if not llm_output:
+        logger.info(
+            "Intent parser returning default intent for query '%s'.", normalized_query
+        )
         return default_intent()
 
     try:
         intent = Intent.model_validate(llm_output)
     except ValidationError:
-        logger.debug("Offline intent stub produced invalid payload; using default.")
+        logger.debug(
+            "Intent payload failed validation; falling back to default intent."
+        )
         return default_intent()
 
     logger.debug("Returning intent: %s", intent)
@@ -389,6 +405,67 @@ def _offline_intent_stub(query: str) -> Dict[str, Any]:
     normalized = query.strip().lower()
     if not normalized:
         return {}
+
+    def _append(container: Dict[str, Any], key: str, values: Any) -> None:
+        if not values:
+            return
+        existing = container.setdefault(key, [])
+        if not isinstance(existing, list):
+            return
+        if isinstance(values, (list, tuple, set)):
+            for value in values:
+                if value not in existing:
+                    existing.append(value)
+        else:
+            if values not in existing:
+                existing.append(values)
+
+    tokens = set(normalized.replace("-", " ").split())
+    payload: Dict[str, Any] = {}
+
+    kids_keywords = {
+        "kid",
+        "kids",
+        "child",
+        "children",
+        "toddler",
+        "toddlers",
+        "family",
+        "family-friendly",
+        "familyfriendly",
+        "cartoon",
+    }
+    if tokens & kids_keywords or "family friendly" in normalized:
+        _append(payload, "include_genres", ["Family", "Animation"])
+        payload.setdefault("maturity_rating_max", "PG")
+        if "show" in tokens or "series" in tokens:
+            _append(payload, "media_types", "tv")
+        if "movie" in tokens or "film" in tokens:
+            _append(payload, "media_types", "movie")
+
+    if "animated" in tokens or "cartoon" in tokens:
+        _append(payload, "include_genres", "Animation")
+
+    if "teen" in tokens and "maturity_rating_max" not in payload:
+        payload["maturity_rating_max"] = "PG-13"
+
+    if "no" in tokens and "gore" in tokens:
+        _append(payload, "exclude_genres", ["Horror", "Thriller"])
+
+    language_keywords = {
+        "french": "fr",
+        "spanish": "es",
+        "german": "de",
+        "japanese": "ja",
+        "korean": "ko",
+        "hindi": "hi",
+    }
+    for word, code in language_keywords.items():
+        if word in tokens:
+            _append(payload, "languages", code)
+
+    if payload:
+        return payload
 
     fixtures: Dict[str, Dict[str, Any]] = {
         "light sci-fi <2h": {

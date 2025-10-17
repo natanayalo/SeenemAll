@@ -44,7 +44,7 @@ def test_parse_intent_fixtures():
         ),
         (
             "no gore",
-            Intent(exclude_genres=["Horror"]),
+            Intent(exclude_genres=["Horror", "Thriller"]),
         ),
         (
             "movies from the 90s",
@@ -94,7 +94,7 @@ def test_rewrite_query():
 def test_parse_intent_uses_cache(monkeypatch):
     user_context = {"user_id": "u-test"}
     first = parse_intent("no gore", user_context)
-    assert first.exclude_genres == ["Horror"]
+    assert first.exclude_genres == ["Horror", "Thriller"]
 
     hits_before = llm_parser.CACHE_METRICS["hits"]
     second = parse_intent("no gore", user_context)
@@ -121,7 +121,7 @@ def test_parse_intent_llm_failure_falls_back(monkeypatch):
     monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
 
     intent = parse_intent("no gore", {"user_id": "u2"})
-    assert intent.exclude_genres == ["Horror"]
+    assert intent.exclude_genres == ["Horror", "Thriller"]
 
 
 def test_parse_intent_llm_success(monkeypatch):
@@ -250,3 +250,10 @@ def test_call_gemini_parser_returns_payload(monkeypatch):
 
 def test_offline_intent_stub_handles_unknown_query():
     assert llm_parser._offline_intent_stub("unknown request") == {}
+
+
+def test_offline_intent_stub_handles_kids_query():
+    payload = llm_parser._offline_intent_stub("kids show")
+    assert payload["maturity_rating_max"] == "PG"
+    assert set(payload["include_genres"]) >= {"Family", "Animation"}
+    assert "tv" in payload.get("media_types", [])
