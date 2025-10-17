@@ -555,7 +555,7 @@ def _offline_intent_stub(query: str) -> Dict[str, Any]:
 def rewrite_query(query: str, intent: Intent) -> Rewrite:
     """
     Rewrites the user's query into a concise, embeddable format.
-    Caches results for a short period.
+    Currently defers to the original query (no-op).
     """
     normalized_query = query or ""
     cache_key = get_rewrite_cache_key(normalized_query, intent)
@@ -567,15 +567,7 @@ def rewrite_query(query: str, intent: Intent) -> Rewrite:
 
     _log_metrics(_increment_metric("rewrite_misses"), cache="rewrite")
 
-    # For now, this is a mock implementation.
-    if intent.include_genres:
-        lowered = {genre.lower() for genre in intent.include_genres}
-        if lowered & {"sci-fi", "science fiction", "science-fiction"}:
-            rewrite = Rewrite(rewritten_text="sci-fi movies")
-        else:
-            rewrite = default_rewrite()
-    else:
-        rewrite = default_rewrite()
+    rewrite = Rewrite(rewritten_text=query)
 
     REWRITE_CACHE[cache_key] = _clone_rewrite(rewrite)
     _log_metrics(_snapshot_metrics(), cache="rewrite", event="store")
