@@ -365,8 +365,12 @@ def _apply_mixer_scores(candidates: List[Dict[str, Any]]) -> None:
     if not candidates:
         return
 
-    max_popularity = max(float(item.get("popularity") or 0.0) for item in candidates)
-    max_vote_count = max(float(item.get("vote_count") or 0.0) for item in candidates)
+    max_popularity = max(
+        (float(item.get("popularity") or 0.0) for item in candidates), default=0.0
+    )
+    max_vote_count = max(
+        (float(item.get("vote_count") or 0.0) for item in candidates), default=0.0
+    )
 
     ann_weight = max(_HYBRID_MIN_ANN_WEIGHT, _HYBRID_ANN_WEIGHT)
     collab_weight = _MIXER_COLLAB_WEIGHT
