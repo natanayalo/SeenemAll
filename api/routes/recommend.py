@@ -56,6 +56,12 @@ _MIXER_COLLAB_WEIGHT = _float_from_env("MIXER_COLLAB_WEIGHT", 0.3)
 _MIXER_TRENDING_WEIGHT = _float_from_env("MIXER_TRENDING_WEIGHT", 0.2)
 _MIXER_NOVELTY_WEIGHT = _float_from_env("MIXER_NOVELTY_WEIGHT", 0.1)
 
+_SERENDIPITY_RATIO_RAW = _float_from_env("SERENDIPITY_RATIO", 0.15)
+if _SERENDIPITY_RATIO_RAW <= 0.0:
+    _SERENDIPITY_RATIO = 0.0
+else:
+    _SERENDIPITY_RATIO = max(0.1, min(0.2, _SERENDIPITY_RATIO_RAW))
+
 
 def _parse_llm_intent(
     query: str | None,
@@ -133,6 +139,101 @@ def _apply_franchise_cap(
             franchise_counts[collection_id] = count + 1
 
     return filtered_candidates
+
+
+def _is_long_tail(item: Dict[str, Any], limit: int) -> bool:
+    if limit <= 0:
+        return False
+    original_rank = int(item.get("original_rank", 0) or 0)
+    return original_rank >= limit
+
+
+def _serendipity_target(limit: int) -> int:
+    if _SERENDIPITY_RATIO <= 0.0 or limit <= 0 or limit <= 2:
+        return 0
+    target = round(limit * _SERENDIPITY_RATIO)
+    target = max(1, target)
+    return min(limit, target)
+
+
+def _apply_serendipity_slot(
+    current: List[Dict[str, Any]],
+    candidate_pool: List[Dict[str, Any]],
+    limit: int,
+) -> List[Dict[str, Any]]:
+    if not current or limit <= 0 or _SERENDIPITY_RATIO <= 0.0:
+        return current
+
+    top_count = min(limit, len(current))
+    target = _serendipity_target(limit)
+    if target == 0:
+        return current
+
+    top_section = current[:top_count]
+    existing_long_tail = [item for item in top_section if _is_long_tail(item, limit)]
+    if len(existing_long_tail) >= target:
+        return current
+
+    pool_lookup: Dict[int, Dict[str, Any]] = {}
+    for item in candidate_pool:
+        ident = item.get("id")
+        if ident is None or ident in pool_lookup:
+            continue
+        if _is_long_tail(item, limit):
+            pool_lookup[ident] = item
+    if not pool_lookup:
+        return current
+
+    needed = min(target - len(existing_long_tail), len(pool_lookup))
+    if needed <= 0:
+        return current
+
+    replacements: List[Dict[str, Any]] = []
+    seen_replacement_ids: set[int] = set()
+    top_ids = {item.get("id") for item in top_section}
+    for item in candidate_pool:
+        ident = item.get("id")
+        if ident is None or ident not in pool_lookup:
+            continue
+        if ident in top_ids or ident in seen_replacement_ids:
+            continue
+        replacements.append(item)
+        seen_replacement_ids.add(ident)
+        if len(replacements) >= needed:
+            break
+
+    if not replacements:
+        return current
+
+    result = list(current)
+    victims = [idx for idx in range(top_count) if not _is_long_tail(result[idx], limit)]
+    victims.sort(reverse=True)
+
+    rep_iter = iter(replacements)
+    for idx in victims:
+        try:
+            replacement = next(rep_iter)
+        except StopIteration:
+            break
+        result[idx] = replacement
+
+    seen_ids: set[int] = set()
+    deduped: List[Dict[str, Any]] = []
+    for item in result:
+        ident = item.get("id")
+        if ident is None or ident in seen_ids:
+            continue
+        seen_ids.add(ident)
+        deduped.append(item)
+
+    for item in current:
+        ident = item.get("id")
+        if ident is None or ident in seen_ids:
+            continue
+        seen_ids.add(ident)
+        deduped.append(item)
+
+    return deduped
 
 
 @router.get("")
@@ -348,8 +449,12 @@ async def recommend(
     if not ordered:
         return _empty_response()
 
+    serendipity_context = list(ordered)
+
     if diversify:
         ordered = diversify_with_mmr(ordered, limit=limit)
+
+    ordered = _apply_serendipity_slot(ordered, serendipity_context, limit)
 
     reranked = rerank_with_explanations(
         ordered,

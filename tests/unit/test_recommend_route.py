@@ -709,6 +709,88 @@ def test_recommend_mixer_scores_items(monkeypatch):
     assert all("ann_rank" not in item for item in payload)
 
 
+def test_recommend_injects_serendipity_items(monkeypatch):
+    limit = 6
+    items = []
+    for idx in range(1, 11):
+        items.append(
+            SimpleNamespace(
+                id=idx,
+                tmdb_id=1000 + idx,
+                media_type="movie",
+                title=f"Item {idx}",
+                overview=f"Overview {idx}",
+                poster_url=f"poster{idx}.jpg",
+                runtime=90 + idx,
+                original_language="en",
+                genres=[{"name": "Action"}],
+                release_year=2010 + idx,
+                popularity=float(100 - idx * 3),
+                vote_average=7.0,
+                vote_count=100 - idx,
+                trending_rank=idx,
+                collection_id=None,
+                collection_name=None,
+            )
+        )
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [item.id for item in items],
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "apply_business_rules",
+        lambda ordered, intent=None: ordered,
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda ordered, **_: ordered,
+    )
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend",
+            params={"user_id": "u1", "limit": limit, "diversify": "false"},
+        )
+
+    app.dependency_overrides.clear()
+    session.close()
+
+    assert resp.status_code == 200
+    body = resp.json()
+    payload = body["items"]
+    assert payload
+
+    target = recommend_routes._serendipity_target(limit)
+    long_tail_ids = [ns.id for ns in items[limit:]]
+    top_ids = [entry["id"] for entry in payload[:limit]]
+    serendipity_count = sum(1 for iid in top_ids if iid in long_tail_ids)
+    assert serendipity_count >= target
+
+
 def test_recommend_supports_profile_parameter(monkeypatch):
     class DummySession:
         def execute(self, *_, **__):
