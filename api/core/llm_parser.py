@@ -172,6 +172,39 @@ def _normalize_llm_output(
     return merged or None
 
 
+def _augment_intent(intent: Intent, query: str) -> Intent:
+    tokens = set(query.replace("-", " ").lower().split())
+    include_genres = list(intent.include_genres or [])
+    lower_genres = {genre.lower() for genre in include_genres}
+
+    kids_keywords = {
+        "kid",
+        "kids",
+        "child",
+        "children",
+        "toddler",
+        "toddlers",
+        "family",
+        "family-friendly",
+        "familyfriendly",
+        "cartoon",
+    }
+    is_kid_query = bool(tokens & kids_keywords)
+    is_kid_genre = "kids" in lower_genres
+
+    updated = intent.model_copy(deep=True)
+
+    if is_kid_query or is_kid_genre:
+        if updated.maturity_rating_max is None:
+            updated.maturity_rating_max = "PG"
+        for genre in ("Family", "Animation"):
+            if genre not in include_genres:
+                include_genres.append(genre)
+        updated.include_genres = include_genres
+
+    return updated
+
+
 def parse_intent(
     query: str,
     user_context: Dict[str, Any],
@@ -245,6 +278,7 @@ def parse_intent(
         )
         return default_intent()
 
+    intent = _augment_intent(intent, normalized_query)
     logger.debug("Returning intent: %s", intent)
     INTENT_CACHE[cache_key] = _clone_intent(intent)
     _log_metrics(_snapshot_metrics(), cache="intent", event="store")
