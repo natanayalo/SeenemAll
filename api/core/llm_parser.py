@@ -190,6 +190,8 @@ def parse_intent(
             logger.debug("Offline intent stub produced intent: %s", llm_output)
         else:
             logger.debug("Offline intent stub returned empty intent payload.")
+    else:
+        logger.debug("LLM intent payload: %s", llm_output)
 
     if not llm_output:
         logger.info(
@@ -199,9 +201,11 @@ def parse_intent(
 
     try:
         intent = Intent.model_validate(llm_output)
-    except ValidationError:
+    except ValidationError as exc:
         logger.debug(
-            "Intent payload failed validation; falling back to default intent."
+            "Intent payload failed validation; falling back to default intent. errors=%s payload=%s",
+            exc.errors(),
+            llm_output,
         )
         return default_intent()
 
