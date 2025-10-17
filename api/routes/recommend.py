@@ -579,41 +579,7 @@ def _trending_prior_candidates(
         return []
 
     scored: List[Tuple[int, float, float]] = []
-    for row in rows:
-        item_id: int | None = None
-        trending_rank = None
-        popular_rank = None
-        popularity = None
-        primary_item = None
-
-        if isinstance(row, (tuple, list)):
-            if len(row) >= 1:
-                candidate = row[0]
-                if hasattr(candidate, "id"):
-                    primary_item = candidate
-                else:
-                    item_id = candidate
-            if len(row) >= 2:
-                trending_rank = row[1]
-            if len(row) >= 3:
-                popular_rank = row[2]
-            if len(row) >= 4:
-                popularity = row[3]
-        else:
-            item_id = getattr(row, "id", None)
-            trending_rank = getattr(row, "trending_rank", None)
-            popular_rank = getattr(row, "popular_rank", None)
-            popularity = getattr(row, "popularity", None)
-
-        if item_id is None and primary_item is not None:
-            item_id = getattr(primary_item, "id", None)
-        if trending_rank is None and primary_item is not None:
-            trending_rank = getattr(primary_item, "trending_rank", None)
-        if popular_rank is None and primary_item is not None:
-            popular_rank = getattr(primary_item, "popular_rank", None)
-        if popularity is None and primary_item is not None:
-            popularity = getattr(primary_item, "popularity", None)
-
+    for item_id, trending_rank, popular_rank, popularity in rows:
         if item_id is None:
             continue
 

@@ -57,13 +57,11 @@ class EntityLinker:
                 if tmdb_id is not None and media_type in media_map:
                     media_map[media_type].append(tmdb_id)
 
-            linked_entities: Dict[str, Any] = {}
-            if movies or shows or persons:
-                linked_entities = {
-                    "movie": movies,
-                    "tv": shows,
-                    "person": persons,
-                }
+            linked_entities: Dict[str, Any] = {
+                "movie": movies,
+                "tv": shows,
+                "person": persons,
+            }
 
             ENTITY_LINKER_CACHE[query] = linked_entities
             return linked_entities

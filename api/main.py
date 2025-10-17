@@ -33,10 +33,7 @@ async def app_lifespan(app: FastAPI):
     _initialise_application(app)
     tmdb_client = TMDBClient(TMDB_API_KEY) if TMDB_API_KEY else None
     app.state.tmdb_client = tmdb_client
-    if tmdb_client:
-        app.state.entity_linker = EntityLinker(tmdb_client)
-    else:
-        app.state.entity_linker = None
+    app.state.entity_linker = EntityLinker(tmdb_client) if tmdb_client else None
     yield
     client = getattr(app.state, "tmdb_client", None)
     if client is not None:

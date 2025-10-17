@@ -55,6 +55,18 @@ class _RecommendSession(_HistorySession):
     def execute(self, statement, params=None):
         self.last_statement = statement
         self.last_params = params or {}
+        raw_columns = getattr(statement, "_raw_columns", ())
+        if raw_columns and not hasattr(raw_columns[0], "columns"):
+            rows = [
+                (
+                    item.id,
+                    getattr(item, "trending_rank", None),
+                    getattr(item, "popular_rank", None),
+                    getattr(item, "popularity", None),
+                )
+                for item in self._items
+            ]
+            return FakeResult(rows)
         # Simulate the complex join query result
         rows = [
             (
