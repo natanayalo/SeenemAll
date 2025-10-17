@@ -71,7 +71,8 @@
 **Goal:** Serve recommendations via API
 **Implements:** `api/routes/recommend.py`
 
-- Combines user vector + ANN search
+- Combines user vector, collaborative neighbors, and LLM rewrite for ANN search
+- Integrates entity linking and trending priors before scoring
 - Applies business-rule boosts/filters + optional MMR diversity
 - Invokes the reranker for final ordering + explanations
 - Serves cursor-based pagination with cached responses
@@ -79,8 +80,9 @@
 
 ---
 
+---
+
 ### (Coming Soon)
 | Agent | Description |
 |-------|--------------|
-| 🎯 **Intent Agent** | Parse free-text queries (“light sci-fi < 2h”) and filter catalog |
 | ❤️ **Feedback Agent** | Collect feedback signals and retrain user vector |

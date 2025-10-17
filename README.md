@@ -137,6 +137,46 @@ curl "http://localhost:8000/recommend?user_id=u1&profile=main&limit=10&cursor=ey
 
 ---
 
+## 🧠 Recommendation Pipeline Details
+
+The `/recommend` route orchestrates several retrieval streams before reranking:
+
+- **Entity linker** – `api/core/entity_linker.py` resolves people and titles via TMDB.
+  The singleton linker is created during `FastAPI` lifespan startup (`api/main.py`) and
+  attached to `app.state.entity_linker`, so every request shares the same cache and
+  client. Intent parsing receives the resolved IDs so prompts and downstream filters
+  can respect explicit “more like *Interstellar*” style queries.
+
+- **Hybrid query rewrite** – when a short-term embedding exists, we blend it with the
+  rewrite vector returned by `rewrite_query(...)`. The mix is controlled by
+  `_REWRITE_BLEND_ALPHA` (default `0.5`) and produces a normalized vector that goes into
+  `ann_candidates(...)`. Cold-start users skip the blend entirely and fall back to
+  `_cold_start_candidates(...)`, which prefers popularity/trending ranks for the given
+  intent filters.
+
+- **Collaborative recall** – neighbor metadata captured in `users.neighbors` (see
+  `api/core/user_profile.py`) identifies similar users and the items they recently liked.
+  `_collaborative_candidates(...)` scores those titles and injects them alongside ANN
+  results while respecting exclusions and allow-lists.
+
+- **Trending prior** – `_trending_prior_candidates(...)` pulls from `Item.popularity`,
+  `popular_rank`, and `trending_rank`. The helper protects tests and stubs by gracefully
+  handling rows that lack full columns; when running without a real database (as in the
+  unit suite), it simply returns an empty list.
+
+- **Mixer scoring** – `_apply_mixer_scores(...)` combines ANN relevance, collaborative
+  similarity, trending boosts, and a novelty bonus. The weights can be tuned via
+  environment variables:
+  - `MIXER_COLLAB_WEIGHT` (default `0.3`)
+  - `MIXER_TRENDING_WEIGHT` (default `0.2`)
+  - `MIXER_NOVELTY_WEIGHT` (default `0.1`)
+  - ANN keeps the existing `_HYBRID_ANN_WEIGHT` with a minimum floor.
+
+These sources all feed into business rules, optional MMR diversification, and the LLM
+reranker (when enabled), producing the final explanations and ordering.
+
+---
+
 ## 🧱 Business Rules & Caching
 
 - Tweak ranking behaviour via `config/business_rules.json` (or point `BUSINESS_RULES_PATH`
