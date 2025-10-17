@@ -412,10 +412,11 @@ def _with_default_explanations(
 ) -> List[Dict[str, Any]]:
     enriched: List[Dict[str, Any]] = []
     intent_genres: List[str] = intent.effective_genres() if intent else []
+    current_year = datetime.utcnow().year
     for idx, item in enumerate(items):
         copy_item = dict(item)
         copy_item.setdefault("original_rank", idx)
-        score, heuristics = _heuristic_score(copy_item, idx)
+        score, heuristics = _heuristic_score(copy_item, idx, current_year)
         copy_item["score"] = score
         narrative = _default_explanation(copy_item, intent, query, intent_genres)
         heuristic_summary = _heuristic_summary(copy_item, heuristics)
@@ -430,6 +431,7 @@ def _with_default_explanations(
 def _heuristic_score(
     item: Dict[str, Any],
     position: int,
+    current_year: int,
 ) -> Tuple[float, Dict[str, Any]]:
     retrieval = float(item.get("retrieval_score") or 0.0)
     popularity = float(item.get("popularity") or 0.0)
@@ -453,7 +455,6 @@ def _heuristic_score(
         popular_bonus = max(0.0, 1.0 - min(popular_rank - 1, 100) / 100.0)
 
     recent_bonus = 0.0
-    current_year = datetime.utcnow().year
     if isinstance(release_year, int):
         age = max(0, current_year - release_year)
         if age <= 2:

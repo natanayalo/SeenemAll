@@ -242,12 +242,16 @@ def _normalize_llm_output(
 def _augment_intent(intent: Intent, query: str) -> Intent:
     normalized_query = query.lower()
     tokens = set(normalized_query.replace("-", " ").split())
-    include_genres = list(intent.include_genres or [])
-    lower_includes = {genre.lower() for genre in include_genres}
-    lower_excludes = {genre.lower() for genre in (intent.exclude_genres or [])}
 
     updated = intent.model_copy(deep=True)
+    include_genres = list(updated.include_genres or [])
+    lower_includes = {genre.lower() for genre in include_genres}
+    exclude_genres = list(updated.exclude_genres or [])
+    lower_excludes = {genre.lower() for genre in exclude_genres}
+
     rules = _load_fallback_rules()
+    include_modified = False
+    exclude_modified = False
 
     for rule in rules:
         keyword_hit = any(
@@ -255,27 +259,32 @@ def _augment_intent(intent: Intent, query: str) -> Intent:
             for keyword in rule.keywords
         )
         include_hit = bool(rule.keywords & lower_includes)
-        if keyword_hit or include_hit:
-            # Apply include genres
-            if rule.include_genres:
-                for genre in rule.include_genres:
-                    if genre not in include_genres:
-                        include_genres.append(genre)
-                updated.include_genres = include_genres
+        if not (keyword_hit or include_hit):
+            continue
 
-            # Apply exclude genres
-            if rule.exclude_genres:
-                exclude_genres = list(updated.exclude_genres or [])
-                lower_excludes = {genre.lower() for genre in exclude_genres}
-                for genre in rule.exclude_genres:
-                    if genre.lower() not in lower_excludes:
-                        exclude_genres.append(genre)
-                        lower_excludes.add(genre.lower())
-                updated.exclude_genres = exclude_genres
+        if rule.include_genres:
+            for genre in rule.include_genres:
+                lowered = genre.lower()
+                if lowered not in lower_includes:
+                    include_genres.append(genre)
+                    lower_includes.add(lowered)
+                    include_modified = True
 
-            # Apply maturity constraint
-            if rule.maturity_rating_max and not updated.maturity_rating_max:
-                updated.maturity_rating_max = rule.maturity_rating_max
+        if rule.exclude_genres:
+            for genre in rule.exclude_genres:
+                lowered = genre.lower()
+                if lowered not in lower_excludes:
+                    exclude_genres.append(genre)
+                    lower_excludes.add(lowered)
+                    exclude_modified = True
+
+        if rule.maturity_rating_max and not updated.maturity_rating_max:
+            updated.maturity_rating_max = rule.maturity_rating_max
+
+    if include_modified:
+        updated.include_genres = include_genres
+    if exclude_modified:
+        updated.exclude_genres = exclude_genres
 
     return updated
 
