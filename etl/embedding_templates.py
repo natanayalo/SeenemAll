@@ -113,12 +113,32 @@ def format_with_template(template: str, item: Dict[str, Any]) -> str:
     if template not in TEMPLATES:
         raise ValueError(f"Unknown template: {template}")
 
-    genres = [g["name"] for g in item.get("genres", []) if g.get("name")]
+    genres_list = _extract_genre_names(item.get("genres"))
     year = item.get("release_year")
 
     return TEMPLATES[template](
         title=item.get("title", ""),
         overview=item.get("overview", ""),
-        genres=genres,
+        genres=genres_list,
         year=year,
     )
+
+
+def _extract_genre_names(raw_genres: Any) -> List[str]:
+    genres_list = []
+    if isinstance(raw_genres, list):
+        for entry in raw_genres:
+            if isinstance(entry, dict):
+                name = entry.get("name")
+            else:
+                name = entry
+            if isinstance(name, str) and name:
+                genres_list.append(name)
+    elif isinstance(raw_genres, dict):
+        name = raw_genres.get("name")
+        if isinstance(name, str) and name:
+            genres_list.append(name)
+    elif isinstance(raw_genres, str) and raw_genres:
+        genres_list.append(raw_genres)
+
+    return genres_list

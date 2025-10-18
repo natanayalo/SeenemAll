@@ -1,0 +1,16 @@
+{
+  "narrative": {
+    "genre_match": "Dialed into your {genres} vibe.",
+    "media_type": "It's a {media_type} pick like you asked for.",
+    "runtime_match": "Runs about {runtime} minutes, matching your runtime window.",
+    "query_fallback": "Aligns with \"{query}\".",
+    "fallback": "Popular with viewers who share your taste."
+  },
+  "heuristic": {
+    "trending": "Trending now (#{rank}).",
+    "popular": "Top popular pick (#{rank}).",
+    "votes": "Rated {vote_average:.1f}/10 by {vote_count} fans.",
+    "recent": "Fresh release from {year}.",
+    "fallback": "Popular with viewers who share your taste."
+  }
+}

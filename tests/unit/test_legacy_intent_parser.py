@@ -40,12 +40,14 @@ def test_item_matches_intent_handles_constraints():
         media_types=["tv"],
         min_runtime=30,
         max_runtime=60,
+        maturity_rating_max="TV-14",
     )
 
     good_item = SimpleNamespace(
         media_type="tv",
         runtime=45,
         genres=[{"name": "Science Fiction"}],
+        maturity_rating="PG-13",
     )
     assert legacy.item_matches_intent(good_item, filters) is True
 
@@ -53,6 +55,7 @@ def test_item_matches_intent_handles_constraints():
         media_type="movie",
         runtime=45,
         genres=[{"name": "Science Fiction"}],
+        maturity_rating="PG-13",
     )
     assert legacy.item_matches_intent(wrong_media, filters) is False
 
@@ -60,6 +63,7 @@ def test_item_matches_intent_handles_constraints():
         media_type="tv",
         runtime=10,
         genres=[{"name": "Science Fiction"}],
+        maturity_rating="PG-13",
     )
     assert legacy.item_matches_intent(wrong_runtime, filters) is False
 
@@ -67,8 +71,24 @@ def test_item_matches_intent_handles_constraints():
         media_type="tv",
         runtime=45,
         genres=[{"name": "Comedy"}],
+        maturity_rating="PG-13",
     )
     assert legacy.item_matches_intent(wrong_genre, filters) is False
+
+
+def test_item_matches_intent_blocks_maturity_overflow():
+    filters = legacy.IntentFilters(
+        raw_query="",
+        maturity_rating_max="PG",
+    )
+
+    allowed_item = SimpleNamespace(maturity_rating="G")
+    blocked_item = SimpleNamespace(maturity_rating="TV-MA")
+    unknown_item = SimpleNamespace(maturity_rating=None)
+
+    assert legacy.item_matches_intent(allowed_item, filters) is True
+    assert legacy.item_matches_intent(blocked_item, filters) is False
+    assert legacy.item_matches_intent(unknown_item, filters) is False
 
 
 def test_parse_intent_empty_query_returns_empty_filters():

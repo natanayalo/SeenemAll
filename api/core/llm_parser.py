@@ -2,16 +2,18 @@ import hashlib
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from threading import Lock
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, List, Optional
 
 import httpx
 from cachetools import TTLCache
 from pydantic import ValidationError
 
 from .intent_parser import Intent
+from .legacy_intent_parser import parse_intent as legacy_parse_intent
 from .rewrite import Rewrite
 from api.core.prompt_eval import load_prompt_template
 
@@ -48,6 +50,75 @@ class IntentParserSettings:
     endpoint: str
     enabled: bool
     timeout: float
+
+
+@dataclass(frozen=True)
+class IntentFallbackRule:
+    keywords: set[str]
+    include_genres: List[str]
+    exclude_genres: List[str]
+    maturity_rating_max: Optional[str] = None
+
+
+_DEFAULT_FALLBACK_RULES: Tuple[IntentFallbackRule, ...] = tuple()
+
+
+@lru_cache(maxsize=1)
+def _load_fallback_rules() -> Tuple[IntentFallbackRule, ...]:
+    path = os.getenv("INTENT_FALLBACKS_PATH")
+    if not path:
+        path = os.path.join(os.getcwd(), "config", "intent_fallbacks.json")
+        if not os.path.exists(path):
+            return _DEFAULT_FALLBACK_RULES
+
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            raw_rules = json.load(handle)
+        if not isinstance(raw_rules, list):
+            raise ValueError("Fallback rules file must contain a list of rules")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        logger.warning(
+            "Failed to load fallback rules from %s; using defaults. error=%s",
+            path,
+            exc,
+        )
+        return _DEFAULT_FALLBACK_RULES
+
+    rules: List[IntentFallbackRule] = []
+    for entry in raw_rules:
+        if not isinstance(entry, dict):
+            continue
+        raw_keywords = entry.get("keywords") or []
+        keywords = {
+            str(keyword).lower()
+            for keyword in raw_keywords
+            if isinstance(keyword, str) and keyword.strip()
+        }
+        if not keywords:
+            continue
+        include_genres = [
+            str(genre)
+            for genre in entry.get("include_genres", [])
+            if isinstance(genre, str)
+        ]
+        exclude_genres = [
+            str(genre)
+            for genre in entry.get("exclude_genres", [])
+            if isinstance(genre, str)
+        ]
+        maturity = entry.get("maturity_rating_max")
+        if maturity is not None:
+            maturity = str(maturity)
+        rules.append(
+            IntentFallbackRule(
+                keywords=keywords,
+                include_genres=include_genres,
+                exclude_genres=exclude_genres,
+                maturity_rating_max=maturity,
+            )
+        )
+
+    return tuple(rules) if rules else _DEFAULT_FALLBACK_RULES
 
 
 @lru_cache(maxsize=1)
@@ -138,6 +209,101 @@ def get_rewrite_cache_key(query: str, intent: Intent) -> str:
     return f"{query}:{intent_hash}"
 
 
+def _normalize_llm_output(
+    payload: Dict[str, Any] | List[Any] | None
+) -> Dict[str, Any] | None:
+    if payload is None:
+        return None
+    if isinstance(payload, dict):
+        return payload
+    if not isinstance(payload, list):
+        return None
+
+    def _merge_list(existing: Any, values: List[Any]) -> List[Any]:
+        combined: List[Any]
+        if isinstance(existing, list):
+            combined = list(existing)
+        elif existing is None:
+            combined = []
+        else:
+            combined = [existing]
+        seen = set(combined)
+        for entry in values:
+            if entry not in seen:
+                combined.append(entry)
+                seen.add(entry)
+        return combined
+
+    merged: Dict[str, Any] = {}
+    for fragment in payload:
+        if not isinstance(fragment, dict):
+            continue
+        for key, value in fragment.items():
+            if value is None:
+                continue
+            existing = merged.get(key)
+            if isinstance(value, list):
+                if not value:
+                    continue
+                merged[key] = _merge_list(existing, value)
+            else:
+                if existing in (None, []):
+                    merged[key] = value
+    return merged or None
+
+
+def _augment_intent(intent: Intent, query: str) -> Intent:
+    normalized_query = query.lower()
+    tokens = set(normalized_query.replace("-", " ").split())
+
+    updated = intent.model_copy(deep=True)
+    include_genres = list(updated.include_genres or [])
+    lower_includes = {genre.lower() for genre in include_genres}
+    exclude_genres = list(updated.exclude_genres or [])
+    lower_excludes = {genre.lower() for genre in exclude_genres}
+
+    rules = _load_fallback_rules()
+    include_modified = False
+    exclude_modified = False
+
+    # Include both individual tokens and the full normalized query so that
+    # multi-word keywords like "no gore" from the fallback rules still match.
+    phrase_matches = set(tokens)
+    phrase_matches.add(normalized_query)
+
+    for rule in rules:
+        keyword_hit = any(keyword in phrase_matches for keyword in rule.keywords)
+        include_hit = bool(rule.keywords & lower_includes)
+        if not (keyword_hit or include_hit):
+            continue
+
+        if rule.include_genres:
+            for genre in rule.include_genres:
+                lowered = genre.lower()
+                if lowered not in lower_includes:
+                    include_genres.append(genre)
+                    lower_includes.add(lowered)
+                    include_modified = True
+
+        if rule.exclude_genres:
+            for genre in rule.exclude_genres:
+                lowered = genre.lower()
+                if lowered not in lower_excludes:
+                    exclude_genres.append(genre)
+                    lower_excludes.add(lowered)
+                    exclude_modified = True
+
+        if rule.maturity_rating_max and not updated.maturity_rating_max:
+            updated.maturity_rating_max = rule.maturity_rating_max
+
+    if include_modified:
+        updated.include_genres = include_genres
+    if exclude_modified:
+        updated.exclude_genres = exclude_genres
+
+    return updated
+
+
 def parse_intent(
     query: str,
     user_context: Dict[str, Any],
@@ -162,7 +328,9 @@ def parse_intent(
 
     llm_output: Dict[str, Any] | None = None
     if settings.enabled:
-        logger.info("Intent parser(%s) parsing query.", settings.provider)
+        logger.info(
+            "Intent parser(%s) parsing query '%s'.", settings.provider, normalized_query
+        )
         try:
             if settings.provider == "openai":
                 llm_output = _call_openai_parser(
@@ -176,19 +344,40 @@ def parse_intent(
                 raise IntentParserError(f"Unsupported provider '{settings.provider}'")
         except IntentParserError:
             logger.exception("LLM intent parser failed; falling back to offline stub.")
+    else:
+        logger.info(
+            "Intent parser disabled (no API key or INTENT_ENABLED=0); using offline stub for query '%s'.",
+            normalized_query,
+        )
+
+    logger.debug("LLM intent raw payload: %s", llm_output)
 
     if not llm_output:
         llm_output = _offline_intent_stub(normalized_query)
+        if llm_output:
+            logger.debug("Offline intent stub produced intent: %s", llm_output)
+        else:
+            logger.debug("Offline intent stub returned empty intent payload.")
+
+    llm_output = _normalize_llm_output(llm_output)
 
     if not llm_output:
+        logger.info(
+            "Intent parser returning default intent for query '%s'.", normalized_query
+        )
         return default_intent()
 
     try:
         intent = Intent.model_validate(llm_output)
-    except ValidationError:
-        logger.debug("Offline intent stub produced invalid payload; using default.")
+    except ValidationError as exc:
+        logger.debug(
+            "Intent payload failed validation; falling back to default intent. errors=%s payload=%s",
+            exc.errors(),
+            llm_output,
+        )
         return default_intent()
 
+    intent = _augment_intent(intent, normalized_query)
     logger.debug("Returning intent: %s", intent)
     INTENT_CACHE[cache_key] = _clone_intent(intent)
     _log_metrics(_snapshot_metrics(), cache="intent", event="store")
@@ -209,15 +398,63 @@ def _call_openai_parser(
         "Authorization": f"Bearer {settings.api_key}",
         "Content-Type": "application/json",
     }
+    project = os.getenv("OPENAI_PROJECT")
+    if project:
+        headers["OpenAI-Project"] = project
+
+    # Use Responses API when a project id is provided.
+    endpoint = settings.endpoint
+    body = payload
+    using_responses_api = bool(project) or endpoint.endswith("/responses")
+    if using_responses_api:
+        endpoint = endpoint.rstrip("/")
+        if not endpoint.endswith("/responses"):
+            endpoint = f"{endpoint}/responses"
+
+        messages = payload.get("messages", [])
+
+        def _as_response_input(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            converted: List[Dict[str, Any]] = []
+            for message in messages:
+                text = message.get("content")
+                if text is None:
+                    continue
+                converted.append(
+                    {
+                        "role": message.get("role", "user"),
+                        "content": [{"type": "text", "text": str(text)}],
+                    }
+                )
+            return converted
+
+        body = {
+            "model": settings.model,
+            "input": _as_response_input(messages),
+            "max_output_tokens": 512,
+        }
+
     with httpx.Client(timeout=settings.timeout) as client:
-        response = client.post(settings.endpoint, headers=headers, json=payload)
+        response = client.post(endpoint, headers=headers, json=body)
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             raise IntentParserError(
                 f"OpenAI API responded with status {exc.response.status_code}"
             ) from exc
+
     data = response.json()
+    if using_responses_api:
+        try:
+            first_block = data["output"][0]["content"][0]["text"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise IntentParserError(
+                "Unexpected response structure from Responses API."
+            ) from exc
+        try:
+            return json.loads(first_block)
+        except json.JSONDecodeError as exc:
+            raise IntentParserError("Parser returned non-JSON content.") from exc
+
     try:
         content = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError) as exc:
@@ -386,33 +623,121 @@ def _build_gemini_payload(
 
 
 def _offline_intent_stub(query: str) -> Dict[str, Any]:
-    normalized = query.strip().lower()
-    if not normalized:
+    stripped = (query or "").strip()
+    if not stripped:
         return {}
 
-    fixtures: Dict[str, Dict[str, Any]] = {
-        "light sci-fi <2h": {
-            "include_genres": ["Science Fiction"],
-            "runtime_minutes_max": 120,
-        },
-        "no gore": {"exclude_genres": ["Horror"]},
-        "movies from the 90s": {"year_min": 1990, "year_max": 1999},
-        "something in french": {"languages": ["fr"]},
-    }
+    intent = Intent()
+    intent = _augment_intent(intent, stripped.lower())
 
-    if normalized in fixtures:
-        return fixtures[normalized]
+    legacy_filters = legacy_parse_intent(query)
+    if legacy_filters.genres:
+        include_genres = list(intent.include_genres or [])
+        for genre in legacy_filters.genres:
+            if genre not in include_genres:
+                include_genres.append(genre)
+        if include_genres:
+            intent.include_genres = include_genres
 
-    if "bad" in normalized:
-        return {"include_genres": "not-a-list"}
+    if legacy_filters.min_runtime is not None and intent.runtime_minutes_min is None:
+        intent.runtime_minutes_min = legacy_filters.min_runtime
 
-    return {}
+    if legacy_filters.max_runtime is not None and intent.runtime_minutes_max is None:
+        intent.runtime_minutes_max = legacy_filters.max_runtime
+
+    if legacy_filters.maturity_rating_max and not intent.maturity_rating_max:
+        intent.maturity_rating_max = legacy_filters.maturity_rating_max
+
+    if intent.year_min is None and intent.year_max is None:
+        decade_range = _infer_year_range(stripped.lower())
+        if decade_range:
+            intent.year_min, intent.year_max = decade_range
+
+    if intent.languages is None:
+        detected_languages = _detect_languages(stripped.lower())
+        if detected_languages:
+            intent.languages = detected_languages
+
+    payload = intent.model_dump(exclude_none=True)
+    if legacy_filters.media_types:
+        payload.setdefault("media_types", list(legacy_filters.media_types))
+
+    return payload
+
+
+_DECADE_PATTERN = re.compile(r"\b(?:(?P<century>19|20)?(?P<decade>\d{2}))['’]?s\b")
+_GENRE_REWRITE_MAP = {
+    "science fiction": "sci-fi",
+    "sci fi": "sci-fi",
+    "sci-fi": "sci-fi",
+}
+_LANGUAGE_KEYWORDS = {
+    "french": "fr",
+    "spanish": "es",
+    "german": "de",
+    "italian": "it",
+    "japanese": "ja",
+    "korean": "ko",
+    "hindi": "hi",
+    "mandarin": "zh",
+    "chinese": "zh",
+    "portuguese": "pt",
+}
+
+
+def _infer_year_range(text: str) -> Optional[Tuple[int, int]]:
+    match = _DECADE_PATTERN.search(text)
+    if not match:
+        return None
+
+    century = match.group("century")
+    decade_str = match.group("decade")
+    if decade_str is None:
+        return None
+    decade = int(decade_str)
+
+    if century:
+        start_year = int(f"{century}{decade:02d}")
+    else:
+        base_century = 1900 if decade >= 50 else 2000
+        start_year = base_century + decade
+
+    start_year = (start_year // 10) * 10
+    end_year = start_year + 9
+    return start_year, end_year
+
+
+def _detect_languages(text: str) -> List[str]:
+    detected: List[str] = []
+    for keyword, code in _LANGUAGE_KEYWORDS.items():
+        if keyword in text and code not in detected:
+            detected.append(code)
+    return detected
+
+
+def _rewrite_from_intent(intent: Intent) -> Optional[str]:
+    include_genres = intent.include_genres or []
+    for genre in include_genres:
+        key = genre.lower()
+        phrase = _GENRE_REWRITE_MAP.get(key, key)
+        return f"{phrase} movies"
+
+    if intent.exclude_genres:
+        return ""
+
+    return None
+
+
+def _truncate_words(text: str, limit: int = 8) -> str:
+    words = text.split()
+    if len(words) <= limit:
+        return text
+    return " ".join(words[:limit])
 
 
 def rewrite_query(query: str, intent: Intent) -> Rewrite:
     """
     Rewrites the user's query into a concise, embeddable format.
-    Caches results for a short period.
     """
     normalized_query = query or ""
     cache_key = get_rewrite_cache_key(normalized_query, intent)
@@ -424,15 +749,12 @@ def rewrite_query(query: str, intent: Intent) -> Rewrite:
 
     _log_metrics(_increment_metric("rewrite_misses"), cache="rewrite")
 
-    # For now, this is a mock implementation.
-    if intent.include_genres:
-        lowered = {genre.lower() for genre in intent.include_genres}
-        if lowered & {"sci-fi", "science fiction", "science-fiction"}:
-            rewrite = Rewrite(rewritten_text="sci-fi movies")
-        else:
-            rewrite = default_rewrite()
-    else:
-        rewrite = default_rewrite()
+    rewritten_text = _rewrite_from_intent(intent)
+    if rewritten_text is None:
+        rewritten_text = normalized_query
+    rewritten_text = _truncate_words(rewritten_text)
+
+    rewrite = Rewrite(rewritten_text=rewritten_text)
 
     REWRITE_CACHE[cache_key] = _clone_rewrite(rewrite)
     _log_metrics(_snapshot_metrics(), cache="rewrite", event="store")

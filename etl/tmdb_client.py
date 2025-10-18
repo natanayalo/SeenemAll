@@ -50,7 +50,12 @@ class TMDBClient:
                     yield it
 
     async def details(self, media: str, tmdb_id: int) -> Dict[str, Any]:
-        return await self._get(f"/{media}/{tmdb_id}", {"language": "en-US"})
+        params: Dict[str, Any] = {"language": "en-US"}
+        if media == "movie":
+            params["append_to_response"] = "release_dates"
+        elif media == "tv":
+            params["append_to_response"] = "content_ratings"
+        return await self._get(f"/{media}/{tmdb_id}", params)
 
     async def search(self, query: str, media_type: str | None = None) -> Dict[str, Any]:
         params = {"query": query}

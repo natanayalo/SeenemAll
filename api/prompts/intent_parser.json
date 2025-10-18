@@ -44,6 +44,16 @@
                 "exclude_genres": ["Family", "Kids"],
                 "maturity_rating_max": "R"
             }
+        },
+        {
+            "input": {
+                "query": "kids animated show"
+            },
+            "expected_output": {
+                "include_genres": ["Family", "Animation"],
+                "exclude_genres": ["Horror", "Thriller"],
+                "maturity_rating_max": "PG"
+            }
         }
     ]
 }

@@ -30,6 +30,7 @@ from api.core.business_rules import apply_business_rules
 from api.core.llm_parser import rewrite_query
 from api.core.embeddings import encode_texts
 from api.core.user_profile import NEGATIVE_EVENT_TYPES, _event_weight
+from api.core.maturity import rating_level
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
 logger = logging.getLogger(__name__)
@@ -56,6 +57,12 @@ _MIXER_COLLAB_WEIGHT = _float_from_env("MIXER_COLLAB_WEIGHT", 0.3)
 _MIXER_TRENDING_WEIGHT = _float_from_env("MIXER_TRENDING_WEIGHT", 0.2)
 _MIXER_NOVELTY_WEIGHT = _float_from_env("MIXER_NOVELTY_WEIGHT", 0.1)
 
+_SERENDIPITY_RATIO_RAW = _float_from_env("SERENDIPITY_RATIO", 0.15)
+if _SERENDIPITY_RATIO_RAW <= 0.0:
+    _SERENDIPITY_RATIO = 0.0
+else:
+    _SERENDIPITY_RATIO = max(0.1, min(0.2, _SERENDIPITY_RATIO_RAW))
+
 
 def _parse_llm_intent(
     query: str | None,
@@ -80,6 +87,7 @@ def _intent_filters_from_llm(query: str | None, llm_intent: Intent) -> IntentFil
         media_types=[],
         min_runtime=llm_intent.runtime_minutes_min,
         max_runtime=llm_intent.runtime_minutes_max,
+        maturity_rating_max=llm_intent.maturity_rating_max,
     )
     return filters
 
@@ -109,7 +117,133 @@ def _merge_with_legacy_filters(
     if primary.max_runtime is None and fallback.max_runtime is not None:
         primary.max_runtime = fallback.max_runtime
 
+    _merge_maturity_rating(primary, fallback)
+
     return primary
+
+
+def _merge_maturity_rating(primary: IntentFilters, fallback: IntentFilters) -> None:
+    """Merge maturity caps, keeping the stricter (lower) rating."""
+    fallback_cap = getattr(fallback, "maturity_rating_max", None)
+    if not fallback_cap:
+        return
+
+    if not primary.maturity_rating_max:
+        primary.maturity_rating_max = fallback_cap
+        return
+
+    fallback_level = rating_level(fallback_cap)
+    primary_level = rating_level(primary.maturity_rating_max)
+    if fallback_level is None:
+        return
+    if primary_level is None or fallback_level < primary_level:
+        primary.maturity_rating_max = fallback_cap
+
+
+def _apply_franchise_cap(
+    candidates: List[Dict[str, Any]], cap: int = 2
+) -> List[Dict[str, Any]]:
+    if not candidates or cap <= 0:
+        return candidates
+
+    franchise_counts: Dict[int, int] = {}
+    filtered_candidates: List[Dict[str, Any]] = []
+
+    for item in candidates:
+        collection_id = item.get("collection_id")
+        if collection_id is None:
+            filtered_candidates.append(item)
+            continue
+
+        count = franchise_counts.get(collection_id, 0)
+        if count < cap:
+            filtered_candidates.append(item)
+            franchise_counts[collection_id] = count + 1
+
+    return filtered_candidates
+
+
+def _is_long_tail(item: Dict[str, Any], limit: int) -> bool:
+    if limit <= 0:
+        return False
+    original_rank = int(item.get("original_rank", 0) or 0)
+    return original_rank >= limit
+
+
+def _serendipity_target(limit: int) -> int:
+    """
+    Determine how many serendipity slots to allocate.
+
+    We skip serendipity when the limit is very small (<=2) because swapping
+    long-tail items into a list that short tends to degrade perceived quality.
+    """
+    if _SERENDIPITY_RATIO <= 0.0 or limit <= 2:
+        return 0
+    target = round(limit * _SERENDIPITY_RATIO)
+    target = max(1, target)
+    return min(limit, target)
+
+
+def _apply_serendipity_slot(
+    current: List[Dict[str, Any]],
+    candidate_pool: List[Dict[str, Any]],
+    limit: int,
+) -> List[Dict[str, Any]]:
+    if not current or limit <= 0 or _SERENDIPITY_RATIO <= 0.0:
+        return current
+
+    top_count = min(limit, len(current))
+    target = _serendipity_target(limit)
+    if target == 0:
+        return current
+
+    top_section = list(current[:top_count])
+    existing_long_tail = [item for item in top_section if _is_long_tail(item, limit)]
+    if len(existing_long_tail) >= target:
+        return current
+
+    short_tail_candidates = [
+        idx for idx, item in enumerate(top_section) if not _is_long_tail(item, limit)
+    ]
+    if not short_tail_candidates:
+        return current
+
+    top_ids = {item.get("id") for item in top_section if item.get("id") is not None}
+
+    replacement_pool: List[Dict[str, Any]] = []
+    seen_pool: set[int] = set()
+    for item in candidate_pool:
+        ident = item.get("id")
+        if ident is None or ident in top_ids or ident in seen_pool:
+            continue
+        if _is_long_tail(item, limit):
+            replacement_pool.append(item)
+            seen_pool.add(ident)
+
+    if not replacement_pool:
+        return current
+
+    needed = min(target - len(existing_long_tail), len(replacement_pool))
+    if needed <= 0:
+        return current
+
+    short_tail_candidates = short_tail_candidates[-needed:]
+    replacements = replacement_pool[:needed]
+
+    new_top = top_section
+    for idx, replacement in zip(short_tail_candidates, replacements):
+        new_top[idx] = replacement
+
+    deduped: List[Dict[str, Any]] = []
+    seen_ids: set[int] = set()
+    for item in new_top + list(current):
+        ident = item.get("id")
+        if ident is None or ident not in seen_ids:
+            if ident is not None:
+                seen_ids.add(ident)
+            deduped.append(item)
+
+    return deduped
 
 
 @router.get("")
@@ -141,6 +275,19 @@ async def recommend(
 
     llm_user_context = {"user_id": canonical_id, "profile_id": profile}
     llm_intent = _parse_llm_intent(query, llm_user_context, linked_entities)
+    if logger.isEnabledFor(logging.DEBUG):
+        intent_snapshot = {
+            key: value
+            for key, value in llm_intent.model_dump(exclude_none=True).items()
+            if key in {"include_genres", "exclude_genres", "maturity_rating_max"}
+        }
+        logger.debug("LLM intent parsed for user %s: %s", canonical_id, intent_snapshot)
+        if linked_entities:
+            entity_counts = {
+                key: len(value) if isinstance(value, list) else 0
+                for key, value in linked_entities.items()
+            }
+            logger.debug("Linked entity counts: %s", entity_counts)
     intent = _intent_filters_from_llm(query, llm_intent)
     if query:
         intent = _merge_with_legacy_filters(intent, legacy_parse_intent(query))
@@ -291,6 +438,9 @@ async def recommend(
                 "original_language": it.original_language,
                 "genres": it.genres,
                 "release_year": it.release_year,
+                "collection_id": it.collection_id,
+                "collection_name": it.collection_name,
+                "maturity_rating": getattr(it, "maturity_rating", None),
                 "watch_options": cleaned_options,
                 "watch_url": (
                     cleaned_options[0]["url"] if cleaned_options else None
@@ -314,13 +464,19 @@ async def recommend(
     if not ordered:
         return _empty_response()
 
+    if diversify:
+        ordered = _apply_franchise_cap(ordered)
     _apply_mixer_scores(ordered)
     ordered = apply_business_rules(ordered, intent=intent)
     if not ordered:
         return _empty_response()
 
+    serendipity_context = list(ordered)
+
     if diversify:
         ordered = diversify_with_mmr(ordered, limit=limit)
+
+    ordered = _apply_serendipity_slot(ordered, serendipity_context, limit)
 
     reranked = rerank_with_explanations(
         ordered,
