@@ -28,24 +28,13 @@ from api.core.legacy_intent_parser import (
 )
 from api.core.reranker import rerank_with_explanations, diversify_with_mmr
 from api.core.business_rules import apply_business_rules
-from api.core.llm_parser import rewrite_query
+from api.core.llm_parser import rewrite_query, linked_media_types
 from api.core.embeddings import encode_texts
 from api.core.user_profile import NEGATIVE_EVENT_TYPES, _event_weight
 from api.core.maturity import rating_level
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
 logger = logging.getLogger(__name__)
-
-
-def _media_types_from_linked(linked_entities: Dict[str, Any] | None) -> List[str]:
-    if not linked_entities:
-        return []
-    result: List[str] = []
-    for key, media_type in (("tv", "tv"), ("movie", "movie")):
-        values = linked_entities.get(key)
-        if isinstance(values, list) and values:
-            result.append(media_type)
-    return result
 
 
 def _float_from_env(name: str, default: float) -> float:
@@ -312,14 +301,14 @@ async def recommend(
     legacy_filters = legacy_parse_intent(query) if query else None
     if legacy_filters:
         intent = _merge_with_legacy_filters(intent, legacy_filters)
-    linked_media_types = _media_types_from_linked(linked_entities)
+    entity_media_types = linked_media_types(linked_entities)
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
             "Media type signals for user %s | llm=%s legacy=%s linked=%s -> merged=%s",
             canonical_id,
             llm_media_types,
             legacy_filters.media_types if legacy_filters else None,
-            linked_media_types,
+            entity_media_types,
             intent.media_types,
         )
     candidate_limit = min(500, max(limit, limit * 3))

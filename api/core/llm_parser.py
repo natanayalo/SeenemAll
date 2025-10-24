@@ -318,15 +318,14 @@ def _augment_intent(intent: Intent, query: str) -> Intent:
     return updated
 
 
-def _linked_media_types(linked_entities: Dict[str, Any] | None) -> List[str]:
+def linked_media_types(linked_entities: Dict[str, Any] | None) -> List[str]:
     if not linked_entities:
         return []
     result: List[str] = []
-    for key, media_type in (("tv", "tv"), ("movie", "movie")):
-        values = linked_entities.get(key)
+    for media_type in ("tv", "movie"):
+        values = linked_entities.get(media_type)
         if isinstance(values, list) and values:
-            if media_type not in result:
-                result.append(media_type)
+            result.append(media_type)
     return result
 
 
@@ -334,7 +333,7 @@ def _infer_media_types_for_prompt(
     query: str, linked_entities: Dict[str, Any] | None
 ) -> List[str]:
     hints: List[str] = []
-    for media_type in _linked_media_types(linked_entities):
+    for media_type in linked_media_types(linked_entities):
         hints.append(media_type)
 
     if query:

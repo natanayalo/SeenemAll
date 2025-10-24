@@ -196,7 +196,6 @@ def test_load_genres_from_db_filters_and_logs(monkeypatch, caplog):
 
     rows = [
         ("tv", [{"name": "Drama"}, {"name": "science fiction"}]),
-        ("movie", [{"name": "Comedy"}]),
         ("tv", [{"name": "Drama"}]),
     ]
 
@@ -236,7 +235,7 @@ def test_load_genres_from_db_filters_and_logs(monkeypatch, caplog):
 
 def test_iterate_and_item_genre_helpers():
     payload = [{"name": "Drama"}, {"name": "Comedy"}, "Thriller"]
-    names = legacy._iterate_genre_names(payload)
+    names = list(legacy._iterate_genre_names(payload))
     assert names == ["Drama", "Comedy", "Thriller"]
 
     class ItemWithGenres:

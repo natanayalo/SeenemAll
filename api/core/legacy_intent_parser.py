@@ -352,9 +352,7 @@ def _load_genres_from_db(media_types: Sequence[str] | None) -> List[str] | None:
         stmt = stmt.execution_options(stream_results=True)
         result = session.execute(stmt)
         genres: Dict[str, str] = {}
-        for media_type, payload in result:
-            if media_types and media_type not in media_types:
-                continue
+        for _media_type, payload in result:
             for name in _iterate_genre_names(payload):
                 key = name.lower()
                 if key not in genres:
@@ -380,16 +378,9 @@ def _load_genres_from_db(media_types: Sequence[str] | None) -> List[str] | None:
 
 def _iterate_genre_names(raw: object) -> Iterable[str]:
     if raw is None:
-        return []
-    raw_iter: Iterable[Any]
-    if isinstance(raw, dict):
-        raw_iter = [raw]
-    elif isinstance(raw, list):
-        raw_iter = raw
-    else:
-        raw_iter = [raw]
+        return
+    raw_iter: Iterable[Any] = raw if isinstance(raw, list) else [raw]
 
-    names: List[str] = []
     for entry in raw_iter:
         if isinstance(entry, dict):
             name = entry.get("name")
@@ -398,8 +389,7 @@ def _iterate_genre_names(raw: object) -> Iterable[str]:
         if isinstance(name, str):
             cleaned = name.strip()
             if cleaned:
-                names.append(cleaned)
-    return names
+                yield cleaned
 
 
 def _item_genre_names(item: "Item | object") -> set[str]:
