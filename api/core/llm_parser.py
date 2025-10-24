@@ -13,7 +13,10 @@ from cachetools import TTLCache
 from pydantic import ValidationError
 
 from .intent_parser import Intent
-from .legacy_intent_parser import parse_intent as legacy_parse_intent
+from .legacy_intent_parser import (
+    parse_intent as legacy_parse_intent,
+    canonical_genres,
+)
 from .rewrite import Rewrite
 from api.core.prompt_eval import load_prompt_template
 
@@ -36,6 +39,13 @@ REWRITE_CACHE: TTLCache[str, Rewrite] = TTLCache(
 CACHE_METRICS = {"hits": 0, "misses": 0, "rewrite_hits": 0, "rewrite_misses": 0}
 METRICS_LOCK = Lock()
 logger = logging.getLogger(__name__)
+
+_ENABLE_MEDIA_TYPE_SCOPING = os.getenv(
+    "INTENT_SCOPE_GENRES_BY_MEDIA", "1"
+).strip().lower() not in {"0", "false", "no"}
+_ENABLE_ANN_DESCRIPTION = os.getenv(
+    "INTENT_ENABLE_ANN_DESCRIPTION", "0"
+).strip().lower() not in {"0", "false", "no"}
 
 
 class IntentParserError(RuntimeError):
@@ -304,6 +314,35 @@ def _augment_intent(intent: Intent, query: str) -> Intent:
     return updated
 
 
+def _linked_media_types(linked_entities: Dict[str, Any] | None) -> List[str]:
+    if not linked_entities:
+        return []
+    result: List[str] = []
+    for key, media_type in (("tv", "tv"), ("movie", "movie")):
+        values = linked_entities.get(key)
+        if isinstance(values, list) and values:
+            if media_type not in result:
+                result.append(media_type)
+    return result
+
+
+def _infer_media_types_for_prompt(
+    query: str, linked_entities: Dict[str, Any] | None
+) -> List[str]:
+    hints: List[str] = []
+    for media_type in _linked_media_types(linked_entities):
+        hints.append(media_type)
+
+    if query:
+        legacy_types = legacy_parse_intent(query).media_types
+        for media_type in legacy_types:
+            lowered = media_type.strip().lower()
+            if lowered and lowered not in hints:
+                hints.append(lowered)
+
+    return hints
+
+
 def parse_intent(
     query: str,
     user_context: Dict[str, Any],
@@ -546,7 +585,51 @@ def _build_prompt_text(
 ) -> Tuple[str, str]:
     prompt_config = load_prompt_template("intent_parser")
     system_prompt = prompt_config.get("system_prompt", "")
-    examples = prompt_config.get("examples", [])
+    examples = list(prompt_config.get("examples", []))
+
+    if _ENABLE_ANN_DESCRIPTION and system_prompt:
+        system_prompt = (
+            f"{system_prompt}\n\n"
+            "When possible, populate `ann_description` with one evocative sentence "
+            "(18-35 words, <=200 characters) that conveys the desired mood, themes, and stakes. "
+            "Avoid restating obvious filters such as media types, named people, or services unless they add vital context. "
+            "Only include the field when there is enough signal; otherwise omit it."
+        )
+        examples.append(
+            {
+                "input": {
+                    "query": "gritty dystopian series on netflix with pedro pascal"
+                },
+                "expected_output": {
+                    "include_genres": ["Science Fiction"],
+                    "media_types": ["tv"],
+                    "include_people": ["Pedro Pascal"],
+                    "streaming_providers": ["netflix"],
+                    "ann_description": "A gritty dystopian tale where a controlled future society unravels, confronting authoritarian power and personal cost.",
+                },
+            }
+        )
+
+    media_types_hint: List[str] | None = None
+    if _ENABLE_MEDIA_TYPE_SCOPING:
+        hints = _infer_media_types_for_prompt(query or "", linked_entities)
+        if hints:
+            media_types_hint = hints
+            logger.debug(
+                "Scoping catalog genres for LLM prompt to media_types=%s", hints
+            )
+
+    genre_list = canonical_genres(media_types_hint)
+    if genre_list:
+        allowed_block = (
+            "Allowed catalog genres (choose only from this list for include/exclude/boost):\n"
+            + "\n".join(f"- {genre}" for genre in genre_list)
+            + "\nIf the user mentions a synonym or related phrase, map it to the closest genre above."
+        )
+        if system_prompt:
+            system_prompt = f"{system_prompt}\n\n{allowed_block}"
+        else:
+            system_prompt = allowed_block
 
     example_texts = []
     for example in examples:

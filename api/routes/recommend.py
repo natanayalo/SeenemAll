@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import logging
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -36,6 +37,17 @@ router = APIRouter(prefix="/recommend", tags=["recommend"])
 logger = logging.getLogger(__name__)
 
 
+def _media_types_from_linked(linked_entities: Dict[str, Any] | None) -> List[str]:
+    if not linked_entities:
+        return []
+    result: List[str] = []
+    for key, media_type in (("tv", "tv"), ("movie", "movie")):
+        values = linked_entities.get(key)
+        if isinstance(values, list) and values:
+            result.append(media_type)
+    return result
+
+
 def _float_from_env(name: str, default: float) -> float:
     raw = os.getenv(name)
     if raw is None:
@@ -62,6 +74,13 @@ if _SERENDIPITY_RATIO_RAW <= 0.0:
     _SERENDIPITY_RATIO = 0.0
 else:
     _SERENDIPITY_RATIO = max(0.1, min(0.2, _SERENDIPITY_RATIO_RAW))
+
+
+@dataclass
+class PrefilterDecision:
+    allowed_ids: List[int] | None
+    boost_ids: List[int]
+    enforce_genres: bool
 
 
 def _parse_llm_intent(
@@ -289,16 +308,37 @@ async def recommend(
             }
             logger.debug("Linked entity counts: %s", entity_counts)
     intent = _intent_filters_from_llm(query, llm_intent)
-    if query:
-        intent = _merge_with_legacy_filters(intent, legacy_parse_intent(query))
+    llm_media_types = list(intent.media_types or [])
+    legacy_filters = legacy_parse_intent(query) if query else None
+    if legacy_filters:
+        intent = _merge_with_legacy_filters(intent, legacy_filters)
+    linked_media_types = _media_types_from_linked(linked_entities)
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "Media type signals for user %s | llm=%s legacy=%s linked=%s -> merged=%s",
+            canonical_id,
+            llm_media_types,
+            legacy_filters.media_types if legacy_filters else None,
+            linked_media_types,
+            intent.media_types,
+        )
     candidate_limit = min(500, max(limit, limit * 3))
     if intent.has_filters():
         candidate_limit = min(500, max(candidate_limit, limit * 5))
 
-    allowlist = _prefilter_allowed_ids(db, intent, candidate_limit)
+    prefilter = _prefilter_allowed_ids(db, intent, candidate_limit)
+    allowlist = prefilter.allowed_ids
+    boost_ids = prefilter.boost_ids or []
+    enforce_genres = prefilter.enforce_genres
     if cold_start:
         logger.info("Using cold-start candidates for user %s", canonical_id)
         ids = _cold_start_candidates(db, intent, candidate_limit, allowlist)
+        logger.debug(
+            "Cold-start retrieval | candidate_count=%d allowlist_size=%s enforce_genres=%s",
+            len(ids),
+            len(allowlist) if allowlist is not None else None,
+            enforce_genres,
+        )
     else:
         logger.info("Using ANN candidates for user %s", canonical_id)
         assert short_v is not None
@@ -314,6 +354,13 @@ async def recommend(
         ids = ann_candidates(
             db, q_vec, exclude, limit=candidate_limit, allowed_ids=allowlist
         )
+        logger.debug(
+            "ANN retrieval | candidate_count=%d allowlist_size=%s enforce_genres=%s rewrite=%s",
+            len(ids),
+            len(allowlist) if allowlist is not None else None,
+            enforce_genres,
+            bool(rewrite.rewritten_text),
+        )
 
     collab_results = _collaborative_candidates(
         db,
@@ -321,6 +368,12 @@ async def recommend(
         exclude,
         candidate_limit,
         allowed_ids=allowlist,
+    )
+    logger.debug(
+        "Collaborative retrieval | neighbor_count=%d candidate_count=%d allowlist_size=%s",
+        len(profile_meta.get("neighbors") or []),
+        len(collab_results),
+        len(allowlist) if allowlist is not None else None,
     )
     collab_scores = {iid: score for iid, score in collab_results}
     merged_scores: Dict[int, Dict[str, float]] = {}
@@ -337,13 +390,18 @@ async def recommend(
             merged_scores.setdefault(iid, {})["collab"] = score / max_collab
 
     trending_results: List[Tuple[int, float]] = []
-    if cold_start or ann_scores or collab_scores:
+    if cold_start or ann_scores or collab_scores or boost_ids:
         trending_results = _trending_prior_candidates(
             db,
             intent,
             exclude,
             candidate_limit,
             allowed_ids=allowlist,
+        )
+        logger.debug(
+            "Trending prior retrieval | candidate_count=%d allowlist_size=%s",
+            len(trending_results),
+            len(allowlist) if allowlist is not None else None,
         )
         trending_scores = {iid: score for iid, score in trending_results}
         if trending_scores:
@@ -369,8 +427,40 @@ async def recommend(
             if len(merged) >= candidate_limit:
                 break
         ids = merged
-    else:
-        ids = ids[:candidate_limit]
+    # Limit applied after boost reordering
+
+    if boost_ids:
+        exclude_set = set(exclude or [])
+        priority: List[int] = []
+        seen_priority: set[int] = set()
+        for candidate in boost_ids:
+            if candidate in exclude_set or candidate in seen_priority:
+                continue
+            priority.append(candidate)
+            seen_priority.add(candidate)
+
+        combined: List[int] = list(priority)
+        seen_all = set(seen_priority)
+        for candidate in ids:
+            if candidate in seen_all:
+                continue
+            combined.append(candidate)
+            seen_all.add(candidate)
+
+        ids = combined
+        for idx, candidate in enumerate(priority):
+            score = 1.0 / (1.0 + idx)
+            scores = merged_scores.setdefault(candidate, {})
+            current = scores.get("ann")
+            if current is None or score > current:
+                scores["ann"] = score
+        logger.debug(
+            "Boost reordering applied | boost_count=%d merged_length=%d",
+            len(priority),
+            len(ids),
+        )
+
+    ids = ids[:candidate_limit]
 
     negative_items = set(profile_meta.get("negative_items") or [])
     if negative_items:
@@ -406,11 +496,13 @@ async def recommend(
     }
     ordered: List[Dict[str, Any]] = []
     max_candidates = min(candidate_limit, max(limit * 2, 25))
+    skipped_intent = 0
     for iid in ids:
         it, vec, watch_options = items_with_data.get(iid, (None, None, None))
         if it is None or vec is None or len(vec) == 0:
             continue
-        if not item_matches_intent(it, intent):
+        if not item_matches_intent(it, intent, enforce_genres=enforce_genres):
+            skipped_intent += 1
             continue
 
         sources = merged_scores.get(iid, {})
@@ -463,6 +555,12 @@ async def recommend(
 
     if not ordered:
         return _empty_response()
+    if skipped_intent and logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "Post-filter dropped %d candidates due to intent match (enforce_genres=%s)",
+            skipped_intent,
+            enforce_genres,
+        )
 
     if diversify:
         ordered = _apply_franchise_cap(ordered)
@@ -772,38 +870,85 @@ def _trending_prior_candidates(
 
 def _prefilter_allowed_ids(
     db: Session, intent: IntentFilters | None, limit: int
-) -> List[int] | None:
+) -> PrefilterDecision:
     if intent is None or not intent.has_filters():
-        return None
+        return PrefilterDecision(None, [], True)
 
-    media_types = intent.media_types or []
-    genres = intent.effective_genres()
+    threshold = max(10, limit // 2)
+    fetch_limit = max(limit * 5, limit)
 
-    if not media_types and not genres:
-        return None
+    strict_ids = _run_prefilter_query(
+        db,
+        intent,
+        fetch_limit=fetch_limit,
+        include_genres=True,
+    )
+    logger.debug(
+        "Prefilter strict run | threshold=%d strict_count=%d media_types=%s genres=%s",
+        threshold,
+        len(strict_ids),
+        intent.media_types,
+        intent.effective_genres(),
+    )
+    if len(strict_ids) >= threshold:
+        logger.debug("Prefilter returning strict allowlist.")
+        return PrefilterDecision(strict_ids, strict_ids, True)
 
+    relaxed_ids = _run_prefilter_query(
+        db,
+        intent,
+        fetch_limit=fetch_limit,
+        include_genres=False,
+    )
+
+    if len(relaxed_ids) >= threshold:
+        # Genre matches were sparse, treat them as boosts but keep other filters strict.
+        logger.debug(
+            "Prefilter relaxed pass selected | relaxed_count=%d strict_count=%d",
+            len(relaxed_ids),
+            len(strict_ids),
+        )
+        return PrefilterDecision(relaxed_ids, strict_ids, False)
+
+    # Fall back to ANN-first retrieval. Preserve genre matches as soft boosts.
+    logger.debug(
+        "Prefilter falling back to ANN-first | relaxed_count=%d strict_count=%d",
+        len(relaxed_ids),
+        len(strict_ids),
+    )
+    return PrefilterDecision(None, strict_ids, False)
+
+
+def _run_prefilter_query(
+    db: Session,
+    intent: IntentFilters,
+    *,
+    fetch_limit: int,
+    include_genres: bool,
+) -> List[int]:
     stmt = select(Item.id)
 
+    media_types = intent.media_types or []
     if media_types:
         stmt = stmt.where(Item.media_type.in_(media_types))
 
-    if genres:
-        filters = []
-        for genre in genres:
-            if not genre:
-                continue
-            filters.append(_genre_contains_clause(db, genre))
-        if filters:
-            stmt = stmt.where(or_(*filters))
+    if include_genres:
+        genres = intent.effective_genres()
+        if genres:
+            filters = [_genre_contains_clause(db, genre) for genre in genres if genre]
+            if filters:
+                stmt = stmt.where(or_(*filters))
 
-    fetch_limit = max(limit * 5, limit)
     rows = db.execute(stmt.limit(fetch_limit)).scalars().all()
-    if not rows:
-        return []
-    # Preserve ordering but ensure uniqueness
+    return _ordered_unique(rows)
+
+
+def _ordered_unique(values: List[int]) -> List[int]:
     seen: set[int] = set()
     ordered: List[int] = []
-    for value in rows:
+    for value in values:
+        if value is None:
+            continue
         if value not in seen:
             seen.add(value)
             ordered.append(value)

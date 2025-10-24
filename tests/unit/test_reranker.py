@@ -746,3 +746,129 @@ def test_rerank_with_explanations_uses_llm_decisions(monkeypatch):
     assert result[2]["id"] == 3
     assert result[2]["explanation"]
     _reset_settings()
+
+
+def test_env_helpers_coerce_types(monkeypatch):
+    monkeypatch.setenv("FLOAT_ENV_TEST", "0.42")
+    assert reranker._float_from_env("FLOAT_ENV_TEST", 0.1) == 0.42
+    monkeypatch.setenv("FLOAT_ENV_TEST", "not-a-number")
+    assert reranker._float_from_env("FLOAT_ENV_TEST", 0.2) == 0.2
+    monkeypatch.delenv("FLOAT_ENV_TEST", raising=False)
+    assert reranker._float_from_env("FLOAT_ENV_TEST", 0.3) == 0.3
+
+    monkeypatch.setenv("INT_ENV_TEST", "7")
+    assert reranker._int_from_env("INT_ENV_TEST", 1) == 7
+    monkeypatch.setenv("INT_ENV_TEST", "bad")
+    assert reranker._int_from_env("INT_ENV_TEST", 5) == 5
+    monkeypatch.delenv("INT_ENV_TEST", raising=False)
+    assert reranker._int_from_env("INT_ENV_TEST", 9) == 9
+
+    monkeypatch.setenv("OPT_INT_ENV_TEST", "")
+    assert reranker._optional_int_from_env("OPT_INT_ENV_TEST") is None
+    monkeypatch.setenv("OPT_INT_ENV_TEST", "11")
+    assert reranker._optional_int_from_env("OPT_INT_ENV_TEST") == 11
+    monkeypatch.setenv("OPT_INT_ENV_TEST", "oops")
+    assert reranker._optional_int_from_env("OPT_INT_ENV_TEST") is None
+
+
+def test_templates_loader_uses_env(monkeypatch, tmp_path, caplog):
+    reranker._load_explanation_templates_cached.cache_clear()
+    template_file = tmp_path / "templates.json"
+    template_file.write_text(json.dumps({"heuristic": {"fallback": "Custom fallback"}}))
+    monkeypatch.setenv("EXPLANATION_TEMPLATES_PATH", str(template_file))
+
+    loaded = reranker._load_explanation_templates()
+    assert loaded["heuristic"]["fallback"] == "Custom fallback"
+
+    reranker._load_explanation_templates_cached.cache_clear()
+    broken = tmp_path / "broken.json"
+    broken.write_text("not-json")
+    monkeypatch.setenv("EXPLANATION_TEMPLATES_PATH", str(broken))
+    caplog.set_level(logging.WARNING, logger=reranker.logger.name)
+    loaded = reranker._load_explanation_templates()
+    assert (
+        loaded["heuristic"]["fallback"]
+        == reranker._DEFAULT_EXPLANATION_TEMPLATES["heuristic"]["fallback"]
+    )
+
+
+def test_diversify_with_mmr_handles_empty_input():
+    assert reranker.diversify_with_mmr([]) == []
+
+
+def test_safe_template_handles_invalid_inputs():
+    assert reranker._safe_template(None, rank=1) == ""
+    assert reranker._safe_template("Rank {rank}", rank=5) == "Rank 5"
+    assert reranker._safe_template("Rank {rank}", position=2) == "Rank {rank}"
+
+
+def test_heuristic_summary_uses_fallback(monkeypatch):
+    monkeypatch.setattr(
+        reranker,
+        "_load_explanation_templates",
+        lambda: reranker._DEFAULT_EXPLANATION_TEMPLATES,
+    )
+    heuristics = {
+        "popularity_norm": 0.8,
+        "trending_rank": None,
+        "recent_bonus": 0.0,
+        "popular_rank": None,
+        "vote_average": 0.0,
+        "vote_count": 0,
+    }
+    summary = reranker._heuristic_summary({"id": 1}, heuristics)
+    assert "Popular with viewers" in summary
+
+
+def test_merge_with_base_returns_original_when_no_decisions():
+    base = [{"id": 1, "score": 0.9}]
+    assert reranker._merge_with_base(base, []) == base
+
+
+def test_reranker_prompt_evaluation_logs(monkeypatch, caplog):
+    caplog.set_level(logging.DEBUG, logger=reranker.logger.name)
+
+    def fake_openai(settings, items, intent, query, user):
+        return [reranker.LLMDecision(item_id=1, score=0.8, explanation="Reason")]
+
+    monkeypatch.setattr(reranker, "_call_openai_reranker", fake_openai)
+    monkeypatch.setattr(reranker, "_call_gemini_reranker", fake_openai)
+
+    monkeypatch.setattr(
+        reranker,
+        "_get_prompt_config",
+        lambda: {
+            "examples": [
+                {
+                    "input": {"query": "needle", "intent": None},
+                    "expected_output": {
+                        "items": [{"id": 1, "score": 0.8, "explanation": "Reason"}]
+                    },
+                }
+            ]
+        },
+    )
+
+    evaluations: list[dict] = []
+
+    def fake_evaluate(output, expected, intent, query):
+        evaluations.append(output)
+        return 0.9, []
+
+    monkeypatch.setattr(
+        "api.core.prompt_eval.evaluate_reranker_output",
+        fake_evaluate,
+    )
+
+    settings = reranker.RerankerSettings(
+        provider="openai",
+        api_key="key",
+        model="gpt",
+        endpoint="https://example.com",
+        enabled=True,
+        timeout=1.0,
+    )
+
+    decisions = reranker._call_reranker(settings, [{"id": 1}], None, "needle", None)
+    assert decisions and decisions[0].score == 0.8
+    assert evaluations and evaluations[0]["items"][0]["score"] == 0.8

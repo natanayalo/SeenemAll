@@ -1,7 +1,11 @@
 """Tests for embedding template formats."""
 
 import pytest
-from etl.embedding_templates import format_with_template
+from etl.embedding_templates import (
+    format_with_template,
+    _get_era,
+    _extract_genre_names,
+)
 
 TEST_ITEM = {
     "id": 1,
@@ -79,3 +83,20 @@ def test_missing_temporal_data():
     emphasized = format_with_template("emphasized", item_no_year)
     assert "#1990s" not in emphasized
     assert "#Modern" not in emphasized
+
+
+def test_get_era_branches():
+    assert _get_era(None) is None
+    assert _get_era(2026) == "Upcoming"
+    assert _get_era(2020) == "Contemporary"
+    assert _get_era(2015) == "Recent"
+    assert _get_era(1998) == "Modern"
+    assert _get_era(1978) == "Classic"
+    assert _get_era(1965) == "Vintage"
+
+
+def test_extract_genre_names_variants():
+    assert _extract_genre_names({"name": "Action"}) == ["Action"]
+    assert _extract_genre_names("Comedy") == ["Comedy"]
+    genres = _extract_genre_names([{"name": "Drama"}, "Sci-Fi", {"name": ""}, 42])
+    assert genres == ["Drama", "Sci-Fi"]

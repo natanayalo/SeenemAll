@@ -28,3 +28,16 @@ class Intent(BaseModel):
     boost_genres: Optional[List[str]] = Field(
         None, description="List of genres to boost in recommendations."
     )
+    media_types: Optional[List[str]] = Field(
+        None, description="Optional list of media types (e.g., 'tv', 'movie')."
+    )
+    include_people: Optional[List[str]] = Field(
+        None, description="List of person names or IDs to include."
+    )
+    streaming_providers: Optional[List[str]] = Field(
+        None, description="Preferred streaming providers (normalized identifiers)."
+    )
+    ann_description: Optional[str] = Field(
+        None,
+        description="Optional natural-language summary for ANN query enrichment.",
+    )

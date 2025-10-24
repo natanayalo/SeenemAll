@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+from types import SimpleNamespace
 
 import api.core.user_profile as user_profile
 from api.core.user_profile import (
@@ -246,3 +247,144 @@ def test_collect_collaborative_vector_returns_neighbors():
     )
     assert vec is not None
     assert neighbors and neighbors[0].user_id == "neighbor"
+
+
+def test_event_weight_clamps_negative_base():
+    assert user_profile._event_weight("liked", -2.0) == 0.0
+
+
+def test_collect_collaborative_vector_short_circuits_on_empty_items():
+    class Stub:
+        def query(self, *args, **kwargs):
+            raise AssertionError("query should not be invoked")
+
+    vec, neighbors = user_profile._collect_collaborative_vector(Stub(), "u", [])
+    assert vec is None and neighbors == []
+
+
+def test_collect_collaborative_vector_skips_null_users(monkeypatch):
+    class Session:
+        def query(self, *entities):
+            class Query:
+                def filter(self, *args, **kwargs):
+                    return self
+
+                def all(self):
+                    return [(None, 2.0)]
+
+            return Query()
+
+    vec, neighbors = user_profile._collect_collaborative_vector(Session(), "user", [1])
+    assert vec is None and neighbors == []
+
+
+def test_collect_collaborative_vector_handles_missing_vectors(monkeypatch):
+    class Session:
+        def __init__(self):
+            self._stage = 0
+
+        def query(self, *entities):
+            class UserHistoryQuery:
+                def __init__(self, parent):
+                    self.parent = parent
+
+                def filter(self, *args, **kwargs):
+                    return self
+
+                def all(self):
+                    return [("friend", 1.0)]
+
+            class UserQuery:
+                def __init__(self, parent):
+                    self.parent = parent
+
+                def filter(self, *args, **kwargs):
+                    return self
+
+                def all(self):
+                    return [SimpleNamespace(user_id="friend", long_vec=None)]
+
+            if entities and entities[0] is user_profile.UserHistory.user_id:
+                return UserHistoryQuery(self)
+            return UserQuery(self)
+
+    vec, neighbors = user_profile._collect_collaborative_vector(Session(), "user", [1])
+    assert vec is None and neighbors == []
+
+
+def test_time_decay_weights_zero_items():
+    weights = user_profile._time_decay_weights(0)
+    assert weights.shape == (0,)
+
+
+def test_compute_user_vector_handles_zero_weights(monkeypatch):
+    session = FakeSession(
+        history_rows=[(1, 0.0)],
+        embedding_vectors=[(1, [1.0, 0.0, 0.0])],
+        item_rows=[(1, [{"name": "Drama"}])],
+    )
+    monkeypatch.setattr(
+        user_profile,
+        "_collect_collaborative_vector",
+        lambda *args, **kwargs: (None, []),
+    )
+    long_vec, short_vec, genre_prefs, neighbors, negatives = (
+        user_profile.compute_user_vector(session, "user")
+    )
+    assert np.isclose(np.linalg.norm(long_vec), 1.0, atol=1e-6)
+    assert np.isclose(np.linalg.norm(short_vec), 1.0, atol=1e-6)
+    assert genre_prefs is not None
+    assert neighbors == []
+    assert negatives == []
+
+
+def test_compute_user_vector_collab_fills_missing_long_vec(monkeypatch):
+    session = FakeSession(
+        history_rows=[(1, 1.0)],
+        embedding_vectors=[(1, [1.0, 0.0, 0.0])],
+        item_rows=[(1, [{"name": "Action"}])],
+    )
+
+    monkeypatch.setattr(user_profile.np, "average", lambda *args, **kwargs: None)
+
+    def fake_collect(db, user_id, item_ids):
+        return np.array([0.0, 1.0, 0.0], dtype="float32"), [
+            user_profile.NeighborInfo(user_id="friend", weight=2.0)
+        ]
+
+    monkeypatch.setattr(user_profile, "_collect_collaborative_vector", fake_collect)
+
+    long_vec, short_vec, genre_prefs, neighbors, negatives = (
+        user_profile.compute_user_vector(session, "user")
+    )
+    assert long_vec[1] > 0.5
+    assert neighbors and neighbors[0].user_id == "friend"
+
+
+def test_compute_user_vector_skips_nonpositive_genre_weights(monkeypatch):
+    session = FakeSession(
+        history_rows=[(1, 1.0), (2, 1.0)],
+        embedding_vectors=[
+            (1, [1.0, 0.0, 0.0]),
+            (2, [0.0, 1.0, 0.0]),
+        ],
+        item_rows=[
+            (1, [{"name": "Drama"}]),
+            (2, [{"name": None}]),
+        ],
+    )
+
+    monkeypatch.setattr(
+        user_profile,
+        "_collect_collaborative_vector",
+        lambda *args, **kwargs: (None, []),
+    )
+    monkeypatch.setattr(
+        user_profile, "_time_decay_weights", lambda n: np.zeros(n, dtype="float32")
+    )
+
+    long_vec, short_vec, genre_prefs, neighbors, negatives = (
+        user_profile.compute_user_vector(session, "user")
+    )
+    assert genre_prefs is None
+    assert np.linalg.norm(short_vec) == 0.0
