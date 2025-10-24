@@ -134,7 +134,8 @@ class MockRow:
         self.id = ns.id
         self.ns = ns
         vector = np.ones(384, dtype="float32")
-        self._data = (ns, vector, [])  # Using tuple for immutability
+        watch_options = getattr(ns, "watch_options", [])
+        self._data = (ns, vector, watch_options)  # Using tuple for immutability
 
     def __iter__(self):
         """Make this row behave like a SQLAlchemy Row when unpacked."""
@@ -969,6 +970,85 @@ def test_recommend_filters_negative_items(monkeypatch):
     assert resp.status_code == 200
     body = resp.json()
     assert body["items"] == []
+
+
+def test_recommend_filters_streaming_providers(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Alpha",
+            overview="Alpha saves the world.",
+            poster_url="alpha.jpg",
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Action"}],
+            release_year=2020,
+            collection_id=None,
+            collection_name=None,
+            watch_options=[{"service": "nfx", "url": "http://alpha"}],
+        ),
+        SimpleNamespace(
+            id=2,
+            tmdb_id=202,
+            media_type="movie",
+            title="Beta",
+            overview="Beta saves the world.",
+            poster_url="beta.jpg",
+            runtime=95,
+            original_language="en",
+            genres=[{"name": "Action"}],
+            release_year=2020,
+            collection_id=None,
+            collection_name=None,
+            watch_options=[{"service": "hlu", "url": "http://beta"}],
+        ),
+    ]
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [item.id for item in items],
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda candidates, **_: candidates,
+    )
+
+    def fake_intent(query, user_context, linked_entities=None):
+        return Intent(streaming_providers=["netflix"])
+
+    monkeypatch.setattr(recommend_routes, "_parse_llm_intent", fake_intent)
+
+    with TestClient(app) as client:
+        resp = client.get("/recommend", params={"user_id": "u1", "query": "netflix"})
+
+    app.dependency_overrides.clear()
+    assert resp.status_code == 200
+    body = resp.json()
+    assert [item["id"] for item in body["items"]] == [1]
+    assert body["items"][0]["watch_options"] == [
+        {"service": "nfx", "url": "http://alpha"}
+    ]
 
 
 def _build_franchise_item(

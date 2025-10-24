@@ -5,7 +5,7 @@ import json
 import os
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Sequence, Set
 
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -35,6 +35,42 @@ from api.core.maturity import rating_level
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
 logger = logging.getLogger(__name__)
+
+_STREAMING_PROVIDER_ALIASES: Dict[str, Set[str]] = {
+    "netflix": {"netflix", "nfx"},
+    "disney_plus": {"disney_plus", "disney", "dnp"},
+    "prime_video": {"prime_video", "primevideo", "amazon", "amz", "amp"},
+    "hulu": {"hulu", "hlu"},
+    "max": {"max", "hbomax", "hbo", "hbm"},
+    "apple_tv_plus": {"apple_tv_plus", "appletvplus", "apple", "atp"},
+    "paramount_plus": {"paramount_plus", "paramountplus", "prm", "pmnt", "paramount"},
+}
+
+
+def _normalize_streaming_services(
+    providers: Sequence[str] | None,
+) -> Set[str]:
+    normalized: Set[str] = set()
+    if not providers:
+        return normalized
+
+    for provider in providers:
+        if not isinstance(provider, str):
+            continue
+        key = provider.strip().lower()
+        if not key:
+            continue
+        matched = False
+        for canonical, variants in _STREAMING_PROVIDER_ALIASES.items():
+            alias_set = set(variants)
+            alias_set.add(canonical)
+            if key == canonical or key in alias_set:
+                normalized.update(alias_set)
+                matched = True
+                break
+        if not matched:
+            normalized.add(key)
+    return normalized
 
 
 def _float_from_env(name: str, default: float) -> float:
@@ -297,6 +333,7 @@ async def recommend(
             }
             logger.debug("Linked entity counts: %s", entity_counts)
     intent = _intent_filters_from_llm(query, llm_intent)
+    preferred_services = _normalize_streaming_services(llm_intent.streaming_providers)
     llm_media_types = list(intent.media_types or [])
     legacy_filters = legacy_parse_intent(query) if query else None
     if legacy_filters:
@@ -311,6 +348,12 @@ async def recommend(
             entity_media_types,
             intent.media_types,
         )
+        if preferred_services:
+            logger.debug(
+                "Requested streaming providers for user %s: %s",
+                canonical_id,
+                sorted(preferred_services),
+            )
     candidate_limit = min(500, max(limit, limit * 3))
     if intent.has_filters():
         candidate_limit = min(500, max(candidate_limit, limit * 5))
@@ -509,6 +552,19 @@ async def recommend(
                 if opt["url"] is not None
             ]
 
+        filtered_options = cleaned_options
+        if preferred_services:
+            matching_options = [
+                opt
+                for opt in cleaned_options
+                if isinstance(opt, dict)
+                and ((service := str(opt.get("service") or "").strip().lower()))
+                and service in preferred_services
+            ]
+            if not matching_options:
+                continue
+            filtered_options = matching_options
+
         ordered.append(
             {
                 "id": it.id,
@@ -524,9 +580,9 @@ async def recommend(
                 "collection_id": it.collection_id,
                 "collection_name": it.collection_name,
                 "maturity_rating": getattr(it, "maturity_rating", None),
-                "watch_options": cleaned_options,
+                "watch_options": filtered_options,
                 "watch_url": (
-                    cleaned_options[0]["url"] if cleaned_options else None
+                    filtered_options[0]["url"] if filtered_options else None
                 ),  # For backward compatibility
                 "original_rank": len(ordered),
                 "ann_rank": len(ordered),
