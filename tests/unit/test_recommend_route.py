@@ -64,7 +64,9 @@ def _reset_prefilter(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit: PrefilterDecision(None, [], True),
+        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+            None, [], True
+        ),
     )
     yield
 
@@ -477,7 +479,9 @@ def test_recommend_prefilter_passes_allowed_ids(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit: PrefilterDecision([101, 202], [101, 202], True),
+        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+            [101, 202], [101, 202], True
+        ),
     )
 
     recorded = {}
@@ -540,7 +544,9 @@ def test_recommend_relaxed_prefilter_allows_mismatched_genres(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit: PrefilterDecision(None, [], False),
+        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+            None, [], False
+        ),
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -1040,7 +1046,10 @@ def test_recommend_filters_streaming_providers(monkeypatch):
     monkeypatch.setattr(recommend_routes, "_parse_llm_intent", fake_intent)
 
     with TestClient(app) as client:
-        resp = client.get("/recommend", params={"user_id": "u1", "query": "netflix"})
+        resp = client.get(
+            "/recommend",
+            params={"user_id": "u1", "query": "netflix", "limit": 1},
+        )
 
     app.dependency_overrides.clear()
     assert resp.status_code == 200
@@ -1049,6 +1058,91 @@ def test_recommend_filters_streaming_providers(monkeypatch):
     assert body["items"][0]["watch_options"] == [
         {"service": "nfx", "url": "http://alpha"}
     ]
+
+
+def test_recommend_provider_fallback_when_insufficient(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Alpha",
+            overview="Alpha saves the world.",
+            poster_url="alpha.jpg",
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Action"}],
+            release_year=2020,
+            collection_id=None,
+            collection_name=None,
+            watch_options=[{"service": "nfx", "url": "http://alpha"}],
+        ),
+        SimpleNamespace(
+            id=2,
+            tmdb_id=202,
+            media_type="movie",
+            title="Beta",
+            overview="Beta saves the world.",
+            poster_url="beta.jpg",
+            runtime=95,
+            original_language="en",
+            genres=[{"name": "Action"}],
+            release_year=2020,
+            collection_id=None,
+            collection_name=None,
+            watch_options=[{"service": "hlu", "url": "http://beta"}],
+        ),
+    ]
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [item.id for item in items],
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda candidates, **_: candidates,
+    )
+
+    def fake_intent(query, user_context, linked_entities=None):
+        return Intent(streaming_providers=["netflix"])
+
+    monkeypatch.setattr(recommend_routes, "_parse_llm_intent", fake_intent)
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend",
+            params={"user_id": "u1", "query": "netflix", "limit": 2},
+        )
+
+    app.dependency_overrides.clear()
+    assert resp.status_code == 200
+    body = resp.json()
+    ids = [item["id"] for item in body["items"]]
+    assert ids == [1, 2]
+    assert (
+        body["items"][0]["watch_options"]
+        and body["items"][0]["watch_options"][0]["service"] == "nfx"
+    )
+    assert body["items"][1]["watch_options"][0]["service"] == "hlu"
 
 
 def _build_franchise_item(
@@ -1375,7 +1469,9 @@ def test_recommend_uses_entity_linker_and_blends_query_vector(
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit: PrefilterDecision([1], [1], True),
+        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+            [1], [1], True
+        ),
     )
     monkeypatch.setattr(
         recommend_routes,

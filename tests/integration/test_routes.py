@@ -28,7 +28,9 @@ def _disable_prefilters(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit: PrefilterDecision(None, [], True),
+        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+            None, [], True
+        ),
     )
     monkeypatch.setattr(business_rules, "load_rules", lambda: {})
 

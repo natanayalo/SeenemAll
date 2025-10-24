@@ -358,7 +358,9 @@ async def recommend(
     if intent.has_filters():
         candidate_limit = min(500, max(candidate_limit, limit * 5))
 
-    prefilter = _prefilter_allowed_ids(db, intent, candidate_limit)
+    prefilter = _prefilter_allowed_ids(
+        db, intent, candidate_limit, preferred_services=preferred_services
+    )
     allowlist = prefilter.allowed_ids
     boost_ids = prefilter.boost_ids or []
     # Carry the stricter genre requirement forward so downstream filtering
@@ -529,8 +531,10 @@ async def recommend(
         ).all()
     }
     ordered: List[Dict[str, Any]] = []
+    fallback_candidates: List[Dict[str, Any]] = []
     max_candidates = min(candidate_limit, max(limit * 2, 25))
     skipped_intent = 0
+    rank_counter = 0
     for iid in ids:
         it, vec, watch_options = items_with_data.get(iid, (None, None, None))
         if it is None or vec is None or len(vec) == 0:
@@ -551,7 +555,7 @@ async def recommend(
                 for opt in watch_options
                 if opt["url"] is not None
             ]
-
+        provider_allowed = True
         filtered_options = cleaned_options
         if preferred_services:
             matching_options = [
@@ -562,43 +566,55 @@ async def recommend(
                 and service in preferred_services
             ]
             if not matching_options:
-                continue
-            filtered_options = matching_options
+                provider_allowed = False
+            else:
+                filtered_options = matching_options
 
-        ordered.append(
-            {
-                "id": it.id,
-                "tmdb_id": it.tmdb_id,
-                "media_type": it.media_type,
-                "title": it.title,
-                "overview": it.overview,
-                "poster_url": it.poster_url,
-                "runtime": it.runtime,
-                "original_language": it.original_language,
-                "genres": it.genres,
-                "release_year": it.release_year,
-                "collection_id": it.collection_id,
-                "collection_name": it.collection_name,
-                "maturity_rating": getattr(it, "maturity_rating", None),
-                "watch_options": filtered_options,
-                "watch_url": (
-                    filtered_options[0]["url"] if filtered_options else None
-                ),  # For backward compatibility
-                "original_rank": len(ordered),
-                "ann_rank": len(ordered),
-                "vector": vec,
-                "popularity": getattr(it, "popularity", None),
-                "vote_average": getattr(it, "vote_average", None),
-                "vote_count": getattr(it, "vote_count", None),
-                "popular_rank": getattr(it, "popular_rank", None),
-                "trending_rank": getattr(it, "trending_rank", None),
-                "top_rated_rank": getattr(it, "top_rated_rank", None),
-                "retrieval_score": None,
-                "source_scores": sources,
-            }
-        )
-        if len(ordered) >= max_candidates:
+        candidate_payload = {
+            "id": it.id,
+            "tmdb_id": it.tmdb_id,
+            "media_type": it.media_type,
+            "title": it.title,
+            "overview": it.overview,
+            "poster_url": it.poster_url,
+            "runtime": it.runtime,
+            "original_language": it.original_language,
+            "genres": it.genres,
+            "release_year": it.release_year,
+            "collection_id": it.collection_id,
+            "collection_name": it.collection_name,
+            "maturity_rating": getattr(it, "maturity_rating", None),
+            "watch_options": filtered_options,
+            "watch_url": (filtered_options[0]["url"] if filtered_options else None),
+            "original_rank": rank_counter,
+            "ann_rank": rank_counter,
+            "vector": vec,
+            "popularity": getattr(it, "popularity", None),
+            "vote_average": getattr(it, "vote_average", None),
+            "vote_count": getattr(it, "vote_count", None),
+            "popular_rank": getattr(it, "popular_rank", None),
+            "trending_rank": getattr(it, "trending_rank", None),
+            "top_rated_rank": getattr(it, "top_rated_rank", None),
+            "retrieval_score": None,
+            "source_scores": sources,
+        }
+
+        if provider_allowed:
+            ordered.append(candidate_payload)
+        else:
+            candidate_payload["watch_options"] = cleaned_options
+            candidate_payload["watch_url"] = (
+                cleaned_options[0]["url"] if cleaned_options else None
+            )
+            fallback_candidates.append(candidate_payload)
+
+        rank_counter += 1
+        if provider_allowed and len(ordered) >= max_candidates:
             break
+
+    if preferred_services and len(ordered) < limit and fallback_candidates:
+        deficit = limit - len(ordered)
+        ordered.extend(fallback_candidates[:deficit])
 
     if not ordered:
         return _empty_response()
@@ -916,7 +932,10 @@ def _trending_prior_candidates(
 
 
 def _prefilter_allowed_ids(
-    db: Session, intent: IntentFilters | None, limit: int
+    db: Session,
+    intent: IntentFilters | None,
+    limit: int,
+    preferred_services: Set[str] | None = None,
 ) -> PrefilterDecision:
     if intent is None or not intent.has_filters():
         # Nothing to prefilter: leave the allowlist unset, but keep genre enforcement
@@ -931,6 +950,7 @@ def _prefilter_allowed_ids(
         intent,
         fetch_limit=fetch_limit,
         include_genres=True,
+        required_services=preferred_services,
     )
     logger.debug(
         "Prefilter strict run | threshold=%d strict_count=%d media_types=%s genres=%s",
@@ -948,6 +968,7 @@ def _prefilter_allowed_ids(
         intent,
         fetch_limit=fetch_limit,
         include_genres=False,
+        required_services=preferred_services,
     )
 
     if len(relaxed_ids) >= threshold:
@@ -974,8 +995,20 @@ def _run_prefilter_query(
     *,
     fetch_limit: int,
     include_genres: bool,
+    required_services: Set[str] | None = None,
 ) -> List[int]:
     stmt = select(Item.id)
+
+    if required_services:
+        stmt = (
+            stmt.join(
+                Availability,
+                (Availability.item_id == Item.id)
+                & (Availability.country == COUNTRY_DEFAULT),
+            )
+            .where(Availability.service.in_(required_services))
+            .distinct()
+        )
 
     media_types = intent.media_types or []
     if media_types:
