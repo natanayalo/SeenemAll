@@ -44,7 +44,7 @@ def test_parse_intent_fixtures():
         ),
         (
             "no gore",
-            Intent(exclude_genres=["Horror"]),
+            Intent(exclude_genres=["Horror", "Thriller"]),
         ),
         (
             "movies from the 90s",
@@ -94,7 +94,7 @@ def test_rewrite_query():
 def test_parse_intent_uses_cache(monkeypatch):
     user_context = {"user_id": "u-test"}
     first = parse_intent("no gore", user_context)
-    assert first.exclude_genres == ["Horror"]
+    assert first.exclude_genres == ["Horror", "Thriller"]
 
     hits_before = llm_parser.CACHE_METRICS["hits"]
     second = parse_intent("no gore", user_context)
@@ -121,7 +121,35 @@ def test_parse_intent_llm_failure_falls_back(monkeypatch):
     monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
 
     intent = parse_intent("no gore", {"user_id": "u2"})
-    assert intent.exclude_genres == ["Horror"]
+    assert intent.exclude_genres == ["Horror", "Thriller"]
+
+
+def test_parse_intent_merges_list_payload(monkeypatch):
+    llm_parser.INTENT_CACHE.clear()
+    settings = IntentParserSettings(
+        provider="openai",
+        api_key="test-key",
+        model="gpt-test",
+        endpoint="https://example.com",
+        enabled=True,
+        timeout=3.0,
+    )
+
+    monkeypatch.setattr(llm_parser, "_get_settings", lambda: settings)
+
+    def fake_call(settings, query, user_context, linked_entities):
+        return {
+            "include_genres": ["Family", "Animation"],
+            "exclude_genres": ["Horror"],
+            "maturity_rating_max": "PG",
+        }
+
+    monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
+
+    intent = parse_intent("kids show", {"user_id": "u3"})
+    assert intent.maturity_rating_max == "PG"
+    assert set(intent.exclude_genres or []) == {"Horror", "Thriller"}
+    assert set(intent.include_genres or []) == {"Family", "Animation"}
 
 
 def test_parse_intent_llm_success(monkeypatch):
@@ -157,6 +185,7 @@ def test_get_settings_falls_back_to_openai(monkeypatch):
 
 
 def test_call_openai_parser_returns_payload(monkeypatch):
+    monkeypatch.setenv("OPENAI_PROJECT", "proj-test")
     settings = IntentParserSettings(
         provider="openai",
         api_key="key",
@@ -169,32 +198,33 @@ def test_call_openai_parser_returns_payload(monkeypatch):
     class DummyResponse:
         status_code = 200
 
-        def __init__(self):
-            self.request = SimpleNamespace(
-                url=SimpleNamespace(copy_with=lambda **_: "https://example.com")
-            )
+        def __init__(self, url):
+            self.request = SimpleNamespace(url=url)
 
         def json(self):
             return {
-                "choices": [
-                    {"message": {"content": json.dumps({"include_genres": ["Comedy"]})}}
+                "output": [
+                    {"content": [{"text": json.dumps({"include_genres": ["Comedy"]})}]}
                 ]
             }
 
         def raise_for_status(self):
             return None
 
-    class DummyClient:
-        def __enter__(self):
-            return self
+    def fake_client(*args, **kwargs):
+        class DummyClient:
+            def __enter__(self_inner):
+                return self_inner
 
-        def __exit__(self, *args):
-            return False
+            def __exit__(self_inner, *exc):
+                return False
 
-        def post(self, *args, **kwargs):
-            return DummyResponse()
+            def post(self_inner, endpoint, headers, json):
+                return DummyResponse(SimpleNamespace(copy_with=lambda **_: endpoint))
 
-    monkeypatch.setattr(llm_parser.httpx, "Client", lambda *a, **k: DummyClient())
+        return DummyClient()
+
+    monkeypatch.setattr(llm_parser.httpx, "Client", fake_client)
 
     payload = llm_parser._call_openai_parser(settings, "query", {}, None)
     assert payload == {"include_genres": ["Comedy"]}
@@ -250,3 +280,10 @@ def test_call_gemini_parser_returns_payload(monkeypatch):
 
 def test_offline_intent_stub_handles_unknown_query():
     assert llm_parser._offline_intent_stub("unknown request") == {}
+
+
+def test_offline_intent_stub_handles_kids_query():
+    payload = llm_parser._offline_intent_stub("kids show")
+    assert payload["maturity_rating_max"] == "PG"
+    assert set(payload["include_genres"]) >= {"Family", "Animation"}
+    assert "tv" in payload.get("media_types", [])

@@ -5,8 +5,9 @@ import logging
 import os
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from functools import lru_cache
-from typing import Any, Dict, Iterable, List, Sequence
+from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 import httpx
 import numpy as np
@@ -26,6 +27,109 @@ if not logger.handlers:
 
 _DEFAULT_MAX_ITEMS_FOR_LLM = 25
 _DEFAULT_TIMEOUT_SECONDS = 12.0
+
+_DEFAULT_EXPLANATION_TEMPLATES = {
+    "narrative": {
+        "genre_match": "Dialed into your {genres} vibe.",
+        "media_type": "It's a {media_type} pick like you asked for.",
+        "runtime_match": "Runs about {runtime} minutes, matching your runtime window.",
+        "query_fallback": 'Aligns with "{query}".',
+        "fallback": "Popular with viewers who share your taste.",
+    },
+    "heuristic": {
+        "trending": "Trending now (#{rank}).",
+        "popular": "Top popular pick (#{rank}).",
+        "votes": "Rated {vote_average:.1f}/10 by {vote_count} fans.",
+        "recent": "Fresh release from {year}.",
+        "fallback": "Popular with viewers who share your taste.",
+    },
+}
+
+
+def _float_from_env(name: str, default: float) -> float:
+    """Read a float override from the environment, falling back to *default*."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _int_from_env(name: str, default: int) -> int:
+    """Read an integer override from the environment, falling back to *default*."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _optional_int_from_env(name: str) -> int | None:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+_MMR_LAMBDA_DEFAULT = _float_from_env("MMR_LAMBDA", 0.7)
+_MMR_POOL_MULTIPLIER = max(1, _int_from_env("MMR_POOL_MULTIPLIER", 3))
+_MMR_POOL_MIN = max(0, _int_from_env("MMR_POOL_MIN", 25))
+_MMR_POOL_MAX = _optional_int_from_env("MMR_POOL_MAX")
+if _MMR_POOL_MAX is not None and _MMR_POOL_MAX <= 0:
+    _MMR_POOL_MAX = None
+
+_HEURISTIC_POPULARITY_WEIGHT = _float_from_env("HEURISTIC_POPULARITY_WEIGHT", 0.3)
+_HEURISTIC_VOTE_QUALITY_WEIGHT = _float_from_env("HEURISTIC_VOTE_QUALITY_WEIGHT", 0.2)
+_HEURISTIC_VOTE_VOLUME_WEIGHT = _float_from_env("HEURISTIC_VOTE_VOLUME_WEIGHT", 0.1)
+_HEURISTIC_TRENDING_WEIGHT = _float_from_env("HEURISTIC_TRENDING_WEIGHT", 0.25)
+_HEURISTIC_POPULAR_WEIGHT = _float_from_env("HEURISTIC_POPULAR_WEIGHT", 0.15)
+_HEURISTIC_RECENT_WEIGHT = _float_from_env("HEURISTIC_RECENT_WEIGHT", 0.2)
+_HEURISTIC_POSITION_BASE = _float_from_env("HEURISTIC_POSITION_BASE", 0.05)
+_HEURISTIC_POSITION_DECAY = _float_from_env("HEURISTIC_POSITION_DECAY", 0.002)
+
+
+def _get_templates_path() -> str:
+    env_path = os.getenv("EXPLANATION_TEMPLATES_PATH")
+    if env_path:
+        return env_path
+    return os.path.join(os.getcwd(), "config", "explanation_templates.json")
+
+
+@lru_cache(maxsize=32)
+def _load_explanation_templates_cached(
+    path: str, mtime: float | None
+) -> Dict[str, Any]:
+    if path == "__defaults__":
+        return _DEFAULT_EXPLANATION_TEMPLATES
+
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            templates = json.load(handle)
+        if not isinstance(templates, dict):
+            raise ValueError("Explanation template file must contain a JSON object.")
+        return templates
+    except (OSError, json.JSONDecodeError, ValueError):
+        logger.warning(
+            "Failed to parse explanation templates at %s; falling back to defaults.",
+            path,
+        )
+        return _DEFAULT_EXPLANATION_TEMPLATES
+
+
+def _load_explanation_templates() -> Dict[str, Any]:
+    path = _get_templates_path()
+    try:
+        mtime = os.path.getmtime(path)
+    except FileNotFoundError:
+        return _load_explanation_templates_cached("__defaults__", None)
+    return _load_explanation_templates_cached(path, mtime)
 
 
 def _get_prompt_config():
@@ -104,7 +208,10 @@ def rerank_with_explanations(
 
 
 def diversify_with_mmr(
-    items: List[Dict[str, Any]], lambda_param: float = 0.7, limit: int | None = None
+    items: List[Dict[str, Any]],
+    lambda_param: float | None = None,
+    limit: int | None = None,
+    pool_size: int | None = None,
 ) -> List[Dict[str, Any]]:
     if not items:
         return []
@@ -112,12 +219,81 @@ def diversify_with_mmr(
     limit = limit or len(items)
     limit = max(1, min(limit, len(items)))
 
-    lambda_param = float(lambda_param)
-    if lambda_param < 0.0 or lambda_param > 1.0:
-        lambda_param = min(1.0, max(0.0, lambda_param))
+    lambda_value = _resolve_lambda_value(lambda_param)
+
+    pool = _resolve_mmr_pool_size(limit, len(items), pool_size)
+    head = items[:pool]
+
+    ranked = _mmr_rank_subset(head, lambda_value, limit)
+    seen_keys = {_item_identity(item) for item in ranked}
+
+    if len(ranked) < limit:
+        for item in items:
+            if len(ranked) >= limit:
+                break
+            ident = _item_identity(item)
+            if ident in seen_keys:
+                continue
+            ranked.append(item)
+            seen_keys.add(ident)
+
+    return ranked[:limit]
+
+
+def _resolve_mmr_pool_size(
+    requested_limit: int, total_items: int, override: int | None
+) -> int:
+    if total_items <= 0:
+        return 0
+    if override is not None:
+        return max(1, min(total_items, override))
+
+    baseline = max(1, min(requested_limit, total_items))
+    pool = baseline
+    if _MMR_POOL_MULTIPLIER > 1:
+        pool = max(pool, baseline * _MMR_POOL_MULTIPLIER)
+    if _MMR_POOL_MIN > 0:
+        pool = max(pool, _MMR_POOL_MIN)
+    if _MMR_POOL_MAX is not None:
+        pool = min(pool, _MMR_POOL_MAX)
+    pool = min(pool, total_items)
+    return max(1, pool)
+
+
+def _resolve_lambda_value(lambda_param: float | None) -> float:
+    try:
+        value = (
+            float(lambda_param)
+            if lambda_param is not None
+            else float(_MMR_LAMBDA_DEFAULT)
+        )
+    except (TypeError, ValueError):
+        value = float(_MMR_LAMBDA_DEFAULT)
+    return min(1.0, max(0.0, value))
+
+
+def _mmr_rank_subset(
+    subset: Sequence[Dict[str, Any]],
+    lambda_value: float,
+    limit: int,
+) -> List[Dict[str, Any]]:
+    if not subset:
+        return []
+
+    ranked: List[Dict[str, Any]] = []
+    ranked_vectors: List[np.ndarray] = []
+
+    first_item = subset[0]
+    ranked.append(first_item)
+    first_vector = _normalized_vector(first_item.get("vector"))
+    if first_vector is not None:
+        ranked_vectors.append(first_vector)
+
+    if len(ranked) >= limit:
+        return ranked[:limit]
 
     prepared: List[Dict[str, Any]] = []
-    for idx, item in enumerate(items):
+    for idx, item in enumerate(subset):
         normalized = _normalized_vector(item.get("vector"))
         if normalized is None:
             continue
@@ -132,29 +308,13 @@ def diversify_with_mmr(
             }
         )
 
-    ranked: List[Dict[str, Any]] = []
-    ranked_vectors: List[np.ndarray] = []
-
-    first_item = items[0]
-    ranked.append(first_item)
-    first_vector = _normalized_vector(first_item.get("vector"))
-    if first_vector is not None:
-        ranked_vectors.append(first_vector)
-
-    if len(ranked) >= limit:
-        return ranked[:limit]
-
     first_identity = _item_identity(first_item)
     prepared = [
         entry for entry in prepared if _item_identity(entry["item"]) != first_identity
     ]
 
     if not prepared:
-        for item in items[1:]:
-            ranked.append(item)
-            if len(ranked) >= limit:
-                break
-        return ranked[:limit]
+        return ranked
 
     prepared.sort(key=lambda entry: entry["original_rank"])
 
@@ -171,8 +331,8 @@ def diversify_with_mmr(
             else:
                 similarity = 0.0
             mmr_score = (
-                lambda_param * candidate["relevance"]
-                - (1.0 - lambda_param) * similarity
+                lambda_value * candidate["relevance"]
+                - (1.0 - lambda_value) * similarity
             )
             if mmr_score > best_score:
                 best_idx = idx
@@ -185,20 +345,7 @@ def diversify_with_mmr(
         ranked.append(chosen["item"])
         ranked_vectors.append(chosen["vector"])
 
-    if len(ranked) >= limit:
-        return ranked[:limit]
-
-    seen_keys = {_item_identity(item) for item in ranked}
-    for item in items:
-        ident = _item_identity(item)
-        if ident in seen_keys:
-            continue
-        ranked.append(item)
-        seen_keys.add(ident)
-        if len(ranked) >= limit:
-            break
-
-    return ranked[:limit]
+    return ranked
 
 
 def cosine_similarity(v1, v2):
@@ -268,6 +415,10 @@ def _get_settings() -> RerankerSettings:
     )
 
 
+def _current_year() -> int:
+    return datetime.now(UTC).year
+
+
 def _with_default_explanations(
     items: Sequence[Dict[str, Any]],
     intent: IntentFilters | None,
@@ -275,15 +426,145 @@ def _with_default_explanations(
 ) -> List[Dict[str, Any]]:
     enriched: List[Dict[str, Any]] = []
     intent_genres: List[str] = intent.effective_genres() if intent else []
+    current_year = _current_year()
     for idx, item in enumerate(items):
         copy_item = dict(item)
         copy_item.setdefault("original_rank", idx)
-        copy_item["score"] = max(0.0, 1.0 - idx * 0.05)
-        copy_item["explanation"] = _default_explanation(
-            copy_item, intent, query, intent_genres
-        )
+        score, heuristics = _heuristic_score(copy_item, idx, current_year)
+        copy_item["score"] = score
+        narrative = _default_explanation(copy_item, intent, query, intent_genres)
+        heuristic_summary = _heuristic_summary(copy_item, heuristics)
+        explanation_parts = [narrative, heuristic_summary]
+        copy_item["explanation"] = " ".join(
+            part for part in explanation_parts if part
+        ).strip()
         enriched.append(copy_item)
     return enriched
+
+
+def _heuristic_score(
+    item: Dict[str, Any],
+    position: int,
+    current_year: int,
+) -> Tuple[float, Dict[str, Any]]:
+    retrieval = float(item.get("retrieval_score") or 0.0)
+    popularity = float(item.get("popularity") or 0.0)
+    vote_average = float(item.get("vote_average") or 0.0)
+    vote_count = float(item.get("vote_count") or 0.0)
+    trending_rank = item.get("trending_rank")
+    popular_rank = item.get("popular_rank")
+    release_year = item.get("release_year")
+
+    popularity_norm = min(popularity / 100.0, 1.0)
+    vote_quality = max((vote_average - 6.5) / 3.5, 0.0)
+    vote_quality = min(vote_quality, 1.0)
+    vote_volume = min(vote_count / 5000.0, 1.0)
+
+    trending_bonus = 0.0
+    if isinstance(trending_rank, (int, float)) and trending_rank > 0:
+        trending_bonus = max(0.0, 1.0 - min(trending_rank - 1, 50) / 50.0)
+
+    popular_bonus = 0.0
+    if isinstance(popular_rank, (int, float)) and popular_rank > 0:
+        popular_bonus = max(0.0, 1.0 - min(popular_rank - 1, 100) / 100.0)
+
+    recent_bonus = 0.0
+    if isinstance(release_year, int):
+        age = max(0, current_year - release_year)
+        if age <= 2:
+            recent_bonus = 1.0
+        elif age <= 5:
+            recent_bonus = 0.5
+
+    base_score = retrieval
+    score = base_score
+    score += _HEURISTIC_POPULARITY_WEIGHT * popularity_norm
+    score += _HEURISTIC_VOTE_QUALITY_WEIGHT * vote_quality
+    score += _HEURISTIC_VOTE_VOLUME_WEIGHT * vote_volume
+    score += _HEURISTIC_TRENDING_WEIGHT * trending_bonus
+    score += _HEURISTIC_POPULAR_WEIGHT * popular_bonus
+    score += _HEURISTIC_RECENT_WEIGHT * recent_bonus
+    score += max(0.0, _HEURISTIC_POSITION_BASE - position * _HEURISTIC_POSITION_DECAY)
+
+    heuristics = {
+        "popularity_norm": popularity_norm,
+        "vote_quality": vote_quality,
+        "vote_volume": vote_volume,
+        "trending_rank": trending_rank,
+        "popular_rank": popular_rank,
+        "recent_bonus": recent_bonus,
+        "vote_average": vote_average,
+        "vote_count": int(vote_count) if vote_count else 0,
+        "release_year": release_year,
+    }
+    return round(score, 4), heuristics
+
+
+def _safe_template(template: str | None, **kwargs: Any) -> str:
+    if not template or not isinstance(template, str):
+        return ""
+    try:
+        return template.format(**kwargs)
+    except (KeyError, IndexError, ValueError):
+        return template or ""
+
+
+def _heuristic_summary(item: Dict[str, Any], heuristics: Dict[str, Any]) -> str:
+    templates = _load_explanation_templates()
+    heuristic_templates = templates.get("heuristic", {})
+    reasons: List[str] = []
+
+    trending_rank = heuristics.get("trending_rank")
+    if (
+        isinstance(trending_rank, (int, float))
+        and trending_rank > 0
+        and trending_rank <= 20
+    ):
+        template = heuristic_templates.get("trending") or "Trending now (#{rank})."
+        reasons.append(_safe_template(template, rank=int(trending_rank)))
+
+    if heuristics.get("recent_bonus", 0.0) >= 0.5:
+        candidate_year = heuristics.get("release_year")
+        if isinstance(candidate_year, int) and candidate_year > 1900:
+            template = heuristic_templates.get("recent") or "Fresh release from {year}."
+            release_reason = _safe_template(template, year=candidate_year)
+            if release_reason:
+                reasons.append(release_reason)
+
+    popular_rank = heuristics.get("popular_rank")
+    if (
+        isinstance(popular_rank, (int, float))
+        and popular_rank > 0
+        and popular_rank <= 20
+    ):
+        template = heuristic_templates.get("popular") or "Top popular pick (#{rank})."
+        reasons.append(_safe_template(template, rank=int(popular_rank)))
+
+    vote_average = heuristics.get("vote_average") or 0.0
+    vote_count = heuristics.get("vote_count") or 0
+    if vote_average and vote_average >= 7.5 and vote_count >= 500:
+        template = (
+            heuristic_templates.get("votes")
+            or "Rated {vote_average:.1f}/10 by {vote_count} fans."
+        )
+        formatted_votes = f"{vote_count:,}"
+        reasons.append(
+            _safe_template(
+                template,
+                vote_average=vote_average,
+                vote_count=formatted_votes,
+                votes=formatted_votes,
+            )
+        )
+
+    if not reasons and heuristics.get("popularity_norm", 0.0) >= 0.7:
+        fallback = (
+            heuristic_templates.get("fallback")
+            or _DEFAULT_EXPLANATION_TEMPLATES["heuristic"]["fallback"]
+        )
+        reasons.append(fallback)
+
+    return " ".join(reasons[:2])
 
 
 def _merge_with_base(
@@ -378,15 +659,63 @@ def _call_openai_reranker(
         "Authorization": f"Bearer {settings.api_key}",
         "Content-Type": "application/json",
     }
+    project = os.getenv("OPENAI_PROJECT")
+    if project:
+        headers["OpenAI-Project"] = project
+
+    endpoint = settings.endpoint
+    body = payload
+    using_responses_api = bool(project) or endpoint.endswith("/responses")
+    if using_responses_api:
+        endpoint = endpoint.rstrip("/")
+        if not endpoint.endswith("/responses"):
+            endpoint = f"{endpoint}/responses"
+
+        messages = payload.get("messages", [])
+
+        def _as_response_input(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            converted: List[Dict[str, Any]] = []
+            for message in messages:
+                text = message.get("content")
+                if text is None:
+                    continue
+                converted.append(
+                    {
+                        "role": message.get("role", "user"),
+                        "content": [{"type": "text", "text": str(text)}],
+                    }
+                )
+            return converted
+
+        body = {
+            "model": settings.model,
+            "input": _as_response_input(messages),
+            "max_output_tokens": 2048,
+        }
+
     with httpx.Client(timeout=settings.timeout) as client:
-        response = client.post(settings.endpoint, headers=headers, json=payload)
+        response = client.post(endpoint, headers=headers, json=body)
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:  # pragma: no cover - network failure path
             raise RerankerError(
                 f"OpenAI API responded with status {exc.response.status_code}"
             ) from exc
+
     data = response.json()
+    if using_responses_api:
+        try:
+            first_block = data["output"][0]["content"][0]["text"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise RerankerError(
+                "Unexpected response structure from Responses API."
+            ) from exc
+        try:
+            parsed = json.loads(first_block)
+        except json.JSONDecodeError as exc:
+            raise RerankerError("Reranker returned non-JSON content.") from exc
+        return _parse_decisions_json(parsed)
+
     try:
         content = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError) as exc:
@@ -479,9 +808,9 @@ def _call_gemini_reranker(
     return _parse_decisions_json(parsed)
 
 
-def _parse_decisions_json(payload: Dict[str, Any]) -> List[LLMDecision]:
-    raw_items = payload.get("items")
-    if not isinstance(raw_items, list):
+def _parse_decisions_json(payload: Dict[str, Any] | List) -> List[LLMDecision]:
+    raw_items = _decision_items(payload)
+    if not raw_items:
         return []
 
     decisions: List[LLMDecision] = []
@@ -507,6 +836,15 @@ def _parse_decisions_json(payload: Dict[str, Any]) -> List[LLMDecision]:
             LLMDecision(item_id=iid, score=score_val, explanation=explanation)
         )
     return decisions
+
+
+def _decision_items(payload: Dict[str, Any] | List[Any] | None) -> List[Any]:
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        items = payload.get("items")
+        return items if isinstance(items, list) else []
+    return []
 
 
 def _build_prompt_text(
@@ -612,6 +950,8 @@ def _default_explanation(
     query: str | None,
     intent_genres: Sequence[str],
 ) -> str:
+    templates = _load_explanation_templates()
+    narrative_templates = templates.get("narrative", {})
     parts: List[str] = []
 
     item_genres = _extract_genre_names(item.get("genres"))
@@ -621,10 +961,23 @@ def _default_explanation(
     ]
     if matched_genres:
         pretty = ", ".join(matched_genres[:2])
-        parts.append(f"Fits the {pretty} vibe you asked for.")
+        template = (
+            narrative_templates.get("genre_match")
+            or _DEFAULT_EXPLANATION_TEMPLATES["narrative"]["genre_match"]
+        )
+        parts.append(_safe_template(template, genres=pretty))
 
     if intent and intent.media_types and item.get("media_type") in intent.media_types:
-        parts.append(f"It's a {item['media_type']} pick like you specified.")
+        template = (
+            narrative_templates.get("media_type")
+            or _DEFAULT_EXPLANATION_TEMPLATES["narrative"]["media_type"]
+        )
+        parts.append(
+            _safe_template(
+                template,
+                media_type=str(item.get("media_type")),
+            )
+        )
 
     runtime = item.get("runtime")
     if (
@@ -635,17 +988,29 @@ def _default_explanation(
             or (intent.max_runtime and runtime <= intent.max_runtime)
         )
     ):
-        parts.append(f"Runs about {runtime} minutes, matching your runtime preference.")
+        template = (
+            narrative_templates.get("runtime_match")
+            or _DEFAULT_EXPLANATION_TEMPLATES["narrative"]["runtime_match"]
+        )
+        parts.append(_safe_template(template, runtime=runtime))
 
     summary = _short_overview(item.get("overview"))
     if summary:
         parts.append(summary)
 
     if query and not parts:
-        parts.append(f"Aligns with '{query}'.")
+        template = (
+            narrative_templates.get("query_fallback")
+            or _DEFAULT_EXPLANATION_TEMPLATES["narrative"]["query_fallback"]
+        )
+        parts.append(_safe_template(template, query=query))
 
     if not parts:
-        parts.append("Popular with viewers who share your taste.")
+        fallback = (
+            narrative_templates.get("fallback")
+            or _DEFAULT_EXPLANATION_TEMPLATES["narrative"]["fallback"]
+        )
+        parts.append(fallback)
 
     return " ".join(parts)
 

@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+from datetime import datetime
 from typing import List
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -110,6 +112,7 @@ def test_get_settings_fallback_provider(monkeypatch):
 
 def test_call_openai_reranker_parses_payload(monkeypatch):
     _reset_settings()
+    monkeypatch.setenv("OPENAI_PROJECT", "proj-test")
     monkeypatch.setenv("RERANK_API_KEY", "fake")
     settings = reranker._get_settings()
 
@@ -118,16 +121,15 @@ def test_call_openai_reranker_parses_payload(monkeypatch):
     class DummyResponse:
         status_code = 200
 
+        def __init__(self, url):
+            self.request = SimpleNamespace(url=url)
+
         def raise_for_status(self):
             return None
 
         def json(self):
             payload = {"items": [{"id": 42, "score": 0.8, "explanation": "Ranked"}]}
-            return {
-                "choices": [
-                    {"message": {"content": json.dumps(payload)}},
-                ]
-            }
+            return {"output": [{"content": [{"text": json.dumps(payload)}]}]}
 
     class DummyClient:
         def __init__(self, *args, **kwargs):
@@ -143,7 +145,7 @@ def test_call_openai_reranker_parses_payload(monkeypatch):
             captured_request["endpoint"] = endpoint
             captured_request["headers"] = headers
             captured_request["payload"] = json
-            return DummyResponse()
+            return DummyResponse(SimpleNamespace(copy_with=lambda **_: endpoint))
 
     monkeypatch.setattr(reranker.httpx, "Client", DummyClient)
 
@@ -157,6 +159,9 @@ def test_call_openai_reranker_parses_payload(monkeypatch):
 
     assert decisions and decisions[0].item_id == 42
     assert decisions[0].explanation == "Ranked"
+    assert captured_request["endpoint"].endswith("/responses")
+    assert captured_request["payload"]["model"] == settings.model
+    assert captured_request["payload"]["input"][0]["content"][0]["type"] == "text"
     assert "Authorization" in captured_request["headers"]
     assert captured_request["payload"]["model"] == settings.model
     _reset_settings()
@@ -412,6 +417,20 @@ def test_diversify_with_mmr_balances_similarity():
     assert 0.85 <= sim <= 1.0
 
 
+def test_diversify_with_mmr_respects_pool_override():
+    items = []
+    for idx in range(8):
+        vec = [0.0, 0.0, 0.0, 0.0]
+        vec[idx % 4] = 1.0
+        items.append({"id": idx, "original_rank": idx, "vector": vec.copy()})
+
+    diversified = reranker.diversify_with_mmr(
+        items, lambda_param=0.6, limit=3, pool_size=4
+    )
+    assert len(diversified) == 3
+    assert all(entry["id"] < 4 for entry in diversified)
+
+
 def test_diversify_with_mmr_appends_items_without_vectors_in_order():
     items = [
         {"id": 1, "original_rank": 0, "vector": [1.0, 0.0]},
@@ -454,6 +473,15 @@ def test_diversify_with_mmr_clamps_lambda():
 
     diversified = reranker.diversify_with_mmr(items, lambda_param=2.0, limit=3)
     assert [item["id"] for item in diversified] == [1, 2, 3]
+
+
+def test_resolve_mmr_pool_size_honours_multiplier(monkeypatch):
+    monkeypatch.setattr(reranker, "_MMR_POOL_MULTIPLIER", 2, raising=False)
+    monkeypatch.setattr(reranker, "_MMR_POOL_MIN", 0, raising=False)
+    monkeypatch.setattr(reranker, "_MMR_POOL_MAX", None, raising=False)
+
+    pool = reranker._resolve_mmr_pool_size(5, 40, override=None)
+    assert pool == 10
 
 
 def test_default_explanation_uses_intent_filters():
@@ -599,6 +627,92 @@ def test_default_explanation_covers_runtime_branch():
     explanation = reranker._default_explanation(item, filters, "long drama", ["Drama"])
     assert "Drama" in explanation
     assert "150" in explanation
+
+
+def test_heuristic_ranker_highlights_trending(monkeypatch):
+    _reset_settings()
+    monkeypatch.delenv("RERANK_API_KEY", raising=False)
+    monkeypatch.setenv("RERANK_ENABLED", "0")
+    reranker._get_settings.cache_clear()
+
+    current_year = datetime.utcnow().year
+    items = [
+        {
+            "id": 1,
+            "title": "Now Trending",
+            "overview": "A gripping new release taking off.",
+            "genres": [{"name": "Thriller"}],
+            "media_type": "movie",
+            "retrieval_score": 0.6,
+            "popularity": 95.0,
+            "vote_average": 8.2,
+            "vote_count": 1200,
+            "trending_rank": 3,
+            "popular_rank": 5,
+            "release_year": current_year,
+        }
+    ]
+
+    result = reranker.rerank_with_explanations(items, intent=None, query=None)
+    assert result[0]["score"] >= 0.6
+    explanation = result[0]["explanation"]
+    assert "Trending" in explanation or "trending" in explanation.lower()
+    assert str(current_year) in explanation
+    _reset_settings()
+
+
+def test_explanation_templates_override(monkeypatch):
+    _reset_settings()
+    monkeypatch.delenv("RERANK_API_KEY", raising=False)
+    monkeypatch.setenv("RERANK_ENABLED", "0")
+    reranker._get_settings.cache_clear()
+
+    custom_templates = {
+        "narrative": {
+            "genre_match": "Custom genre match for {genres}.",
+            "fallback": "Custom narrative fallback.",
+        },
+        "heuristic": {
+            "trending": "Custom trending #{rank}.",
+            "recent": "Custom fresh in {year}.",
+            "fallback": "Custom heuristic fallback.",
+        },
+    }
+
+    monkeypatch.setattr(
+        reranker, "_load_explanation_templates", lambda: custom_templates
+    )
+
+    filters = IntentFilters(
+        raw_query="thrilling ride",
+        genres=["Thriller"],
+        moods=[],
+        media_types=["movie"],
+        min_runtime=None,
+        max_runtime=None,
+    )
+
+    current_year = datetime.utcnow().year
+    items = [
+        {
+            "id": 1,
+            "title": "Custom Template Test",
+            "overview": "Edge of your seat thriller.",
+            "genres": [{"name": "Thriller"}],
+            "media_type": "movie",
+            "retrieval_score": 0.4,
+            "popularity": 40.0,
+            "trending_rank": 2,
+            "release_year": current_year,
+        }
+    ]
+
+    result = reranker.rerank_with_explanations(items, intent=filters, query=None)
+    explanation = result[0]["explanation"]
+    assert "Custom genre match" in explanation
+    assert "Custom trending #2" in explanation
+    assert f"{current_year}" in explanation
+    _reset_settings()
 
 
 def test_rerank_with_explanations_uses_llm_decisions(monkeypatch):

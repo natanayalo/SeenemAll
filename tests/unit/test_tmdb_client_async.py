@@ -113,7 +113,10 @@ def test_details_delegates_to_get(monkeypatch):
 
         async def fake_get(path, params):
             assert path == "/movie/9"
-            assert params == {"language": "en-US"}
+            assert params == {
+                "language": "en-US",
+                "append_to_response": "release_dates",
+            }
             return {"id": 9}
 
         monkeypatch.setattr(client, "_get", fake_get)
@@ -121,6 +124,27 @@ def test_details_delegates_to_get(monkeypatch):
         await client.aclose()
 
         assert data["id"] == 9
+
+    asyncio.run(scenario())
+
+
+def test_details_tv_includes_content_ratings(monkeypatch):
+    async def scenario():
+        client = TMDBClient("secret")
+
+        async def fake_get(path, params):
+            assert path == "/tv/42"
+            assert params == {
+                "language": "en-US",
+                "append_to_response": "content_ratings",
+            }
+            return {"id": 42}
+
+        monkeypatch.setattr(client, "_get", fake_get)
+        data = await client.details("tv", 42)
+        await client.aclose()
+
+        assert data["id"] == 42
 
     asyncio.run(scenario())
 

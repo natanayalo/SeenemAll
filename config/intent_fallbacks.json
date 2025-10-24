@@ -1,0 +1,51 @@
+[
+  {
+    "name": "kids",
+    "keywords": [
+      "kid",
+      "kids",
+      "child",
+      "children",
+      "toddler",
+      "toddlers",
+      "family",
+      "family-friendly",
+      "familyfriendly",
+      "cartoon"
+    ],
+    "include_genres": ["Family", "Animation"],
+    "exclude_genres": ["Horror", "Thriller"],
+    "maturity_rating_max": "PG"
+  },
+  {
+    "name": "teen",
+    "keywords": ["teen", "teenager", "teens"],
+    "include_genres": ["Drama"],
+    "exclude_genres": ["Horror"],
+    "maturity_rating_max": "PG-13"
+  },
+  {
+    "name": "horror",
+    "keywords": ["horror", "scary", "spooky", "gory"],
+    "include_genres": ["Horror", "Thriller"],
+    "maturity_rating_max": "R"
+  },
+  {
+    "name": "documentary",
+    "keywords": ["documentary", "docu", "doc"],
+    "include_genres": ["Documentary"],
+    "exclude_genres": ["Animation"],
+    "maturity_rating_max": "PG-13"
+  },
+  {
+    "name": "rom-com",
+    "keywords": ["romcom", "rom-com", "romance", "date night"],
+    "include_genres": ["Romance", "Comedy"],
+    "maturity_rating_max": "PG-13"
+  },
+  {
+    "name": "no gore",
+    "keywords": ["no gore", "not violent", "no violence"],
+    "exclude_genres": ["Horror", "Thriller"]
+  }
+]

@@ -251,6 +251,8 @@ def test_recommend_includes_reranker_output(monkeypatch):
             original_language="en",
             genres=[{"name": "Action"}],
             release_year=2020,
+            collection_id=None,
+            collection_name=None,
         ),
         SimpleNamespace(
             id=2,
@@ -263,6 +265,8 @@ def test_recommend_includes_reranker_output(monkeypatch):
             original_language="en",
             genres=[{"name": "Mystery"}],
             release_year=2022,
+            collection_id=None,
+            collection_name=None,
         ),
     ]
 
@@ -321,6 +325,8 @@ def test_recommend_includes_reranker_output(monkeypatch):
     payload = body["items"]
     assert [item["id"] for item in payload] == [2, 1]
     assert payload[0]["explanation"] == "Because mysteries are trending."
+    assert "collection_id" in payload[0]
+    assert "collection_name" in payload[0]
     assert "original_rank" not in payload[0]
     assert captured["user_id"] == "u1"
 
@@ -338,6 +344,8 @@ def test_recommend_paginates_with_cursor(monkeypatch):
             original_language="en",
             genres=[{"name": "Drama"}],
             release_year=2020,
+            collection_id=None,
+            collection_name=None,
         ),
         SimpleNamespace(
             id=2,
@@ -350,6 +358,8 @@ def test_recommend_paginates_with_cursor(monkeypatch):
             original_language="en",
             genres=[{"name": "Drama"}],
             release_year=2021,
+            collection_id=None,
+            collection_name=None,
         ),
     ]
 
@@ -422,6 +432,8 @@ def test_recommend_prefilter_passes_allowed_ids(monkeypatch):
             original_language="en",
             genres=[{"name": "Comedy"}],
             release_year=2020,
+            collection_id=None,
+            collection_name=None,
         )
     ]
 
@@ -486,6 +498,8 @@ def test_recommend_merges_collaborative_candidates(monkeypatch):
             original_language="en",
             genres=[{"name": "Action"}],
             release_year=2020,
+            collection_id=None,
+            collection_name=None,
         ),
         SimpleNamespace(
             id=2,
@@ -498,6 +512,8 @@ def test_recommend_merges_collaborative_candidates(monkeypatch):
             original_language="en",
             genres=[{"name": "Mystery"}],
             release_year=2022,
+            collection_id=None,
+            collection_name=None,
         ),
         SimpleNamespace(
             id=3,
@@ -510,6 +526,8 @@ def test_recommend_merges_collaborative_candidates(monkeypatch):
             original_language="en",
             genres=[{"name": "Drama"}],
             release_year=2023,
+            collection_id=None,
+            collection_name=None,
         ),
     ]
 
@@ -604,6 +622,8 @@ def test_recommend_mixer_scores_items(monkeypatch):
             popularity=10.0,
             trending_rank=5,
             popular_rank=3,
+            collection_id=None,
+            collection_name=None,
         ),
         SimpleNamespace(
             id=2,
@@ -619,6 +639,8 @@ def test_recommend_mixer_scores_items(monkeypatch):
             popularity=30.0,
             trending_rank=None,
             popular_rank=2,
+            collection_id=None,
+            collection_name=None,
         ),
         SimpleNamespace(
             id=3,
@@ -634,6 +656,8 @@ def test_recommend_mixer_scores_items(monkeypatch):
             popularity=5.0,
             trending_rank=1,
             popular_rank=4,
+            collection_id=None,
+            collection_name=None,
         ),
     ]
 
@@ -683,6 +707,88 @@ def test_recommend_mixer_scores_items(monkeypatch):
     payload = body["items"]
     assert [item["id"] for item in payload] == [1, 2, 3]
     assert all("ann_rank" not in item for item in payload)
+
+
+def test_recommend_injects_serendipity_items(monkeypatch):
+    limit = 6
+    items = []
+    for idx in range(1, 11):
+        items.append(
+            SimpleNamespace(
+                id=idx,
+                tmdb_id=1000 + idx,
+                media_type="movie",
+                title=f"Item {idx}",
+                overview=f"Overview {idx}",
+                poster_url=f"poster{idx}.jpg",
+                runtime=90 + idx,
+                original_language="en",
+                genres=[{"name": "Action"}],
+                release_year=2010 + idx,
+                popularity=float(100 - idx * 3),
+                vote_average=7.0,
+                vote_count=100 - idx,
+                trending_rank=idx,
+                collection_id=None,
+                collection_name=None,
+            )
+        )
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [item.id for item in items],
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "apply_business_rules",
+        lambda ordered, intent=None: ordered,
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda ordered, **_: ordered,
+    )
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend",
+            params={"user_id": "u1", "limit": limit, "diversify": "false"},
+        )
+
+    app.dependency_overrides.clear()
+    session.close()
+
+    assert resp.status_code == 200
+    body = resp.json()
+    payload = body["items"]
+    assert payload
+
+    target = recommend_routes._serendipity_target(limit)
+    long_tail_ids = [ns.id for ns in items[limit:]]
+    top_ids = [entry["id"] for entry in payload[:limit]]
+    serendipity_count = sum(1 for iid in top_ids if iid in long_tail_ids)
+    assert serendipity_count >= target
 
 
 def test_recommend_supports_profile_parameter(monkeypatch):
@@ -737,6 +843,8 @@ def test_recommend_filters_negative_items(monkeypatch):
                 original_language="en",
                 genres=[{"name": "Action"}],
                 release_year=2020,
+                collection_id=None,
+                collection_name=None,
             ),
         ]
     )
@@ -774,6 +882,158 @@ def test_recommend_filters_negative_items(monkeypatch):
     assert resp.status_code == 200
     body = resp.json()
     assert body["items"] == []
+
+
+def _build_franchise_item(
+    idx: int, franchise_id: int | None, franchise_name: str | None
+):
+    return SimpleNamespace(
+        id=idx,
+        tmdb_id=100 + idx,
+        media_type="movie",
+        title=f"Item {idx}",
+        overview=f"Overview {idx}",
+        poster_url=f"poster{idx}.jpg",
+        runtime=100 + idx,
+        original_language="en",
+        genres=[{"name": "Action"}],
+        release_year=2020 + idx,
+        collection_id=franchise_id,
+        collection_name=franchise_name,
+    )
+
+
+def test_recommend_applies_franchise_cap_when_diversify_enabled(monkeypatch):
+    session = CandidateSession(
+        [
+            _build_franchise_item(1, 42, "Franchise"),
+            _build_franchise_item(2, 42, "Franchise"),
+            _build_franchise_item(3, 42, "Franchise"),
+            _build_franchise_item(4, 7, "Standalone"),
+        ]
+    )
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2, 3, 4],
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "_apply_mixer_scores",
+        lambda items: None,
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "apply_business_rules",
+        lambda items, intent: items,
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "diversify_with_mmr",
+        lambda items, limit: items,
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+
+    with TestClient(app) as client:
+        resp = client.get("/recommend", params={"user_id": "u1", "limit": 4})
+
+    app.dependency_overrides.clear()
+    session.close()
+
+    assert resp.status_code == 200
+    body = resp.json()
+    payload = body["items"]
+    assert [item["id"] for item in payload] == [1, 2, 4]
+    assert all(
+        item.get("collection_id") != 42 or idx < 2 for idx, item in enumerate(payload)
+    )
+
+
+def test_recommend_skips_franchise_cap_when_diversify_disabled(monkeypatch):
+    session = CandidateSession(
+        [
+            _build_franchise_item(1, 42, "Franchise"),
+            _build_franchise_item(2, 42, "Franchise"),
+            _build_franchise_item(3, 42, "Franchise"),
+            _build_franchise_item(4, 7, "Standalone"),
+        ]
+    )
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2, 3, 4],
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "_apply_mixer_scores",
+        lambda items: None,
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "apply_business_rules",
+        lambda items, intent: items,
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "diversify_with_mmr",
+        lambda items, limit: items,
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend",
+            params={"user_id": "u1", "limit": 4, "diversify": "false"},
+        )
+
+    app.dependency_overrides.clear()
+    session.close()
+
+    assert resp.status_code == 200
+    body = resp.json()
+    payload = body["items"]
+    assert [item["id"] for item in payload] == [1, 2, 3, 4]
+    assert sum(1 for item in payload if item.get("collection_id") == 42) == 3
 
 
 def test_cold_start_candidates_respects_allowlist(monkeypatch):
@@ -879,6 +1139,8 @@ def test_recommend_uses_entity_linker_and_blends_query_vector(monkeypatch):
             original_language="en",
             genres=[{"name": "Action"}],
             release_year=2020,
+            collection_id=None,
+            collection_name=None,
         ),
         SimpleNamespace(
             id=2,
@@ -891,6 +1153,8 @@ def test_recommend_uses_entity_linker_and_blends_query_vector(monkeypatch):
             original_language="en",
             genres=[{"name": "Mystery"}],
             release_year=2022,
+            collection_id=None,
+            collection_name=None,
         ),
     ]
 
@@ -1006,6 +1270,8 @@ def test_recommend_logs_cold_start_path(monkeypatch, caplog):
             original_language="en",
             genres=[{"name": "Action"}],
             release_year=2020,
+            collection_id=None,
+            collection_name=None,
         ),
     ]
 
