@@ -290,8 +290,8 @@ def canonical_genres(media_types: Sequence[str] | None = None) -> List[str]:
     or returns no data. Results are cached for a short period to avoid repeated
     catalog scans.
     """
-    normalized = (
-        tuple(
+    if media_types:
+        normalized = tuple(
             sorted(
                 {
                     mt.strip().lower()
@@ -300,9 +300,8 @@ def canonical_genres(media_types: Sequence[str] | None = None) -> List[str]:
                 }
             )
         )
-        if media_types
-        else ()
-    )
+    else:
+        normalized = ()
     cache_key = normalized if normalized else ("__all__",)
     now = time.monotonic()
     cached = _GENRE_CACHE.get(cache_key)

@@ -940,8 +940,6 @@ def _ordered_unique(values: List[int]) -> List[int]:
     seen: set[int] = set()
     ordered: List[int] = []
     for value in values:
-        if value is None:
-            continue
         if value not in seen:
             seen.add(value)
             ordered.append(value)
