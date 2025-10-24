@@ -1,16 +1,20 @@
 from __future__ import annotations
 
-import re
 import functools
 import logging
+import time
+import re
+from datetime import timedelta
 from dataclasses import dataclass, field
-from typing import List, Optional, Sequence, TYPE_CHECKING
+from typing import Any, Dict, Iterable, List, Optional, Sequence
+
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
 from api.core.prompt_eval import load_prompt_template
 from api.core.maturity import is_rating_within
-
-if TYPE_CHECKING:  # pragma: no cover - only used for typing
-    from api.db.models import Item
+from api.db.models import Item
+from api.db.session import get_sessionmaker
 
 
 @functools.lru_cache(maxsize=1)
@@ -235,7 +239,12 @@ def parse_intent(query: str | None) -> IntentFilters:
     return filters
 
 
-def item_matches_intent(item: "Item | object", filters: IntentFilters | None) -> bool:
+def item_matches_intent(
+    item: "Item | object",
+    filters: IntentFilters | None,
+    *,
+    enforce_genres: bool = True,
+) -> bool:
     if not filters or not filters.has_filters():
         return True
 
@@ -257,13 +266,129 @@ def item_matches_intent(item: "Item | object", filters: IntentFilters | None) ->
         if not is_rating_within(item_rating, filters.maturity_rating_max):
             return False
 
-    effective_genres = {g.lower() for g in filters.effective_genres()}
-    if effective_genres:
-        item_genres = _item_genre_names(item)
-        if not item_genres & effective_genres:
-            return False
+    if enforce_genres:
+        effective_genres = {g.lower() for g in filters.effective_genres()}
+        if effective_genres:
+            item_genres = _item_genre_names(item)
+            if not item_genres & effective_genres:
+                return False
 
     return True
+
+
+_GENRE_CACHE_TTL_SECONDS = timedelta(minutes=30).total_seconds()
+_GENRE_CACHE: Dict[tuple[str, ...], tuple[float, List[str]]] = {}
+logger = logging.getLogger(__name__)
+
+
+def canonical_genres(media_types: Sequence[str] | None = None) -> List[str]:
+    """
+    Return the catalog-aware genre list.
+
+    Attempts to hydrate the set from the database to reflect the latest ingest.
+    Falls back to the hard-coded canonical list when the database is unavailable
+    or returns no data. Results are cached for a short period to avoid repeated
+    catalog scans.
+    """
+    if media_types:
+        normalized = tuple(
+            sorted(
+                {
+                    mt.strip().lower()
+                    for mt in media_types
+                    if isinstance(mt, str) and mt.strip()
+                }
+            )
+        )
+    else:
+        normalized = ()
+    cache_key = normalized if normalized else ("__all__",)
+    now = time.monotonic()
+    cached = _GENRE_CACHE.get(cache_key)
+    if cached and now - cached[0] < _GENRE_CACHE_TTL_SECONDS:
+        return list(cached[1])
+
+    loaded = _load_genres_from_db(list(normalized) or None)
+    if loaded:
+        if logger.isEnabledFor(logging.DEBUG):
+            preview = ", ".join(loaded[: min(len(loaded), 30)])
+            tail = f"... (+{len(loaded) - 30} more)" if len(loaded) > 30 else ""
+            logger.debug(
+                "Loaded %d catalog genres%s: %s%s",
+                len(loaded),
+                f" for media_types={normalized!r}" if normalized else "",
+                preview,
+                tail,
+            )
+        _GENRE_CACHE[cache_key] = (now, loaded)
+        return list(loaded)
+
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "Falling back to canonical genre list%s (cache_key=%s).",
+            f" for media_types={normalized!r}" if normalized else "",
+            cache_key,
+        )
+    return list(_CANONICAL_GENRES)
+
+
+def _load_genres_from_db(media_types: Sequence[str] | None) -> List[str] | None:
+    try:
+        SessionLocal = get_sessionmaker()
+    except Exception as exc:  # pragma: no cover - defensive guard
+        logger.debug(
+            "Unable to obtain sessionmaker for catalog genres: %s", exc, exc_info=True
+        )
+        return None
+
+    session = None
+    result = None
+    try:
+        session = SessionLocal()
+        stmt = select(Item.media_type, Item.genres).where(Item.genres.isnot(None))
+        if media_types:
+            stmt = stmt.where(Item.media_type.in_(list(media_types)))
+        stmt = stmt.execution_options(stream_results=True)
+        result = session.execute(stmt)
+        genres: Dict[str, str] = {}
+        for _media_type, payload in result:
+            for name in _iterate_genre_names(payload):
+                key = name.lower()
+                if key not in genres:
+                    genres[key] = name
+        if not genres:
+            logger.debug(
+                "Catalog genre query returned no rows%s.",
+                f" for media_types={media_types!r}" if media_types else "",
+            )
+            return None
+        return sorted(genres.values())
+    except SQLAlchemyError as exc:
+        logger.debug(
+            "Failed to load catalog genres from database: %s", exc, exc_info=True
+        )
+        return None
+    finally:
+        if result is not None:
+            result.close()
+        if session is not None:
+            session.close()
+
+
+def _iterate_genre_names(raw: object) -> Iterable[str]:
+    if raw is None:
+        return
+    raw_iter: Iterable[Any] = raw if isinstance(raw, list) else [raw]
+
+    for entry in raw_iter:
+        if isinstance(entry, dict):
+            name = entry.get("name")
+        else:
+            name = entry
+        if isinstance(name, str):
+            cleaned = name.strip()
+            if cleaned:
+                yield cleaned
 
 
 def _item_genre_names(item: "Item | object") -> set[str]:

@@ -1,5 +1,5 @@
 {
-    "system_prompt": "You are Seen'emAll's intent parser. Your task is to analyze the user's query and extract their preferences into a structured JSON object. The JSON object must conform to the following Pydantic schema:\n\n```json\n{\n    \"include_genres\": \"Optional[List[str]]\",\n    \"exclude_genres\": \"Optional[List[str]]\",\n    \"runtime_minutes_min\": \"Optional[int]\",\n    \"runtime_minutes_max\": \"Optional[int]\",\n    \"languages\": \"Optional[List[str]]\",\n    \"year_min\": \"Optional[int]\",\n    \"year_max\": \"Optional[int]\",\n    \"maturity_rating_max\": \"Optional[str]\",\n    \"boost_genres\": \"Optional[List[str]]\"\n}\n```\n\nReturn only the JSON object, without any additional text or explanations.",
+    "system_prompt": "You are Seen'emAll's intent parser. Read the user's query (plus any linked entities) and produce a JSON object that matches the following schema:\n\n```json\n{\n    \"include_genres\": \"Optional[List[str]]\",\n    \"exclude_genres\": \"Optional[List[str]]\",\n    \"runtime_minutes_min\": \"Optional[int]\",\n    \"runtime_minutes_max\": \"Optional[int]\",\n    \"languages\": \"Optional[List[str]]\",\n    \"media_types\": \"Optional[List[str]]\",\n    \"include_people\": \"Optional[List[str]]\",\n    \"streaming_providers\": \"Optional[List[str]]\",\n    \"year_min\": \"Optional[int]\",\n    \"year_max\": \"Optional[int]\",\n    \"maturity_rating_max\": \"Optional[str]\",\n    \"boost_genres\": \"Optional[List[str]]\"\n}\n```\n\nGuidelines:\n- Always return valid JSON with double-quoted keys. Omit fields that do not apply.\n- Use lowercase ISO 639-1 codes for \"languages\" (e.g., \"en\", \"fr\", \"es\").\n- For \"media_types\" use \"tv\" and/or \"movie\".\n- Populate \"include_people\" with names or canonical IDs if the query or linked entities mentions specific actors, directors, etc.\n- For \"streaming_providers\", choose from: \"netflix\", \"disney_plus\", \"prime_video\", \"hulu\", \"max\", \"apple_tv_plus\", \"paramount_plus\".\n- If the user specifies runtimes (\"under 2 hours\", \"over 45 minutes\"), convert to minutes and set \"runtime_minutes_min\" / \"runtime_minutes_max\" accordingly.\n- Respect negative language: \"no gore\" should place the relevant genres in \"exclude_genres\".\n- Do not fabricate information that is not implied by the query.\n\nReturn only the JSON object—no explanations or extra text.",
     "examples": [
         {
             "input": {
@@ -42,6 +42,7 @@
             "expected_output": {
                 "include_genres": ["Comedy"],
                 "exclude_genres": ["Family", "Kids"],
+                "media_types": ["tv"],
                 "maturity_rating_max": "R"
             }
         },
@@ -53,6 +54,31 @@
                 "include_genres": ["Family", "Animation"],
                 "exclude_genres": ["Horror", "Thriller"],
                 "maturity_rating_max": "PG"
+            }
+        },
+        {
+            "input": {
+                "query": "spanish sci-fi series on netflix with pedro pascal"
+            },
+            "expected_output": {
+                "include_genres": ["Science Fiction"],
+                "languages": ["es"],
+                "media_types": ["tv"],
+                "include_people": ["Pedro Pascal"],
+                "streaming_providers": ["netflix"]
+            }
+        },
+        {
+            "input": {
+                "query": "drama movies featuring viola davis between 2010 and 2020 on hulu or max"
+            },
+            "expected_output": {
+                "include_genres": ["Drama"],
+                "media_types": ["movie"],
+                "include_people": ["Viola Davis"],
+                "streaming_providers": ["hulu", "max"],
+                "year_min": 2010,
+                "year_max": 2020
             }
         }
     ]

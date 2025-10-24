@@ -159,7 +159,7 @@ def test_fetch_and_upsert_collects_lists_and_commits(monkeypatch):
             return sess
 
     list_data = {
-        ("movie", "popular"): [{"id": 1}],
+        ("movie", "popular"): [{"id": 1}, {"id": "bad"}, {"id": None}],
         ("movie", "top_rated"): [{"id": 2}],
         ("movie", "trending"): [{"id": 3}],
         ("tv", "popular"): [{"id": 10}],
@@ -265,3 +265,49 @@ def test_run_invokes_asyncio(monkeypatch):
     assert called["pages"] == 3
     assert called["coro"] == "FAKE_CORO"
     assert called["asyncio_run_calls"] == 1
+
+
+def test_extract_movie_rating_prefers_priority_country():
+    payload = {
+        "results": [
+            {
+                "iso_3166_1": "FR",
+                "release_dates": [{"certification": "16"}],
+            },
+            {
+                "iso_3166_1": "US",
+                "release_dates": [{"certification": "PG-13"}],
+            },
+        ]
+    }
+    assert mod._extract_movie_rating({"release_dates": payload}) == "PG-13"
+
+
+def test_extract_movie_rating_handles_invalid_results():
+    assert mod._extract_movie_rating({"release_dates": {"results": {}}}) is None
+
+
+def test_extract_tv_rating_fallback_and_unknown_region():
+    data = {
+        "content_ratings": {
+            "results": [
+                {"iso_3166_1": "DE", "rating": "16"},
+                {"iso_3166_1": "US", "rating": "TV-PG"},
+            ]
+        }
+    }
+    assert mod._extract_tv_rating(data) == "TV-PG"
+
+
+def test_extract_maturity_rating_returns_none_for_unknown():
+    assert mod._extract_maturity_rating("podcast", {}) is None
+
+
+def test_pick_rating_falls_back_to_any_country(monkeypatch):
+    entries = [
+        {"iso_3166_1": "FR", "release_dates": [{"certification": "12"}]},
+    ]
+    result = mod._pick_rating(
+        entries, lambda entry: [entry.get("release_dates")[0].get("certification")]
+    )
+    assert result == "12"

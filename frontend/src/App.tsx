@@ -34,6 +34,7 @@ function App() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [diversify, setDiversify] = useState(true);
 
   const initializeUserHistory = async () => {
     try {
@@ -60,7 +61,16 @@ function App() {
       console.log('Initializing user history for:', userId);
       await initializeUserHistory();
 
-      const url = `${process.env.REACT_APP_API_URL}/recommend?user_id=${userId}&query=${encodeURIComponent(query)}`;
+      const params = new URLSearchParams();
+      params.append('user_id', userId);
+      if (query.trim()) {
+        params.append('query', query);
+      }
+      if (!diversify) {
+        params.append('diversify', 'false');
+      }
+
+      const url = `${process.env.REACT_APP_API_URL}/recommend?${params.toString()}`;
       console.log('Fetching recommendations from:', url);
 
       const response = await fetch(url, {
@@ -141,6 +151,13 @@ function App() {
                 Try: "sci-fi movies like Inception" or "comedy shows like The Office"
               </Form.Text>
             </Form.Group>
+            <Form.Check
+              type="switch"
+              id="diversify-toggle"
+              label="Enable diversity boosts"
+              checked={diversify}
+              onChange={(e) => setDiversify(e.target.checked)}
+            />
           </Col>
           <Col md={2}>
             <Button

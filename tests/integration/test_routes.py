@@ -11,6 +11,7 @@ from api.db.session import get_db
 from api.main import app
 from api.routes import recommend as recommend_routes
 from api.routes import user as user_routes
+from api.routes.recommend import PrefilterDecision
 from tests.helpers import FakeResult
 from api.core import reranker
 from api.core import business_rules
@@ -25,7 +26,11 @@ def _disable_db_startup(monkeypatch):
 @pytest.fixture(autouse=True)
 def _disable_prefilters(monkeypatch):
     monkeypatch.setattr(
-        recommend_routes, "_prefilter_allowed_ids", lambda db, intent, limit: None
+        recommend_routes,
+        "_prefilter_allowed_ids",
+        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+            None, [], True
+        ),
     )
     monkeypatch.setattr(business_rules, "load_rules", lambda: {})
 
