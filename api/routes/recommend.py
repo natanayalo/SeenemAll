@@ -62,10 +62,9 @@ def _normalize_streaming_services(
             continue
         matched = False
         for canonical, variants in _STREAMING_PROVIDER_ALIASES.items():
-            alias_set = set(variants)
-            alias_set.add(canonical)
-            if key == canonical or key in alias_set:
-                normalized.update(alias_set)
+            all_aliases = variants.union({canonical})
+            if key in all_aliases:
+                normalized.update(all_aliases)
                 matched = True
                 break
         if not matched:
