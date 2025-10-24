@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import re
 import functools
 import logging
 import time
+import re
+from datetime import timedelta
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
@@ -275,7 +276,7 @@ def item_matches_intent(
     return True
 
 
-_GENRE_CACHE_TTL_SECONDS = 1800.0  # 30 minutes
+_GENRE_CACHE_TTL_SECONDS = timedelta(minutes=30).total_seconds()
 _GENRE_CACHE: Dict[tuple[str, ...], tuple[float, List[str]]] = {}
 logger = logging.getLogger(__name__)
 
@@ -341,9 +342,10 @@ def _load_genres_from_db(media_types: Sequence[str] | None) -> List[str] | None:
         )
         return None
 
-    session = SessionLocal()
+    session = None
     result = None
     try:
+        session = SessionLocal()
         stmt = select(Item.media_type, Item.genres).where(Item.genres.isnot(None))
         if media_types:
             stmt = stmt.where(Item.media_type.in_(list(media_types)))
@@ -369,13 +371,11 @@ def _load_genres_from_db(media_types: Sequence[str] | None) -> List[str] | None:
             "Failed to load catalog genres from database: %s", exc, exc_info=True
         )
         return None
-    except Exception as exc:  # pragma: no cover - safety net
-        logger.debug("Unexpected error loading catalog genres: %s", exc, exc_info=True)
-        return None
     finally:
         if result is not None:
             result.close()
-        session.close()
+        if session is not None:
+            session.close()
 
 
 def _iterate_genre_names(raw: object) -> Iterable[str]:

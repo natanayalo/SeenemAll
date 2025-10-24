@@ -26,6 +26,17 @@ def test_parse_intent_between_runtime(monkeypatch):
     assert filters.max_runtime == 120
 
 
+def test_parse_intent_conflicting_signals_prioritises_explicit_genres():
+    filters = legacy.parse_intent(
+        "light horror movie under 2 hours but over 3 hours in runtime"
+    )
+    assert filters.media_types == ["movie"]
+    assert filters.genres[0] == "Horror"
+    assert "light" in filters.moods
+    assert filters.min_runtime == 120
+    assert filters.max_runtime == 180
+
+
 def test_effective_genres_include_mood_mapping(monkeypatch):
     monkeypatch.setattr(legacy, "_get_genre_mapping", lambda: {"light": ["FeelGood"]})
     filters = legacy.IntentFilters(raw_query="feel good", moods=["light"], genres=[])

@@ -329,6 +329,8 @@ async def recommend(
     prefilter = _prefilter_allowed_ids(db, intent, candidate_limit)
     allowlist = prefilter.allowed_ids
     boost_ids = prefilter.boost_ids or []
+    # Carry the stricter genre requirement forward so downstream filtering
+    # (ann_candidates + item_matches_intent) stays aligned with the prefilter.
     enforce_genres = prefilter.enforce_genres
     if cold_start:
         logger.info("Using cold-start candidates for user %s", canonical_id)
@@ -872,6 +874,8 @@ def _prefilter_allowed_ids(
     db: Session, intent: IntentFilters | None, limit: int
 ) -> PrefilterDecision:
     if intent is None or not intent.has_filters():
+        # Nothing to prefilter: leave the allowlist unset, but keep genre enforcement
+        # enabled so downstream checks still respect catalog intent defaults.
         return PrefilterDecision(None, [], True)
 
     threshold = max(10, limit // 2)

@@ -872,3 +872,34 @@ def test_reranker_prompt_evaluation_logs(monkeypatch, caplog):
     decisions = reranker._call_reranker(settings, [{"id": 1}], None, "needle", None)
     assert decisions and decisions[0].score == 0.8
     assert evaluations and evaluations[0]["items"][0]["score"] == 0.8
+
+
+def test_rerank_with_explanations_handles_reranker_error(monkeypatch):
+    _reset_settings()
+    monkeypatch.setenv("RERANK_API_KEY", "key")
+    settings = reranker.RerankerSettings(
+        provider="openai",
+        api_key="key",
+        model="gpt",
+        endpoint="https://example.com",
+        enabled=True,
+        timeout=1.0,
+    )
+    monkeypatch.setattr(reranker, "_get_settings", lambda: settings)
+
+    def boom(*_args, **_kwargs):
+        raise reranker.RerankerError("boom")
+
+    monkeypatch.setattr(reranker, "_call_openai_reranker", boom)
+
+    items = [
+        {
+            "id": 1,
+            "title": "Fallback",
+            "overview": "",
+            "genres": [{"name": "Drama"}],
+        }
+    ]
+
+    result = reranker.rerank_with_explanations(items, intent=None, query="needle")
+    assert result == reranker._with_default_explanations(items, None, "needle")
