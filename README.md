@@ -88,7 +88,7 @@ cd SeenemAll
 # 2. Configure
 cp .env.example .env
 # edit TMDB_API_KEY=your_tmdb_key
-# optional: set RERANK_PROVIDER/RERANK_API_KEY for LLM reranking
+# optional: set RERANK_PROVIDER (openai | gemini | small) + RERANK_API_KEY when needed
 # optional: tweak USER_PROFILE_DECAY_HALF_LIFE, EMBED_MODEL/EMBED_BATCH, EMBED_VERSION/TEMPLATE
 
 # 3. Launch stack
@@ -129,11 +129,22 @@ curl "http://localhost:8000/recommend?user_id=u1&profile=main&limit=10&cursor=ey
 
 ## 🔁 LLM Reranker
 
-- Set `RERANK_PROVIDER=openai` with `RERANK_API_KEY` (or rely on `OPENAI_API_KEY`) **or**
-  `RERANK_PROVIDER=gemini` with a compatible Google Generative AI key.
-- Defaults: `RERANK_MODEL=gpt-4o-mini` for OpenAI, `gemini-2.0-flash-exp` for Gemini.
-- Disable temporarily with `RERANK_ENABLED=0`; without a key we automatically fall back
-  to ANN ordering with heuristic explanations.
+- Hosted options:
+  - `RERANK_PROVIDER=openai` with `RERANK_API_KEY` (or `OPENAI_API_KEY` fallback).
+  - `RERANK_PROVIDER=gemini` with a compatible Google Generative AI key.
+  - Defaults: `RERANK_MODEL=gpt-4o-mini` (OpenAI) and `gemini-2.0-flash-exp` (Gemini).
+- Lightweight option: `RERANK_PROVIDER=small` activates the new MiniLM-L6-v2 reranker
+  that runs locally, caps the input window at 40 items, and returns the best 12 without
+  calling an external API. No API key is required; it reuses the embedding pipeline.
+- Small-model knobs (all optional, see `.env.example` for defaults):
+  `SMALL_RERANK_INPUT_WINDOW`, `SMALL_RERANK_OUTPUT_LIMIT`,
+  `SMALL_RERANK_TIMEOUT`, `SMALL_RERANK_CACHE_TTL`, `SMALL_RERANK_CACHE_MAXSIZE`,
+  and `SMALL_RERANK_RANK_WEIGHT` (bias toward original ANN order).
+- To drop unrated catalog rows entirely, set `HEURISTIC_MIN_SIGNAL_MULTIPLIER`
+  (>0). Leaving it at `0` (default) keeps the old behavior but still logs the
+  signal multiplier for debugging.
+- Disable any provider with `RERANK_ENABLED=0`; when disabled or misconfigured, we fall
+  back to ANN ordering plus heuristic explanations automatically.
 
 ---
 
@@ -152,7 +163,18 @@ The `/recommend` route orchestrates several retrieval streams before reranking:
   `_REWRITE_BLEND_ALPHA` (default `0.5`) and produces a normalized vector that goes into
   `ann_candidates(...)`. Cold-start users skip the blend entirely and fall back to
   `_cold_start_candidates(...)`, which prefers popularity/trending ranks for the given
-  intent filters.
+  intent filters. If the user has no history but a natural-language query is present,
+  we still run ANN retrieval directly on the rewrite vector so “like Squid Game” style
+  prompts can pull in semantically similar titles even before the profile warms up.
+  When `INTENT_ENABLE_ANN_DESCRIPTION=1`, the rewrite vector blends the short
+  `ann_description` sentence with the structured rewrite; tune the contribution via
+  `ANN_DESCRIPTION_WEIGHT` (default `0.6`). For local tuning, you can also pass
+  per-request overrides such as `use_llm_intent=false`,
+  `ann_description_override=...`, `rewrite_override=...`, and the weight knobs
+  `ann_weight_override` / `rewrite_weight_override`. Likewise, mixer weights can be
+  overridden with `mixer_ann_weight`, `mixer_collab_weight`,
+  `mixer_trending_weight`, `mixer_popularity_weight`, and `mixer_novelty_weight`
+  (the React UI exposes sliders for all of these debug controls).
 
 - **Collaborative recall** – neighbor metadata captured in `users.neighbors` (see
   `api/core/user_profile.py`) identifies similar users and the items they recently liked.

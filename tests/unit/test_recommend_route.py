@@ -19,6 +19,7 @@ from api.core import business_rules
 from api.core.legacy_intent_parser import IntentFilters
 from api.core.entity_linker import ENTITY_LINKER_CACHE
 from api.core.intent_parser import Intent
+from api.core.rewrite import Rewrite
 
 ORIGINAL_PREFILTER = recommend_routes._prefilter_allowed_ids
 
@@ -686,7 +687,14 @@ def test_recommend_merges_collaborative_candidates(monkeypatch):
 
     with TestClient(app) as client:
         resp = client.get(
-            "/recommend", params={"user_id": "u1", "limit": 3, "diversify": "false"}
+            "/recommend",
+            params={
+                "user_id": "u1",
+                "limit": 3,
+                "diversify": "false",
+                "mixer_popularity_weight": "0",
+                "mixer_trending_weight": "0",
+            },
         )
 
     app.dependency_overrides.clear()
@@ -788,11 +796,23 @@ def test_recommend_mixer_scores_items(monkeypatch):
 
     monkeypatch.setattr(recommend_routes, "rerank_with_explanations", fake_rerank)
 
-    client = TestClient(app)
-    resp = client.get(
-        "/recommend", params={"user_id": "u1", "limit": 3, "diversify": "false"}
-    )
-    client.close()
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend", params={"user_id": "u1", "limit": 3, "diversify": "false"}
+        )
+        resp_override = client.get(
+            "/recommend",
+            params={
+                "user_id": "u1",
+                "limit": 3,
+                "diversify": "false",
+                "mixer_ann_weight": "0",
+                "mixer_collab_weight": "0",
+                "mixer_trending_weight": "0",
+                "mixer_popularity_weight": "5",
+                "mixer_novelty_weight": "0",
+            },
+        )
     session.close()
     app.dependency_overrides.clear()
 
@@ -801,6 +821,10 @@ def test_recommend_mixer_scores_items(monkeypatch):
     payload = body["items"]
     assert [item["id"] for item in payload] == [1, 2, 3]
     assert all("ann_rank" not in item for item in payload)
+
+    assert resp_override.status_code == 200
+    override_ids = [item["id"] for item in resp_override.json()["items"]]
+    assert override_ids[0] == 2  # popularity dominates when overrides applied
 
 
 def test_recommend_injects_serendipity_items(monkeypatch):
@@ -1197,7 +1221,7 @@ def test_recommend_applies_franchise_cap_when_diversify_enabled(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_apply_mixer_scores",
-        lambda items: None,
+        lambda items, **kwargs: None,
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -1263,7 +1287,7 @@ def test_recommend_skips_franchise_cap_when_diversify_disabled(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_apply_mixer_scores",
-        lambda items: None,
+        lambda items, **kwargs: None,
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -1485,7 +1509,12 @@ def test_recommend_uses_entity_linker_and_blends_query_vector(
         "rewrite_query",
         lambda query, intent: SimpleNamespace(rewritten_text="rewritten query"),
     )
-    monkeypatch.setattr(recommend_routes, "encode_texts", lambda texts: [rewrite_vec])
+
+    def fake_encode(texts):
+        stacked = np.stack([rewrite_vec for _ in texts], axis=0)
+        return stacked
+
+    monkeypatch.setattr(recommend_routes, "encode_texts", fake_encode)
 
     with TestClient(app) as client:
         app.state.entity_linker = _Linker()
@@ -1567,3 +1596,280 @@ def test_recommend_logs_cold_start_path(monkeypatch, caplog):
         "Using cold-start candidates for user u1" in message
         for message in caplog.messages
     )
+
+
+def test_recommend_cold_start_uses_rewrite_ann(monkeypatch):
+    item = SimpleNamespace(
+        id=1,
+        tmdb_id=101,
+        media_type="tv",
+        title="Game Arena",
+        overview="Contestants face deadly games.",
+        poster_url="arena.jpg",
+        runtime=50,
+        original_language="en",
+        genres=[{"name": "Drama"}],
+        release_year=2023,
+        collection_id=None,
+        collection_name=None,
+    )
+
+    session = CandidateSession([item])
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            None,
+            None,
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "_prefilter_allowed_ids",
+        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+            [1], [], True
+        ),
+    )
+
+    rewrite_vec = np.ones(384, dtype="float32") / np.sqrt(384)
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "rewrite_query",
+        lambda query, intent: SimpleNamespace(rewritten_text="desperate deadly games"),
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "_build_rewrite_vector",
+        lambda rewrite_text, ann_desc, ann_w, rewrite_w: rewrite_vec,
+    )
+
+    ann_called = {}
+
+    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+        ann_called["vec"] = vec
+        return [1]
+
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
+
+    def _fail_cold_start(*args, **kwargs):
+        raise AssertionError("cold-start fallback should not run")
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "_cold_start_candidates",
+        _fail_cold_start,
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/recommend",
+            params={"user_id": "u1", "query": "tv shows like Squid Game"},
+        )
+
+    app.dependency_overrides.clear()
+    session.close()
+
+    assert response.status_code == 200
+    assert ann_called
+
+
+def test_recommend_skips_llm_when_disabled(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=1,
+            media_type="movie",
+            title="Alpha",
+            overview="alpha",
+            poster_url="alpha.jpg",
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Drama"}],
+            release_year=2020,
+            collection_id=None,
+            collection_name=None,
+        )
+    ]
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    def fail_parse(*args, **kwargs):
+        raise AssertionError("LLM parser should be disabled")
+
+    monkeypatch.setattr(recommend_routes, "_parse_llm_intent", fail_parse)
+
+    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+        return [1]
+
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
+    monkeypatch.setattr(
+        recommend_routes,
+        "rewrite_query",
+        lambda query, intent: Rewrite(rewritten_text="rewritten"),
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "encode_texts",
+        lambda texts: np.array(
+            [[1.0 for _ in range(384)] for _ in texts], dtype="float32"
+        ),
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "_prefilter_allowed_ids",
+        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+            [1], [], True
+        ),
+    )
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend",
+            params={
+                "user_id": "u1",
+                "query": "alpha",
+                "use_llm_intent": "false",
+            },
+        )
+
+    app.dependency_overrides.clear()
+    session.close()
+
+    assert resp.status_code == 200
+
+
+def test_recommend_manual_rewrite_override(monkeypatch):
+    item = SimpleNamespace(
+        id=1,
+        tmdb_id=1,
+        media_type="movie",
+        title="Alpha",
+        overview="alpha",
+        poster_url="alpha.jpg",
+        runtime=100,
+        original_language="en",
+        genres=[{"name": "Drama"}],
+        release_year=2020,
+        collection_id=None,
+        collection_name=None,
+    )
+
+    session = CandidateSession([item])
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    def fail_rewrite(*args, **kwargs):
+        raise AssertionError("rewrite_query should be bypassed")
+
+    monkeypatch.setattr(recommend_routes, "rewrite_query", fail_rewrite)
+
+    def fake_encode(texts):
+        assert texts == ["manual rewrite"]
+        return np.ones((1, 384), dtype="float32")
+
+    monkeypatch.setattr(recommend_routes, "encode_texts", fake_encode)
+
+    ann_calls = {"count": 0}
+
+    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+        ann_calls["count"] += 1
+        assert vec.shape[0] == 384
+        return [1]
+
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "_prefilter_allowed_ids",
+        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+            [1], [], True
+        ),
+    )
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend",
+            params={
+                "user_id": "u1",
+                "rewrite_override": "manual rewrite",
+            },
+        )
+
+    app.dependency_overrides.clear()
+    session.close()
+
+    assert resp.status_code == 200
+    assert ann_calls["count"] == 1
+
+
+def test_build_rewrite_vector_blends_description(monkeypatch):
+    desc = "grim survival stakes"
+    rewrite_text = "sci-fi survival"
+
+    def fake_encode(texts):
+        assert texts == [desc, rewrite_text]
+        return np.array([[1.0, 0.0], [0.0, 1.0]], dtype="float32")
+
+    monkeypatch.setattr(recommend_routes, "encode_texts", fake_encode)
+
+    vec = recommend_routes._build_rewrite_vector(
+        rewrite_text, desc, ann_weight_override=0.5, rewrite_weight_override=1.0
+    )
+    expected = np.array([0.4472136, 0.8944272], dtype="float32")
+    assert vec is not None
+    assert np.allclose(vec[:2], expected, atol=1e-6)

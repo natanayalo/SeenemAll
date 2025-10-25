@@ -843,9 +843,18 @@ def rewrite_query(query: str, intent: Intent) -> Rewrite:
 
     _log_metrics(_increment_metric("rewrite_misses"), cache="rewrite")
 
-    rewritten_text = _rewrite_from_intent(intent)
-    if rewritten_text is None:
-        rewritten_text = normalized_query
+    description = (intent.ann_description or "").strip()
+    intent_hint = _rewrite_from_intent(intent)
+    if intent_hint is not None:
+        intent_hint = intent_hint.strip()
+    normalized = normalized_query.strip()
+
+    if description:
+        rewritten_text = description
+    elif intent_hint is not None:
+        rewritten_text = intent_hint
+    else:
+        rewritten_text = normalized
     rewritten_text = _truncate_words(rewritten_text)
 
     rewrite = Rewrite(rewritten_text=rewritten_text)

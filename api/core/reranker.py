@@ -4,16 +4,23 @@ import json
 import logging
 import os
 import re
+import atexit
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
+import hashlib
+import time
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+from threading import Lock
 
 import httpx
 import numpy as np
+from cachetools import TTLCache
 
 from api.core.legacy_intent_parser import IntentFilters
 from api.core.prompt_eval import load_prompt_template
+from api.core.embeddings import encode_texts
 
 logger = logging.getLogger(__name__)
 # Ensure INFO-level reranker messages surface unless overridden globally.
@@ -93,6 +100,34 @@ _HEURISTIC_POPULAR_WEIGHT = _float_from_env("HEURISTIC_POPULAR_WEIGHT", 0.15)
 _HEURISTIC_RECENT_WEIGHT = _float_from_env("HEURISTIC_RECENT_WEIGHT", 0.2)
 _HEURISTIC_POSITION_BASE = _float_from_env("HEURISTIC_POSITION_BASE", 0.05)
 _HEURISTIC_POSITION_DECAY = _float_from_env("HEURISTIC_POSITION_DECAY", 0.002)
+_HEURISTIC_MIN_VOTE_COUNT = max(0, _int_from_env("HEURISTIC_MIN_VOTE_COUNT", 50))
+_HEURISTIC_LOW_VOTE_PENALTY = min(
+    0.9, max(0.0, _float_from_env("HEURISTIC_LOW_VOTE_PENALTY", 0.35))
+)
+_HEURISTIC_MIN_POPULARITY = max(0.0, _float_from_env("HEURISTIC_MIN_POPULARITY", 20.0))
+_HEURISTIC_LOW_POPULARITY_PENALTY = min(
+    0.9, max(0.0, _float_from_env("HEURISTIC_LOW_POPULARITY_PENALTY", 0.25))
+)
+_HEURISTIC_MIN_SIGNAL_MULTIPLIER = min(
+    1.0, max(0.0, _float_from_env("HEURISTIC_MIN_SIGNAL_MULTIPLIER", 0.0))
+)
+
+_SMALL_RERANK_INPUT_WINDOW = max(1, _int_from_env("SMALL_RERANK_INPUT_WINDOW", 40))
+_SMALL_RERANK_OUTPUT_LIMIT = max(1, _int_from_env("SMALL_RERANK_OUTPUT_LIMIT", 12))
+_SMALL_RERANK_TIMEOUT_SECONDS = max(0.1, _float_from_env("SMALL_RERANK_TIMEOUT", 1.5))
+_SMALL_RERANK_CACHE_TTL_SECONDS = max(5, _int_from_env("SMALL_RERANK_CACHE_TTL", 120))
+_SMALL_RERANK_CACHE_MAXSIZE = max(16, _int_from_env("SMALL_RERANK_CACHE_MAXSIZE", 256))
+_SMALL_RERANK_RANK_WEIGHT = min(
+    0.3, max(0.0, _float_from_env("SMALL_RERANK_RANK_WEIGHT", 0.05))
+)
+
+_SMALL_RERANK_CACHE: TTLCache[str, List[Tuple[int, float]]] = TTLCache(
+    maxsize=_SMALL_RERANK_CACHE_MAXSIZE, ttl=_SMALL_RERANK_CACHE_TTL_SECONDS
+)
+_SMALL_RERANK_CACHE_LOCK = Lock()
+_SMALL_RERANK_EXECUTOR = ThreadPoolExecutor(max_workers=1)
+# Ensure we clean the worker thread across reloads/tests.
+atexit.register(_SMALL_RERANK_EXECUTOR.shutdown, wait=False)
 
 
 def _get_templates_path() -> str:
@@ -180,30 +215,45 @@ def rerank_with_explanations(
     settings = _get_settings()
     if not settings.enabled:
         logger.warning(
-            "Reranker disabled (missing API key or RERANK_ENABLED=0); returning ANN order."
+            "Reranker(%s) disabled (missing credentials or RERANK_ENABLED=0); returning ANN order.",
+            settings.provider,
         )
         return base
 
     try:
-        llm_items = base[: min(len(base), _DEFAULT_MAX_ITEMS_FOR_LLM)]
+        if settings.provider == "small":
+            window = min(len(base), _SMALL_RERANK_INPUT_WINDOW)
+        else:
+            window = min(len(base), _DEFAULT_MAX_ITEMS_FOR_LLM)
+        llm_items = base[:window]
+        if not llm_items:
+            return base
         logger.info(
             "Reranker(%s) evaluating %d candidates.",
             settings.provider,
             len(llm_items),
         )
+        start_time = time.perf_counter()
         decisions = _call_reranker(settings, llm_items, intent, query, user)
+        latency_ms = (time.perf_counter() - start_time) * 1000.0
         if not decisions:
             logger.info(
-                "Reranker(%s) returned no decisions; using baseline ordering.",
+                "Reranker(%s) returned no decisions; using baseline ordering. latency=%.1fms",
                 settings.provider,
+                latency_ms,
             )
             return base
-        logger.debug(
-            "Reranker(%s) produced %d decisions.", settings.provider, len(decisions)
+        logger.info(
+            "Reranker(%s) produced %d decisions in %.1fms.",
+            settings.provider,
+            len(decisions),
+            latency_ms,
         )
         return _merge_with_base(base, decisions)
     except Exception:  # pragma: no cover - defensive guardrail
-        logger.exception("LLM reranker failed; falling back to ANN order.")
+        logger.exception(
+            "Reranker(%s) failed; falling back to ANN order.", settings.provider
+        )
         return base
 
 
@@ -375,9 +425,9 @@ def _item_identity(item: Dict[str, Any]) -> tuple[Any, int]:
 
 @lru_cache(maxsize=1)
 def _get_settings() -> RerankerSettings:
-    api_key = os.getenv("RERANK_API_KEY") or os.getenv("OPENAI_API_KEY")
     raw_provider = os.getenv("RERANK_PROVIDER", "openai").strip().lower()
-    if raw_provider not in {"openai", "gemini"}:
+    supported = {"openai", "gemini", "small"}
+    if raw_provider not in supported:
         logger.warning(
             "Unsupported RERANK_PROVIDER '%s'; falling back to 'openai'.", raw_provider
         )
@@ -385,9 +435,16 @@ def _get_settings() -> RerankerSettings:
     else:
         provider = raw_provider
 
+    api_key = None
+    if provider in {"openai", "gemini"}:
+        api_key = os.getenv("RERANK_API_KEY") or os.getenv("OPENAI_API_KEY")
+
     if provider == "gemini":
         default_model = "gemini-2.0-flash-lite"
         default_endpoint = "https://generativelanguage.googleapis.com/v1beta/models"
+    elif provider == "small":
+        default_model = os.getenv("SMALL_RERANK_MODEL", "all-MiniLM-L6-v2")
+        default_endpoint = "local://small-rerank"
     else:
         default_model = "gpt-4o-mini"
         default_endpoint = "https://api.openai.com/v1/chat/completions"
@@ -395,8 +452,15 @@ def _get_settings() -> RerankerSettings:
     model = os.getenv("RERANK_MODEL", default_model)
     endpoint = os.getenv("RERANK_ENDPOINT", default_endpoint)
     enabled_value = os.getenv("RERANK_ENABLED", "1").strip().lower()
-    enabled = bool(api_key) and enabled_value not in {"0", "false", "no"}
-    timeout = _DEFAULT_TIMEOUT_SECONDS
+    if provider == "small":
+        enabled = enabled_value not in {"0", "false", "no"}
+    else:
+        enabled = bool(api_key) and enabled_value not in {"0", "false", "no"}
+    timeout = (
+        _SMALL_RERANK_TIMEOUT_SECONDS
+        if provider == "small"
+        else _DEFAULT_TIMEOUT_SECONDS
+    )
     raw_timeout = os.getenv("RERANK_TIMEOUT")
     if raw_timeout:
         try:
@@ -432,6 +496,19 @@ def _with_default_explanations(
         copy_item.setdefault("original_rank", idx)
         score, heuristics = _heuristic_score(copy_item, idx, current_year)
         copy_item["score"] = score
+        if (
+            _HEURISTIC_MIN_SIGNAL_MULTIPLIER > 0.0
+            and heuristics.get("signal_multiplier", 1.0)
+            < _HEURISTIC_MIN_SIGNAL_MULTIPLIER
+        ):
+            logger.debug(
+                "Dropping low-signal item | id=%s title=%s multiplier=%.3f threshold=%.3f",
+                copy_item.get("id"),
+                copy_item.get("title") or copy_item.get("name"),
+                heuristics.get("signal_multiplier"),
+                _HEURISTIC_MIN_SIGNAL_MULTIPLIER,
+            )
+            continue
         narrative = _default_explanation(copy_item, intent, query, intent_genres)
         heuristic_summary = _heuristic_summary(copy_item, heuristics)
         explanation_parts = [narrative, heuristic_summary]
@@ -440,6 +517,26 @@ def _with_default_explanations(
         ).strip()
         enriched.append(copy_item)
     return enriched
+
+
+def _low_signal_multiplier(popularity: float, vote_count: float) -> float:
+    multiplier = 1.0
+
+    vote_floor = max(1, _HEURISTIC_MIN_VOTE_COUNT)
+    raw_votes = max(0.0, vote_count)
+    if vote_floor > 0 and raw_votes < vote_floor:
+        deficit = vote_floor - raw_votes
+        fraction = min(1.0, deficit / vote_floor)
+        multiplier *= max(0.0, 1.0 - _HEURISTIC_LOW_VOTE_PENALTY * fraction)
+
+    popularity_floor = max(1.0, _HEURISTIC_MIN_POPULARITY)
+    raw_popularity = max(0.0, popularity)
+    if raw_popularity < popularity_floor:
+        deficit = popularity_floor - raw_popularity
+        fraction = min(1.0, deficit / popularity_floor)
+        multiplier *= max(0.0, 1.0 - _HEURISTIC_LOW_POPULARITY_PENALTY * fraction)
+
+    return multiplier
 
 
 def _heuristic_score(
@@ -486,6 +583,21 @@ def _heuristic_score(
     score += _HEURISTIC_RECENT_WEIGHT * recent_bonus
     score += max(0.0, _HEURISTIC_POSITION_BASE - position * _HEURISTIC_POSITION_DECAY)
 
+    baseline_score = score
+    signal_multiplier = _low_signal_multiplier(popularity, vote_count)
+    score *= signal_multiplier
+    if signal_multiplier < 0.999:
+        logger.debug(
+            "Low-signal penalty applied | id=%s title=%s votes=%s popularity=%s multiplier=%.3f baseline=%.4f final=%.4f",
+            item.get("id"),
+            item.get("title") or item.get("name"),
+            vote_count,
+            popularity,
+            signal_multiplier,
+            baseline_score,
+            score,
+        )
+
     heuristics = {
         "popularity_norm": popularity_norm,
         "vote_quality": vote_quality,
@@ -496,6 +608,8 @@ def _heuristic_score(
         "vote_average": vote_average,
         "vote_count": int(vote_count) if vote_count else 0,
         "release_year": release_year,
+        "baseline_score": round(baseline_score, 4),
+        "signal_multiplier": round(signal_multiplier, 4),
     }
     return round(score, 4), heuristics
 
@@ -596,6 +710,221 @@ def _merge_with_base(
     return merged
 
 
+def _small_rerank_cache_key(
+    query_text: str,
+    items: Sequence[Dict[str, Any]],
+    user: Dict[str, Any] | None,
+) -> str:
+    user_id = None
+    if isinstance(user, dict):
+        user_id = user.get("user_id") or user.get("id")
+    parts: List[str] = [
+        "v1",
+        str(user_id or ""),
+        query_text.strip().lower(),
+        str(_SMALL_RERANK_OUTPUT_LIMIT),
+    ]
+    for item in items:
+        ident = item.get("id")
+        if ident is None:
+            continue
+        parts.append(
+            "::".join(
+                [
+                    str(ident),
+                    str(item.get("original_rank")),
+                    str(item.get("retrieval_score")),
+                    str(item.get("score")),
+                ]
+            )
+        )
+    payload = "||".join(parts)
+    return hashlib.sha256(payload.encode("utf-8", "ignore")).hexdigest()
+
+
+def _build_small_rerank_query(intent: IntentFilters | None, query: str | None) -> str:
+    segments: List[str] = []
+    if query:
+        cleaned = query.strip()
+        if cleaned:
+            segments.append(cleaned)
+
+    if intent:
+        try:
+            genres = intent.effective_genres()
+        except AttributeError:
+            genres = list(getattr(intent, "genres", []) or [])
+        if genres:
+            segments.append("Genres: " + ", ".join(genres[:6]))
+
+        media_types = getattr(intent, "media_types", []) or []
+        if media_types:
+            segments.append("Media: " + ", ".join(str(mt) for mt in media_types[:4]))
+
+        min_runtime = getattr(intent, "min_runtime", None)
+        max_runtime = getattr(intent, "max_runtime", None)
+        runtime_bits: List[str] = []
+        if min_runtime is not None:
+            runtime_bits.append(f">={min_runtime}m")
+        if max_runtime is not None:
+            runtime_bits.append(f"<={max_runtime}m")
+        if runtime_bits:
+            segments.append("Runtime " + " ".join(runtime_bits))
+
+        maturity = getattr(intent, "maturity_rating_max", None)
+        if maturity:
+            segments.append(f"Rating ≤ {maturity}")
+
+    return " | ".join(seg for seg in segments if seg).strip()
+
+
+def _build_small_rerank_documents(items: Sequence[Dict[str, Any]]) -> List[str]:
+    documents: List[str] = []
+    for item in items:
+        title = str(item.get("title") or item.get("name") or "").strip()
+        overview = str(item.get("overview") or "").strip()
+        genres_field = item.get("genres") or []
+        genres: List[str] = []
+        for entry in genres_field:
+            if isinstance(entry, dict):
+                name = entry.get("name")
+            else:
+                name = getattr(entry, "name", None)
+            if name:
+                genres.append(str(name))
+        media_type = item.get("media_type")
+        runtime = item.get("runtime")
+        release_year = item.get("release_year")
+
+        parts: List[str] = []
+        if title:
+            parts.append(title)
+        if genres:
+            parts.append("Genres: " + ", ".join(genres[:6]))
+        if media_type:
+            parts.append(f"Media: {media_type}")
+        if runtime:
+            parts.append(f"Runtime: {runtime} minutes")
+        if release_year:
+            parts.append(f"Released: {release_year}")
+        if overview:
+            parts.append(overview)
+
+        doc = ". ".join(segment for segment in parts if segment).strip()
+        if not doc:
+            doc = f"Item {item.get('id')}"
+        documents.append(doc)
+    return documents
+
+
+def _execute_small_rerank(
+    query_text: str,
+    items: Sequence[Dict[str, Any]],
+) -> List[Tuple[int, float]]:
+    limit = min(_SMALL_RERANK_OUTPUT_LIMIT, len(items))
+    if limit <= 0:
+        return []
+
+    documents = _build_small_rerank_documents(items)
+    if not documents:
+        return []
+
+    text_inputs = [query_text] + documents
+    embeddings = encode_texts(text_inputs)
+    if (
+        not isinstance(embeddings, np.ndarray)
+        or embeddings.shape[0] != len(text_inputs)
+        or embeddings.ndim != 2
+    ):
+        return []
+
+    query_vec = embeddings[0]
+    if query_vec.size == 0 or float(np.linalg.norm(query_vec)) == 0.0:
+        return []
+
+    item_vecs = embeddings[1:]
+    similarities = np.matmul(item_vecs, query_vec)
+    if similarities.shape[0] != len(items):
+        return []
+
+    scored: List[Tuple[int, float, int]] = []
+    for idx, (item, similarity) in enumerate(zip(items, similarities)):
+        ident = item.get("id")
+        if ident is None:
+            continue
+        base_rank = int(item.get("original_rank", idx))
+        # Normalize cosine similarity from [-1, 1] -> [0, 1]
+        normalized = float((float(similarity) + 1.0) / 2.0)
+        rank_bias = _SMALL_RERANK_RANK_WEIGHT * (1.0 / (1.0 + base_rank))
+        final_score = normalized + rank_bias
+        scored.append((int(ident), final_score, base_rank))
+
+    if not scored:
+        return []
+
+    scored.sort(key=lambda entry: (-entry[1], entry[2]))
+    trimmed = scored[:limit]
+    return [(item_id, score) for item_id, score, _ in trimmed]
+
+
+def _call_small_reranker(
+    settings: RerankerSettings,
+    items: Sequence[Dict[str, Any]],
+    intent: IntentFilters | None,
+    query: str | None,
+    user: Dict[str, Any] | None,
+) -> List[LLMDecision]:
+    if not items:
+        return []
+
+    window = min(len(items), _SMALL_RERANK_INPUT_WINDOW)
+    subset = list(items[:window])
+    query_text = _build_small_rerank_query(intent, query)
+    if not query_text:
+        return []
+
+    cache_key = _small_rerank_cache_key(query_text, subset, user)
+    with _SMALL_RERANK_CACHE_LOCK:
+        cached = _SMALL_RERANK_CACHE.get(cache_key)
+    if cached is not None:
+        return [
+            LLMDecision(item_id=item_id, score=score, explanation=None)
+            for item_id, score in cached
+        ]
+
+    future = _SMALL_RERANK_EXECUTOR.submit(_execute_small_rerank, query_text, subset)
+    try:
+        scored = future.result(timeout=settings.timeout)
+    except FuturesTimeout:
+        future.cancel()
+        logger.warning(
+            "Small reranker timed out after %.2fs; using baseline ordering.",
+            settings.timeout,
+        )
+        return []
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.warning(
+            "Small reranker failed with error: %s; using baseline ordering.", exc
+        )
+        return []
+
+    if not scored:
+        return []
+
+    with _SMALL_RERANK_CACHE_LOCK:
+        _SMALL_RERANK_CACHE[cache_key] = list(scored)
+
+    return [
+        LLMDecision(item_id=item_id, score=score, explanation=None)
+        for item_id, score in scored
+    ]
+
+
+def _reset_small_rerank_cache_for_tests() -> None:
+    with _SMALL_RERANK_CACHE_LOCK:
+        _SMALL_RERANK_CACHE.clear()
+
+
 def _call_reranker(
     settings: RerankerSettings,
     items: Sequence[Dict[str, Any]],
@@ -607,11 +936,13 @@ def _call_reranker(
         decisions = _call_openai_reranker(settings, items, intent, query, user)
     elif settings.provider == "gemini":
         decisions = _call_gemini_reranker(settings, items, intent, query, user)
+    elif settings.provider == "small":
+        decisions = _call_small_reranker(settings, items, intent, query, user)
     else:
         raise RerankerError(f"Unsupported reranker provider '{settings.provider}'")
 
     # Validate reranker output in debug/test environments
-    if logger.isEnabledFor(logging.DEBUG):
+    if logger.isEnabledFor(logging.DEBUG) and settings.provider != "small":
         config = _get_prompt_config()
         for example in config.get("examples", []):
             if (

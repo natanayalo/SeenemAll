@@ -96,6 +96,10 @@ def test_rewrite_query():
             Intent(exclude_genres=["horror"]),
             Rewrite(rewritten_text=""),
         ),
+        (
+            Intent(ann_description="desperate players risk their lives for fortune"),
+            Rewrite(rewritten_text="desperate players risk their lives for fortune"),
+        ),
     ]
 
     for intent, expected_rewrite in test_cases:
@@ -896,6 +900,13 @@ def test_offline_intent_stub_handles_blank_and_legacy(monkeypatch):
 def test_rewrite_query_truncates_long_queries():
     long_query = "one two three four five six seven eight nine ten"
     rewrite = rewrite_query(long_query, Intent())
+    assert rewrite.rewritten_text == "one two three four five six seven eight"
+
+
+def test_rewrite_query_truncates_ann_description(monkeypatch):
+    description = "one two three four five six seven eight nine ten"
+    intent = Intent(ann_description=description)
+    rewrite = rewrite_query("ignored", intent)
     assert rewrite.rewritten_text == "one two three four five six seven eight"
 
 
