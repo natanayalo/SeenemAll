@@ -34,7 +34,7 @@ interface Recommendation {
 function App() {
   const defaultMixerAnn = 0.5;
   const defaultMixerCollab = 0.3;
-  const defaultMixerTrending = 0.4;
+  const defaultMixerTrending = 0.2;
   const defaultMixerPopularity = 0.25;
   const defaultMixerNovelty = 0.1;
   const defaultMixerVote = 0.2;

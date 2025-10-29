@@ -519,6 +519,7 @@ async def recommend(
     rewrite_vec: np.ndarray | None = None
     manual_rewrite_text = (rewrite_override or "").strip() if rewrite_override else ""
     if manual_rewrite_text:
+        manual_rewrite_text = " ".join(manual_rewrite_text.split()[:8])
         rewrite_result = Rewrite(rewritten_text=manual_rewrite_text)
     elif query:
         rewrite_result = rewrite_query(query or "", llm_intent)
@@ -903,7 +904,7 @@ def _apply_mixer_scores(
         else collab_weight_override
     )
     trending_weight = (
-        _HYBRID_TRENDING_WEIGHT
+        _MIXER_TRENDING_WEIGHT
         if trending_weight_override is None
         else trending_weight_override
     )
