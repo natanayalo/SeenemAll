@@ -89,6 +89,7 @@ _HYBRID_POPULARITY_WEIGHT = _float_from_env("HYBRID_POPULARITY_WEIGHT", 0.25)
 _HYBRID_TRENDING_WEIGHT = _float_from_env("HYBRID_TRENDING_WEIGHT", 0.4)
 _HYBRID_MIN_ANN_WEIGHT = 0.05
 _REWRITE_BLEND_ALPHA = 0.5
+_REWRITE_BLEND_ALPHA_QUERY = _float_from_env("REWRITE_BLEND_ALPHA_QUERY", 0.2)
 _COLLAB_HISTORY_LIMIT_MULTIPLIER = 4
 _MIXER_COLLAB_WEIGHT = _float_from_env("MIXER_COLLAB_WEIGHT", 0.3)
 _MIXER_TRENDING_WEIGHT = _float_from_env("MIXER_TRENDING_WEIGHT", 0.2)
@@ -568,7 +569,8 @@ async def recommend(
         logger.info("Using ANN candidates for user %s", canonical_id)
         assert short_v is not None
         if rewrite_vec is not None:
-            alpha = _REWRITE_BLEND_ALPHA
+            alpha = _REWRITE_BLEND_ALPHA_QUERY if query else _REWRITE_BLEND_ALPHA
+            alpha = max(0.0, min(1.0, alpha))
             q_vec = (alpha * short_v) + ((1 - alpha) * rewrite_vec)
             q_vec = q_vec / np.linalg.norm(q_vec)
         else:
@@ -614,24 +616,25 @@ async def recommend(
             merged_scores.setdefault(iid, {})["collab"] = score / max_collab
 
     trending_results: List[Tuple[int, float]] = []
-    if cold_start or ann_scores or collab_scores or boost_ids:
-        trending_results = _trending_prior_candidates(
-            db,
-            intent,
-            exclude,
-            candidate_limit,
-            allowed_ids=allowlist,
-        )
-        logger.debug(
-            "Trending prior retrieval | candidate_count=%d allowlist_size=%s",
-            len(trending_results),
-            len(allowlist) if allowlist is not None else None,
-        )
-        trending_scores = {iid: score for iid, score in trending_results}
-        if trending_scores:
-            max_trending = max(trending_scores.values()) or 1.0
-            for iid, score in trending_scores.items():
-                merged_scores.setdefault(iid, {})["trending"] = score / max_trending
+    if not query:
+        if cold_start or ann_scores or collab_scores or boost_ids:
+            trending_results = _trending_prior_candidates(
+                db,
+                intent,
+                exclude,
+                candidate_limit,
+                allowed_ids=allowlist,
+            )
+            logger.debug(
+                "Trending prior retrieval | candidate_count=%d allowlist_size=%s",
+                len(trending_results),
+                len(allowlist) if allowlist is not None else None,
+            )
+            trending_scores = {iid: score for iid, score in trending_results}
+            if trending_scores:
+                max_trending = max(trending_scores.values()) or 1.0
+                for iid, score in trending_scores.items():
+                    merged_scores.setdefault(iid, {})["trending"] = score / max_trending
 
     collab_ids = [iid for iid, _ in collab_results]
     trending_ids = [iid for iid, _ in trending_results]
@@ -663,26 +666,29 @@ async def recommend(
             priority.append(candidate)
             seen_priority.add(candidate)
 
-        combined: List[int] = list(priority)
-        seen_all = set(seen_priority)
-        for candidate in ids:
-            if candidate in seen_all:
-                continue
-            combined.append(candidate)
-            seen_all.add(candidate)
+        if priority:
+            priority = [cand for cand in priority if cand in ids]
+            if priority:
+                combined: List[int] = list(priority)
+                seen_all = set(priority)
+                for candidate in ids:
+                    if candidate in seen_all:
+                        continue
+                    combined.append(candidate)
+                    seen_all.add(candidate)
 
-        ids = combined
-        for idx, candidate in enumerate(priority):
-            score = 1.0 / (1.0 + idx)
-            scores = merged_scores.setdefault(candidate, {})
-            current = scores.get("ann")
-            if current is None or score > current:
-                scores["ann"] = score
-        logger.debug(
-            "Boost reordering applied | boost_count=%d merged_length=%d",
-            len(priority),
-            len(ids),
-        )
+                ids = combined
+                for idx, candidate in enumerate(priority):
+                    score = 1.0 / (1.0 + idx)
+                    scores = merged_scores.setdefault(candidate, {})
+                    current = scores.get("ann")
+                    if current is None or score > current:
+                        scores["ann"] = score
+                logger.debug(
+                    "Boost reordering applied | boost_count=%d merged_length=%d",
+                    len(priority),
+                    len(ids),
+                )
 
     ids = ids[:candidate_limit]
 
@@ -815,14 +821,31 @@ async def recommend(
 
     if diversify:
         ordered = _apply_franchise_cap(ordered)
+    ann_weight_override = mixer_ann_weight
+    collab_weight_override = mixer_collab_weight
+    trending_weight_override = mixer_trending_weight
+    popularity_weight_override = mixer_popularity_weight
+    vote_weight_override = mixer_vote_weight
+    novelty_weight_override = mixer_novelty_weight
+
+    if query:
+        if trending_weight_override is None:
+            trending_weight_override = 0.0
+        if popularity_weight_override is None:
+            popularity_weight_override = 0.0
+        if vote_weight_override is None:
+            vote_weight_override = 0.0
+        if novelty_weight_override is None:
+            novelty_weight_override = 0.0
+
     _apply_mixer_scores(
         ordered,
-        ann_weight_override=mixer_ann_weight,
-        collab_weight_override=mixer_collab_weight,
-        trending_weight_override=mixer_trending_weight,
-        popularity_weight_override=mixer_popularity_weight,
-        vote_weight_override=mixer_vote_weight,
-        novelty_weight_override=mixer_novelty_weight,
+        ann_weight_override=ann_weight_override,
+        collab_weight_override=collab_weight_override,
+        trending_weight_override=trending_weight_override,
+        popularity_weight_override=popularity_weight_override,
+        vote_weight_override=vote_weight_override,
+        novelty_weight_override=novelty_weight_override,
     )
     ordered = apply_business_rules(ordered, intent=intent)
     if not ordered:
@@ -1189,9 +1212,11 @@ def _prefilter_allowed_ids(
         intent.media_types,
         intent.effective_genres(),
     )
+    boost_cap = max(5, min(limit, 15))
+
     if len(strict_ids) >= threshold:
         logger.debug("Prefilter returning strict allowlist.")
-        return PrefilterDecision(strict_ids, strict_ids, True)
+        return PrefilterDecision(strict_ids, strict_ids[:boost_cap], True)
 
     relaxed_ids = _run_prefilter_query(
         db,
@@ -1216,7 +1241,7 @@ def _prefilter_allowed_ids(
         len(relaxed_ids),
         len(strict_ids),
     )
-    return PrefilterDecision(None, strict_ids, False)
+    return PrefilterDecision(None, strict_ids[:boost_cap], False)
 
 
 def _run_prefilter_query(

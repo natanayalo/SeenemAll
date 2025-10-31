@@ -1,4 +1,4 @@
-.PHONY: up down logs sh migrate rev head alembic-init
+.PHONY: up down logs sh migrate rev head alembic-init etl-tmdb embed etl-justwatch eval
 
 up:
 	docker compose up -d --build
@@ -29,3 +29,6 @@ embed:
 
 etl-justwatch:
 	docker compose exec api python scripts/run_justwatch_sync.py
+
+eval:
+	docker compose exec api python evaluation/evaluate.py

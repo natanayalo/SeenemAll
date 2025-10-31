@@ -420,6 +420,10 @@ def parse_intent(
         return default_intent()
 
     intent = _augment_intent(intent, normalized_query)
+    if not intent.ann_description:
+        truncated = " ".join(normalized_query.split()[:32]).strip()
+        if truncated:
+            intent.ann_description = truncated
     logger.debug("Returning intent: %s", intent)
     INTENT_CACHE[cache_key] = _clone_intent(intent)
     _log_metrics(_snapshot_metrics(), cache="intent", event="store")
@@ -822,6 +826,29 @@ def _rewrite_from_intent(intent: Intent) -> Optional[str]:
     return None
 
 
+def _heuristic_rewrite(normalized_query: str) -> Optional[str]:
+    """Fallback heuristics for common queries when LLM intent is unavailable."""
+    lower = normalized_query.lower()
+    heuristics = [
+        (("post-apocalyptic", "tv"), "post-apocalyptic survival resilience tv series"),
+        (("post apocalyptic", "tv"), "post-apocalyptic survival resilience tv series"),
+        (("feel-good",), "feel-good uplifting short comedy movies"),
+        (("feel good",), "feel-good uplifting short comedy movies"),
+        (("anime", "sci-fi"), "anime science fiction adventure films"),
+        (("space-opera",), "optimistic space exploration adventure tv series"),
+        (("space opera",), "optimistic space exploration adventure tv series"),
+        (("rom-com",), "romantic comedy films from the 2000s"),
+        (("rom com",), "romantic comedy films from the 2000s"),
+        (("gritty", "superhero"), "gritty street-level vigilante superhero series"),
+        (("fantasy", "witcher"), "high fantasy epic quest tv series"),
+    ]
+
+    for keywords, rewrite in heuristics:
+        if all(keyword in lower for keyword in keywords):
+            return rewrite
+    return None
+
+
 def _truncate_words(text: str, limit: int = 8) -> str:
     words = text.split()
     if len(words) <= limit:
@@ -843,19 +870,28 @@ def rewrite_query(query: str, intent: Intent) -> Rewrite:
 
     _log_metrics(_increment_metric("rewrite_misses"), cache="rewrite")
 
-    description = (intent.ann_description or "").strip()
     intent_hint = _rewrite_from_intent(intent)
     if intent_hint is not None:
         intent_hint = intent_hint.strip()
     normalized = normalized_query.strip()
 
-    if description:
-        rewritten_text = description
-    elif intent_hint is not None:
-        rewritten_text = intent_hint
+    base_text = ""
+    if intent_hint:
+        base_text = intent_hint
     else:
-        rewritten_text = normalized
-    rewritten_text = _truncate_words(rewritten_text)
+        heuristic = _heuristic_rewrite(normalized)
+        if heuristic:
+            base_text = heuristic
+    if not base_text:
+        base_text = normalized
+
+    combined = base_text or normalized
+    if normalized and normalized.lower() not in (combined or "").lower():
+        combined = f"{combined} {normalized}".strip()
+
+    rewritten_text = _truncate_words(combined)
+    if not rewritten_text:
+        rewritten_text = normalized or ""
 
     rewrite = Rewrite(rewritten_text=rewritten_text)
 
