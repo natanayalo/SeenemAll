@@ -829,22 +829,19 @@ def _rewrite_from_intent(intent: Intent) -> Optional[str]:
 def _heuristic_rewrite(normalized_query: str) -> Optional[str]:
     """Fallback heuristics for common queries when LLM intent is unavailable."""
     lower = normalized_query.lower()
+    normalized = " ".join(lower.replace("-", " ").split())
     heuristics = [
-        (("post-apocalyptic", "tv"), "post-apocalyptic survival resilience tv series"),
         (("post apocalyptic", "tv"), "post-apocalyptic survival resilience tv series"),
-        (("feel-good",), "feel-good uplifting short comedy movies"),
         (("feel good",), "feel-good uplifting short comedy movies"),
-        (("anime", "sci-fi"), "anime science fiction adventure films"),
-        (("space-opera",), "optimistic space exploration adventure tv series"),
+        (("anime", "sci fi"), "anime science fiction adventure films"),
         (("space opera",), "optimistic space exploration adventure tv series"),
-        (("rom-com",), "romantic comedy films from the 2000s"),
         (("rom com",), "romantic comedy films from the 2000s"),
         (("gritty", "superhero"), "gritty street-level vigilante superhero series"),
         (("fantasy", "witcher"), "high fantasy epic quest tv series"),
     ]
 
     for keywords, rewrite in heuristics:
-        if all(keyword in lower for keyword in keywords):
+        if all(keyword in normalized for keyword in keywords):
             return rewrite
     return None
 

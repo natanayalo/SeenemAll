@@ -106,6 +106,25 @@ _ANN_DESCRIPTION_WEIGHT = _float_from_env("ANN_DESCRIPTION_WEIGHT", 1.2)
 _REWRITE_TEXT_WEIGHT = _float_from_env("REWRITE_TEXT_WEIGHT", 1.0)
 
 
+def _append_weighted_text(
+    text: str | None,
+    weight_override: float | None,
+    default_weight: float,
+    texts: List[str],
+    weights: List[float],
+) -> float:
+    normalized = (text or "").strip()
+    if not normalized:
+        return 0.0
+    weight = default_weight if weight_override is None else weight_override
+    weight = max(0.0, weight)
+    if weight <= 0.0:
+        return 0.0
+    texts.append(normalized)
+    weights.append(weight)
+    return weight
+
+
 @dataclass
 class PrefilterDecision:
     allowed_ids: List[int] | None
@@ -122,29 +141,20 @@ def _build_rewrite_vector(
     texts: List[str] = []
     weights: List[float] = []
 
-    description = (ann_description or "").strip()
-    if description:
-        desc_weight = (
-            _ANN_DESCRIPTION_WEIGHT
-            if ann_weight_override is None
-            else ann_weight_override
-        )
-        desc_weight = max(0.0, desc_weight)
-        if desc_weight > 0.0:
-            texts.append(description)
-            weights.append(desc_weight)
-
-    rewrite_text = (rewrite_text or "").strip()
-    if rewrite_text:
-        rewrite_weight = (
-            _REWRITE_TEXT_WEIGHT
-            if rewrite_weight_override is None
-            else rewrite_weight_override
-        )
-        rewrite_weight = max(0.0, rewrite_weight)
-        if rewrite_weight > 0.0:
-            texts.append(rewrite_text)
-            weights.append(rewrite_weight)
+    description_weight = _append_weighted_text(
+        ann_description,
+        ann_weight_override,
+        _ANN_DESCRIPTION_WEIGHT,
+        texts,
+        weights,
+    )
+    rewrite_weight = _append_weighted_text(
+        rewrite_text,
+        rewrite_weight_override,
+        _REWRITE_TEXT_WEIGHT,
+        texts,
+        weights,
+    )
 
     if not texts:
         return None
@@ -170,18 +180,10 @@ def _build_rewrite_vector(
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
             "Rewrite vector sources | description=%s rewrite=%s desc_weight=%.3f rewrite_weight=%.3f total_weight=%.3f",
-            bool(description),
-            bool(rewrite_text),
-            (
-                ann_weight_override
-                if ann_weight_override is not None and description
-                else (_ANN_DESCRIPTION_WEIGHT if description else 0.0)
-            ),
-            (
-                rewrite_weight_override
-                if rewrite_weight_override is not None and rewrite_text
-                else (_REWRITE_TEXT_WEIGHT if rewrite_text else 0.0)
-            ),
+            bool(description_weight),
+            bool(rewrite_weight),
+            description_weight,
+            rewrite_weight,
             total_weight,
         )
     return combined / norm

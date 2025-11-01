@@ -531,7 +531,7 @@ def _low_signal_multiplier(popularity: float, vote_count: float) -> float:
     raw_popularity = max(0.0, popularity)
     if raw_votes <= 0.0 and raw_popularity <= 0.0:
         return multiplier
-    if vote_floor > 0 and raw_votes < vote_floor:
+    if raw_votes < vote_floor:
         deficit = vote_floor - raw_votes
         fraction = min(1.0, deficit / vote_floor)
         multiplier *= max(0.0, 1.0 - _HEURISTIC_LOW_VOTE_PENALTY * fraction)
@@ -756,9 +756,9 @@ def _build_small_rerank_query(intent: IntentFilters | None, query: str | None) -
             segments.append(cleaned)
 
     if intent:
-        try:
+        if isinstance(intent, IntentFilters):
             genres = intent.effective_genres()
-        except AttributeError:
+        else:
             genres = list(getattr(intent, "genres", []) or [])
         if genres:
             segments.append("Genres: " + ", ".join(genres[:6]))
@@ -784,20 +784,42 @@ def _build_small_rerank_query(intent: IntentFilters | None, query: str | None) -
     return " | ".join(seg for seg in segments if seg).strip()
 
 
+def _extract_genre_names(raw: Any) -> List[str]:
+    genres: List[str] = []
+    if raw is None:
+        return genres
+    entries: Iterable[Any]
+    if isinstance(raw, dict):
+        entries = raw.items()
+        for key, value in entries:
+            if key == "name" and value:
+                genres.append(str(value))
+            elif isinstance(value, (list, tuple, set)):
+                genres.extend(_extract_genre_names(value))
+    elif isinstance(raw, (list, tuple, set)):
+        entries = raw
+        for entry in entries:
+            if isinstance(entry, (list, tuple, set, dict)):
+                genres.extend(_extract_genre_names(entry))
+            else:
+                name = getattr(entry, "name", None)
+                if name:
+                    genres.append(str(name))
+                elif isinstance(entry, str):
+                    genres.append(entry)
+    else:
+        name = getattr(raw, "name", None)
+        if name:
+            genres.append(str(name))
+    return genres
+
+
 def _build_small_rerank_documents(items: Sequence[Dict[str, Any]]) -> List[str]:
     documents: List[str] = []
     for item in items:
         title = str(item.get("title") or item.get("name") or "").strip()
         overview = str(item.get("overview") or "").strip()
-        genres_field = item.get("genres") or []
-        genres: List[str] = []
-        for entry in genres_field:
-            if isinstance(entry, dict):
-                name = entry.get("name")
-            else:
-                name = getattr(entry, "name", None)
-            if name:
-                genres.append(str(name))
+        genres = _extract_genre_names(item.get("genres"))
         media_type = item.get("media_type")
         runtime = item.get("runtime")
         release_year = item.get("release_year")
@@ -1365,25 +1387,6 @@ def _short_overview(text: Any, limit: int = 180) -> str:
         else first_sentence[: limit - 3].rstrip() + "..."
     )
     return truncated
-
-
-def _extract_genre_names(raw: Any) -> List[str]:
-    names: List[str] = []
-    if isinstance(raw, list):
-        for entry in raw:
-            if isinstance(entry, dict):
-                name = entry.get("name")
-                if isinstance(name, str):
-                    names.append(name)
-            elif isinstance(entry, str):
-                names.append(entry)
-    elif isinstance(raw, dict):
-        name = raw.get("name")
-        if isinstance(name, str):
-            names.append(name)
-    elif isinstance(raw, str):
-        names.append(raw)
-    return names
 
 
 def _format_join(values: Sequence[str]) -> str:

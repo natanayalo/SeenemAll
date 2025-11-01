@@ -168,7 +168,7 @@ The `/recommend` route orchestrates several retrieval streams before reranking:
   prompts can pull in semantically similar titles even before the profile warms up.
   When `INTENT_ENABLE_ANN_DESCRIPTION=1`, the rewrite vector blends the short
   `ann_description` sentence with the structured rewrite; tune the contribution via
-  `ANN_DESCRIPTION_WEIGHT` (default `0.6`). For local tuning, you can also pass
+  `ANN_DESCRIPTION_WEIGHT` (default `1.2`). For local tuning, you can also pass
   per-request overrides such as `use_llm_intent=false`,
   `ann_description_override=...`, `rewrite_override=...`, and the weight knobs
   `ann_weight_override` / `rewrite_weight_override`. Likewise, mixer weights can be
