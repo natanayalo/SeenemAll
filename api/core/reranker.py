@@ -785,33 +785,30 @@ def _build_small_rerank_query(intent: IntentFilters | None, query: str | None) -
 
 
 def _extract_genre_names(raw: Any) -> List[str]:
-    genres: List[str] = []
+    """Extract genre names from common genre payload shapes."""
     if raw is None:
-        return genres
-    entries: Iterable[Any]
-    if isinstance(raw, dict):
-        entries = raw.items()
-        for key, value in entries:
-            if key == "name" and value:
-                genres.append(str(value))
-            elif isinstance(value, (list, tuple, set)):
-                genres.extend(_extract_genre_names(value))
-    elif isinstance(raw, (list, tuple, set)):
-        entries = raw
-        for entry in entries:
-            if isinstance(entry, (list, tuple, set, dict)):
-                genres.extend(_extract_genre_names(entry))
+        return []
+
+    names: List[str] = []
+    if isinstance(raw, (list, tuple)):
+        for entry in raw:
+            if isinstance(entry, dict):
+                name = entry.get("name")
             else:
                 name = getattr(entry, "name", None)
-                if name:
-                    genres.append(str(name))
-                elif isinstance(entry, str):
-                    genres.append(entry)
-    else:
-        name = getattr(raw, "name", None)
-        if name:
-            genres.append(str(name))
-    return genres
+            if isinstance(name, str) and name:
+                names.append(name)
+            elif isinstance(entry, str) and entry:
+                names.append(entry)
+    elif isinstance(raw, dict):
+        name = raw.get("name")
+        if isinstance(name, str) and name:
+            names.append(name)
+    elif isinstance(raw, str) and raw:
+        names.append(raw)
+
+    # Preserve order while removing duplicates.
+    return list(dict.fromkeys(names))
 
 
 def _build_small_rerank_documents(items: Sequence[Dict[str, Any]]) -> List[str]:
