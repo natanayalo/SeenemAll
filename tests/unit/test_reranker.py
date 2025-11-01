@@ -403,6 +403,93 @@ def test_low_signal_items_are_dropped(monkeypatch):
     assert [item["id"] for item in ranked] == [2]
 
 
+def test_low_signal_drop_disabled(monkeypatch):
+    monkeypatch.setattr(
+        reranker, "_HEURISTIC_MIN_SIGNAL_MULTIPLIER", 0.9, raising=False
+    )
+    low_signal_item = {
+        "id": 1,
+        "title": "Low Signal",
+        "retrieval_score": 0.9,
+        "popularity": 0.0,
+        "vote_average": 0.0,
+        "vote_count": 0.0,
+        "release_year": reranker._current_year(),
+    }
+    strong_item = {
+        "id": 2,
+        "title": "Trusted",
+        "retrieval_score": 0.9,
+        "popularity": 150.0,
+        "vote_average": 8.5,
+        "vote_count": 5000.0,
+        "release_year": reranker._current_year(),
+    }
+
+    ranked = reranker._with_default_explanations(
+        [low_signal_item, strong_item], intent=None, query=None, apply_low_signal=False
+    )
+    assert [item["id"] for item in ranked] == [1, 2]
+
+
+def test_build_small_rerank_query_includes_filters():
+    intent = IntentFilters(
+        raw_query="emotional mystery",
+        genres=["Drama"],
+        media_types=["tv"],
+        min_runtime=90,
+        max_runtime=120,
+        maturity_rating_max="PG-13",
+    )
+    query_text = reranker._build_small_rerank_query(intent, "emotional mystery")
+    assert "emotional mystery" in query_text
+    assert "Genres: Drama" in query_text
+    assert "Media: tv" in query_text
+    assert "Runtime >=90m" in query_text
+    assert "Rating ≤ PG-13" in query_text
+
+
+def test_build_small_rerank_documents_adds_metadata():
+    documents = reranker._build_small_rerank_documents(
+        [
+            {
+                "id": 1,
+                "title": "Alpha",
+                "overview": "Explorers chart the unknown.",
+                "genres": [{"name": "Science Fiction"}],
+                "media_type": "movie",
+                "runtime": 118,
+                "release_year": 2021,
+            }
+        ]
+    )
+    assert len(documents) == 1
+    doc = documents[0]
+    assert "Alpha" in doc
+    assert "Genres" in doc
+    assert "Runtime" in doc
+    assert "Released: 2021" in doc
+
+
+def test_execute_small_rerank(monkeypatch):
+    monkeypatch.setattr(
+        reranker,
+        "encode_texts",
+        lambda texts: np.array(
+            [
+                [1.0, 0.0],
+                [0.9, 0.0],
+                [0.1, 0.0],
+            ],
+            dtype="float32",
+        ),
+    )
+    items = [{"id": 1, "title": "Alpha"}, {"id": 2, "title": "Beta"}]
+    result = reranker._execute_small_rerank("space adventure", items)
+    assert result[0][0] == 1
+    assert result[1][0] == 2
+
+
 def test_call_openai_reranker_requires_api_key():
     settings = reranker.RerankerSettings(
         provider="openai",

@@ -1873,3 +1873,72 @@ def test_build_rewrite_vector_blends_description(monkeypatch):
     expected = np.array([0.4472136, 0.8944272], dtype="float32")
     assert vec is not None
     assert np.allclose(vec[:2], expected, atol=1e-6)
+
+
+def test_recommend_query_resets_mixer_weights(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Alpha",
+            overview="Alpha saves the world.",
+            poster_url="alpha.jpg",
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Comedy"}],
+            release_year=2020,
+            collection_id=None,
+            collection_name=None,
+        )
+    ]
+
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [1],
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "rerank_with_explanations",
+        lambda items, **_: items,
+    )
+
+    captured = {}
+    original_apply = recommend_routes._apply_mixer_scores
+
+    def spy_apply(candidates, **overrides):
+        captured.update(overrides)
+        return original_apply(candidates, **overrides)
+
+    monkeypatch.setattr(recommend_routes, "_apply_mixer_scores", spy_apply)
+
+    with TestClient(app) as client:
+        client.get(
+            "/recommend",
+            params={"user_id": "u1", "limit": 1, "query": "rom-coms from the 2000s"},
+        )
+
+    app.dependency_overrides.clear()
+    session.close()
+    assert captured["trending_weight_override"] == 0.0
+    assert captured["popularity_weight_override"] == 0.0
+    assert captured["vote_weight_override"] == 0.0
+    assert captured["novelty_weight_override"] == 0.0
