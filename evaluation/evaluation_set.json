@@ -1,0 +1,307 @@
+[
+  {
+    "query": "mind-bending sci-fi movies like Inception",
+    "golden_set": [
+      {
+        "id": 27205,
+        "title": "Inception"
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar"
+      },
+      {
+        "id": 1124,
+        "title": "The Prestige"
+      },
+      {
+        "id": 329865,
+        "title": "Arrival"
+      },
+      {
+        "id": 577922,
+        "title": "Tenet"
+      }
+    ],
+    "genre_override": "Science Fiction"
+  },
+  {
+    "query": "time-travel thrillers",
+    "golden_set": [
+      {
+        "id": 59967,
+        "title": "Looper"
+      },
+      {
+        "id": 137113,
+        "title": "Edge of Tomorrow"
+      },
+      {
+        "id": 60948,
+        "title": "12 Monkeys"
+      },
+      {
+        "id": 45612,
+        "title": "Source Code"
+      },
+      {
+        "id": 1954,
+        "title": "The Butterfly Effect"
+      }
+    ],
+    "genre_override": "Science Fiction"
+  },
+  {
+    "query": "psychological thrillers about money and greed",
+    "description": "Desperate people are pushed to their limits when offered a chance to win an enormous amount of money through increasingly dangerous challenges.",
+    "golden_set": [
+      {
+        "id": 496243,
+        "title": "Parasite"
+      },
+      {
+        "id": 1359,
+        "title": "American Psycho"
+      },
+      {
+        "id": 303858,
+        "title": "Money Monster"
+      }
+    ],
+    "genre_override": "Thriller"
+  },
+  {
+    "query": "heist TV series",
+    "golden_set": [
+      {
+        "id": 71446,
+        "title": "Money Heist"
+      },
+      {
+        "id": 71715,
+        "title": "Good Girls"
+      },
+      {
+        "id": 96677,
+        "title": "Lupin"
+      },
+      {
+        "id": 21510,
+        "title": "White Collar"
+      },
+      {
+        "id": 7482,
+        "title": "Leverage"
+      },
+      {
+        "id": 64199,
+        "title": "Sneaky Pete"
+      }
+    ],
+    "genre_override": "Crime"
+  },
+  {
+    "query": "neo-noir crime movies",
+    "golden_set": [
+      {
+        "id": 829,
+        "title": "Chinatown"
+      },
+      {
+        "id": 2118,
+        "title": "L.A. Confidential"
+      },
+      {
+        "id": 807,
+        "title": "Se7en"
+      },
+      {
+        "id": 6977,
+        "title": "No Country for Old Men"
+      },
+      {
+        "id": 77,
+        "title": "Memento"
+      },
+      {
+        "id": 64690,
+        "title": "Drive"
+      },
+      {
+        "id": 242582,
+        "title": "Nightcrawler"
+      },
+      {
+        "id": 146233,
+        "title": "Prisoners"
+      },
+      {
+        "id": 395834,
+        "title": "Wind River"
+      }
+    ],
+    "genre_override": "Thriller"
+  },
+  {
+    "query": "space-opera TV (not too dark)",
+    "golden_set": [
+      {
+        "id": 71738,
+        "title": "The Orville"
+      },
+      {
+        "id": 1437,
+        "title": "Firefly"
+      },
+      {
+        "id": 4629,
+        "title": "Stargate SG-1"
+      },
+      {
+        "id": 30991,
+        "title": "Cowboy Bebop"
+      },
+      {
+        "id": 4271,
+        "title": "Farscape"
+      },
+      {
+        "id": 103516,
+        "title": "Star Trek: Strange New Worlds"
+      }
+    ],
+    "genre_override": "Sci-Fi & Fantasy"
+  },
+  {
+    "query": "post-apocalyptic TV shows",
+    "golden_set": [
+      {
+        "id": 48866,
+        "title": "The 100"
+      },
+      {
+        "id": 100088,
+        "title": "The Last of Us"
+      },
+      {
+        "id": 1402,
+        "title": "The Walking Dead"
+      }
+    ],
+    "genre_override": "Drama"
+  },
+  {
+    "query": "feel-good comedies under 105 minutes",
+    "golden_set": [
+      {
+        "id": 122906,
+        "title": "About Time"
+      },
+      {
+        "id": 212778,
+        "title": "Chef"
+      },
+      {
+        "id": 369557,
+        "title": "Sing Street"
+      },
+      {
+        "id": 120467,
+        "title": "The Grand Budapest Hotel"
+      },
+      {
+        "id": 77338,
+        "title": "The Intouchables"
+      }
+    ],
+    "genre_override": "Drama"
+  },
+  {
+    "query": "anime sci-fi films",
+    "golden_set": [
+      {
+        "id": 149,
+        "title": "Akira"
+      },
+      {
+        "id": 9323,
+        "title": "Ghost in the Shell"
+      },
+      {
+        "id": 4977,
+        "title": "Paprika"
+      },
+      {
+        "id": 372058,
+        "title": "Your Name."
+      }
+    ],
+    "genre_override": "Animation"
+  },
+  {
+    "query": "rom-coms from the 2000s",
+    "golden_set": [
+      {
+        "id": 19913,
+        "title": "(500) Days of Summer"
+      },
+      {
+        "id": 1824,
+        "title": "50 First Dates"
+      },
+      {
+        "id": 50646,
+        "title": "Crazy, Stupid, Love."
+      },
+      {
+        "id": 508,
+        "title": "Love Actually"
+      },
+      {
+        "id": 9655,
+        "title": "She's the Man"
+      }
+    ],
+    "genre_override": "Comedy"
+  },
+  {
+    "query": "gritty superhero TV (street-level)",
+    "golden_set": [
+      {
+        "id": 9480,
+        "title": "Daredevil"
+      },
+      {
+        "id": 76479,
+        "title": "The Boys"
+      },
+      {
+        "id": 13183,
+        "title": "Watchmen"
+      }
+    ],
+    "genre_override": "Action"
+  },
+  {
+    "query": "fantasy epics like The Witcher",
+    "golden_set": [
+      {
+        "id": 1399,
+        "title": "Game of Thrones"
+      },
+      {
+        "id": 94997,
+        "title": "House of the Dragon"
+      },
+      {
+        "id": 71914,
+        "title": "The Wheel of Time"
+      },
+      {
+        "id": 71912,
+        "title": "The Witcher"
+      }
+    ],
+    "genre_override": "Sci-Fi & Fantasy"
+  }
+]

@@ -26,15 +26,39 @@ interface Recommendation {
   watch_options?: WatchOption[];
   score: number;
   explanation: string;
+  vote_average?: number | null;
+  vote_count?: number | null;
+  popularity?: number | null;
 }
 
 function App() {
+  const defaultMixerAnn = 0.5;
+  const defaultMixerCollab = 0.3;
+  const defaultMixerTrending = 0.2;
+  const defaultMixerPopularity = 0.25;
+  const defaultMixerNovelty = 0.1;
+  const defaultMixerVote = 0.2;
+  const defaultAnnDescriptionWeight = 1.2;
+  const defaultRewriteTextWeight = 1.0;
   const [userId, setUserId] = useState('u1'); // Default user ID
   const [query, setQuery] = useState('');
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [diversify, setDiversify] = useState(true);
+  const [useLlmIntent, setUseLlmIntent] = useState(true);
+  const [manualAnnDescription, setManualAnnDescription] = useState('');
+  const [manualRewrite, setManualRewrite] = useState('');
+  const [annWeight, setAnnWeight] = useState(defaultAnnDescriptionWeight);
+  const [rewriteWeight, setRewriteWeight] = useState(defaultRewriteTextWeight);
+  const [genreOverride, setGenreOverride] = useState('');
+  const [useMixerOverrides, setUseMixerOverrides] = useState(false);
+  const [mixerAnnWeight, setMixerAnnWeight] = useState(defaultMixerAnn);
+  const [mixerCollabWeight, setMixerCollabWeight] = useState(defaultMixerCollab);
+  const [mixerTrendingWeight, setMixerTrendingWeight] = useState(defaultMixerTrending);
+  const [mixerPopularityWeight, setMixerPopularityWeight] = useState(defaultMixerPopularity);
+  const [mixerNoveltyWeight, setMixerNoveltyWeight] = useState(defaultMixerNovelty);
+  const [mixerVoteWeight, setMixerVoteWeight] = useState(defaultMixerVote);
 
   const initializeUserHistory = async () => {
     try {
@@ -68,6 +92,36 @@ function App() {
       }
       if (!diversify) {
         params.append('diversify', 'false');
+      }
+      if (!useLlmIntent) {
+        params.append('use_llm_intent', 'false');
+      }
+      if (manualAnnDescription.trim()) {
+        params.append('ann_description_override', manualAnnDescription.trim());
+      }
+      if (manualRewrite.trim()) {
+        params.append('rewrite_override', manualRewrite.trim());
+      }
+      if (genreOverride.trim()) {
+        params.append('genre_override', genreOverride.trim());
+      }
+      const hasCustomAnnWeight =
+        Math.abs(annWeight - defaultAnnDescriptionWeight) > 0.001;
+      if (hasCustomAnnWeight) {
+        params.append('ann_weight_override', annWeight.toString());
+      }
+      const hasCustomRewriteWeight =
+        Math.abs(rewriteWeight - defaultRewriteTextWeight) > 0.001;
+      if (hasCustomRewriteWeight) {
+        params.append('rewrite_weight_override', rewriteWeight.toString());
+      }
+      if (useMixerOverrides) {
+        params.append('mixer_ann_weight', mixerAnnWeight.toString());
+        params.append('mixer_collab_weight', mixerCollabWeight.toString());
+        params.append('mixer_trending_weight', mixerTrendingWeight.toString());
+        params.append('mixer_popularity_weight', mixerPopularityWeight.toString());
+        params.append('mixer_novelty_weight', mixerNoveltyWeight.toString());
+        params.append('mixer_vote_weight', mixerVoteWeight.toString());
       }
 
       const url = `${process.env.REACT_APP_API_URL}/recommend?${params.toString()}`;
@@ -158,6 +212,25 @@ function App() {
               checked={diversify}
               onChange={(e) => setDiversify(e.target.checked)}
             />
+            <Form.Check
+              type="switch"
+              id="use-llm-toggle"
+              label="Use LLM intent parser"
+              checked={useLlmIntent}
+              onChange={(e) => setUseLlmIntent(e.target.checked)}
+              className="mt-2"
+            />
+            <Form.Text className="text-muted">
+              Neighbor weight is controlled by MIXER_COLLAB_WEIGHT (default 0.3).
+            </Form.Text>
+            <Form.Check
+              type="switch"
+              id="mixer-override-toggle"
+              label="Customize mixer weights"
+              checked={useMixerOverrides}
+              onChange={(e) => setUseMixerOverrides(e.target.checked)}
+              className="mt-2"
+            />
           </Col>
           <Col md={2}>
             <Button
@@ -184,7 +257,157 @@ function App() {
             </Button>
           </Col>
         </Row>
+        <Row className="justify-content-center mt-3">
+          <Col md={4}>
+            <Form.Group>
+              <Form.Label>Manual ANN Description</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={2}
+                value={manualAnnDescription}
+                onChange={(e) => setManualAnnDescription(e.target.value)}
+                placeholder="Optional override e.g. 'A deadly survival game for a cash prize'"
+              />
+            </Form.Group>
+          </Col>
+          <Col md={4}>
+            <Form.Group>
+              <Form.Label>Manual Rewrite Text</Form.Label>
+              <Form.Control
+                type="text"
+                value={manualRewrite}
+                onChange={(e) => setManualRewrite(e.target.value)}
+                placeholder="Optional override e.g. 'sci-fi survival games'"
+              />
+            </Form.Group>
+          </Col>
+          <Col md={4}>
+            <Form.Group>
+              <Form.Label>Genre Override</Form.Label>
+              <Form.Control
+                type="text"
+                value={genreOverride}
+                onChange={(e) => setGenreOverride(e.target.value)}
+                placeholder="e.g., Drama, Sci-Fi"
+              />
+              <Form.Text className="text-muted">
+                When set, replaces inferred genres with this comma-separated list.
+              </Form.Text>
+            </Form.Group>
+          </Col>
+        </Row>
+        <Row className="justify-content-center mt-2">
+          <Col md={3}>
+            <Form.Group>
+              <Form.Label>ANN Description Weight ({annWeight.toFixed(2)})</Form.Label>
+              <Form.Range
+                min={0}
+                max={2}
+                step={0.1}
+                value={annWeight}
+                onChange={(e) => setAnnWeight(parseFloat(e.target.value))}
+              />
+            </Form.Group>
+          </Col>
+          <Col md={3}>
+            <Form.Group>
+              <Form.Label>Rewrite Text Weight ({rewriteWeight.toFixed(2)})</Form.Label>
+              <Form.Range
+                min={0}
+                max={2}
+                step={0.1}
+                value={rewriteWeight}
+                onChange={(e) => setRewriteWeight(parseFloat(e.target.value))}
+              />
+            </Form.Group>
+          </Col>
+        </Row>
       </Form>
+
+      {useMixerOverrides && (
+        <Row className="justify-content-center mt-3">
+          <Col md={10}>
+            <Form.Label>Hybrid / Mixer Weights</Form.Label>
+            <Form.Text className="text-muted d-block mb-2">
+              Adjust how ANN, collaborative, trending, popularity, and novelty signals influence ranking.
+            </Form.Text>
+            <Row className="gy-3">
+              <Col md={2} sm={4} xs={6}>
+                <Form.Group>
+                  <Form.Label>ANN ({mixerAnnWeight.toFixed(2)})</Form.Label>
+                  <Form.Range
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    value={mixerAnnWeight}
+                    onChange={(e) => setMixerAnnWeight(parseFloat(e.target.value))}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={2} sm={4} xs={6}>
+                <Form.Group>
+                  <Form.Label>Collab ({mixerCollabWeight.toFixed(2)})</Form.Label>
+                  <Form.Range
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    value={mixerCollabWeight}
+                    onChange={(e) => setMixerCollabWeight(parseFloat(e.target.value))}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={2} sm={4} xs={6}>
+                <Form.Group>
+                  <Form.Label>Trending ({mixerTrendingWeight.toFixed(2)})</Form.Label>
+                  <Form.Range
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    value={mixerTrendingWeight}
+                    onChange={(e) => setMixerTrendingWeight(parseFloat(e.target.value))}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={2} sm={4} xs={6}>
+                <Form.Group>
+                  <Form.Label>Popularity ({mixerPopularityWeight.toFixed(2)})</Form.Label>
+                  <Form.Range
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    value={mixerPopularityWeight}
+                    onChange={(e) => setMixerPopularityWeight(parseFloat(e.target.value))}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={2} sm={4} xs={6}>
+                <Form.Group>
+                  <Form.Label>Novelty ({mixerNoveltyWeight.toFixed(2)})</Form.Label>
+                  <Form.Range
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    value={mixerNoveltyWeight}
+                    onChange={(e) => setMixerNoveltyWeight(parseFloat(e.target.value))}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={2} sm={4} xs={6}>
+                <Form.Group>
+                  <Form.Label>Vote Count ({mixerVoteWeight.toFixed(2)})</Form.Label>
+                  <Form.Range
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    value={mixerVoteWeight}
+                    onChange={(e) => setMixerVoteWeight(parseFloat(e.target.value))}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+          </Col>
+        </Row>
+      )}
 
       {error && (
         <div className="alert alert-danger text-center" role="alert">
@@ -209,6 +432,17 @@ function App() {
                 <Card.Subtitle className="mb-2 text-muted">
                   {rec.media_type.toUpperCase()} • {rec.release_year} • {rec.runtime ? `${rec.runtime}min` : 'N/A'}
                 </Card.Subtitle>
+                {(rec.vote_average || rec.vote_count || rec.popularity) && (
+                  <div className="mb-2 small text-muted">
+                    {rec.vote_average ? `⭐ ${rec.vote_average.toFixed(1)}/10` : '⭐ N/A'}
+                    {typeof rec.vote_count === 'number' && rec.vote_count > 0 && (
+                      <> · {rec.vote_count.toLocaleString()} votes</>
+                    )}
+                    {typeof rec.popularity === 'number' && (
+                      <> · 🔥 Popularity {Math.round(rec.popularity)}</>
+                    )}
+                  </div>
+                )}
                 <Card.Text>{rec.overview}</Card.Text>
                 <small className="text-muted mb-2 d-block">
                   {rec.genres.map(genre => genre.name).join(', ')}

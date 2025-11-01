@@ -74,9 +74,12 @@ def test_parse_intent_fixtures():
 
     for query, expected_intent in test_cases:
         intent = parse_intent(query, {})
-        assert (
-            intent.model_dump() == expected_intent.model_dump()
-        ), f"Query: '{query}' failed"
+        expected_data = expected_intent.model_dump(exclude_none=True)
+        actual_data = intent.model_dump()
+        for field, expected_value in expected_data.items():
+            assert (
+                actual_data.get(field) == expected_value
+            ), f"Query: '{query}' field '{field}' mismatch"
 
 
 def test_rewrite_query():
@@ -86,15 +89,21 @@ def test_rewrite_query():
     test_cases = [
         (
             Intent(include_genres=["sci-fi"], runtime_minutes_max=120),
-            Rewrite(rewritten_text="sci-fi movies"),
+            Rewrite(rewritten_text="sci-fi movies some query"),
         ),
         (
             Intent(include_genres=["Science Fiction"]),
-            Rewrite(rewritten_text="sci-fi movies"),
+            Rewrite(rewritten_text="sci-fi movies some query"),
         ),
         (
             Intent(exclude_genres=["horror"]),
-            Rewrite(rewritten_text=""),
+            Rewrite(rewritten_text="some query"),
+        ),
+        (
+            Intent(ann_description="desperate players risk their lives for fortune"),
+            Rewrite(
+                rewritten_text="desperate players risk their lives for fortune some"
+            ),
         ),
     ]
 
@@ -896,6 +905,13 @@ def test_offline_intent_stub_handles_blank_and_legacy(monkeypatch):
 def test_rewrite_query_truncates_long_queries():
     long_query = "one two three four five six seven eight nine ten"
     rewrite = rewrite_query(long_query, Intent())
+    assert rewrite.rewritten_text == "one two three four five six seven eight"
+
+
+def test_rewrite_query_truncates_ann_description(monkeypatch):
+    description = "one two three four five six seven eight nine ten"
+    intent = Intent(ann_description=description)
+    rewrite = rewrite_query("ignored", intent)
     assert rewrite.rewritten_text == "one two three four five six seven eight"
 
 

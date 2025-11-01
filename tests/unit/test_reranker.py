@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+import numpy as np
 
 from api.core import reranker
 from api.core.legacy_intent_parser import IntentFilters
@@ -16,6 +17,7 @@ from api.core.legacy_intent_parser import IntentFilters
 
 def _reset_settings() -> None:
     reranker._get_settings.cache_clear()
+    reranker._reset_small_rerank_cache_for_tests()
     for key in [
         "RERANK_API_KEY",
         "OPENAI_API_KEY",
@@ -203,6 +205,289 @@ def test_rerank_with_explanations_uses_gemini(monkeypatch):
     assert [item["id"] for item in result[:2]] == [2, 1]
     assert result[0]["explanation"] == "Gemini pick."
     _reset_settings()
+
+
+def test_small_reranker_orders_items(monkeypatch):
+    _reset_settings()
+    monkeypatch.setenv("RERANK_PROVIDER", "small")
+    filters = IntentFilters(
+        raw_query="space opera", genres=["Sci-Fi"], moods=[], media_types=["movie"]
+    )
+
+    items = [
+        {
+            "id": 1,
+            "title": "Alpha Adventure",
+            "genres": [{"name": "Adventure"}],
+            "overview": "Heroic quest.",
+            "original_rank": 0,
+        },
+        {
+            "id": 2,
+            "title": "Bravo Mystery",
+            "genres": [{"name": "Mystery"}],
+            "overview": "Slow burn mystery.",
+            "original_rank": 1,
+        },
+        {
+            "id": 3,
+            "title": "Charlie Cosmos",
+            "genres": [{"name": "Science Fiction"}],
+            "overview": "Spaceships and stars.",
+            "original_rank": 2,
+        },
+    ]
+
+    def fake_encode(texts):
+        vectors = []
+        for idx, text in enumerate(texts):
+            if idx == 0:
+                vectors.append(np.array([1.0, 0.0], dtype="float32"))
+            elif "Charlie" in text:
+                vectors.append(np.array([0.95, 0.05], dtype="float32"))
+            elif "Alpha" in text:
+                vectors.append(np.array([0.85, 0.15], dtype="float32"))
+            else:
+                vectors.append(np.array([0.4, 0.6], dtype="float32"))
+        return np.vstack(vectors).astype("float32")
+
+    monkeypatch.setattr(reranker, "encode_texts", fake_encode)
+
+    result = reranker.rerank_with_explanations(
+        items,
+        intent=filters,
+        query="space adventure with ships",
+        user={"user_id": "u1"},
+    )
+    assert [item["id"] for item in result[:3]] == [3, 1, 2]
+    _reset_settings()
+
+
+def test_small_reranker_uses_cache(monkeypatch):
+    _reset_settings()
+    monkeypatch.setenv("RERANK_PROVIDER", "small")
+
+    items = [
+        {
+            "id": 1,
+            "title": "Alpha",
+            "genres": [{"name": "Adventure"}],
+            "overview": "Heroic quest.",
+        },
+        {
+            "id": 2,
+            "title": "Bravo",
+            "genres": [{"name": "Drama"}],
+            "overview": "Slow burn mystery.",
+        },
+    ]
+
+    calls = {"count": 0}
+
+    def fake_encode(texts):
+        calls["count"] += 1
+        vectors = [np.array([1.0, 0.0], dtype="float32")]
+        vectors.append(np.array([0.9, 0.1], dtype="float32"))
+        vectors.append(np.array([0.7, 0.3], dtype="float32"))
+        return np.vstack(vectors).astype("float32")
+
+    monkeypatch.setattr(reranker, "encode_texts", fake_encode)
+
+    first = reranker.rerank_with_explanations(
+        items, intent=None, query="adventure", user={"user_id": "u-cache"}
+    )
+    second = reranker.rerank_with_explanations(
+        items, intent=None, query="adventure", user={"user_id": "u-cache"}
+    )
+
+    assert calls["count"] == 1
+    assert [item["id"] for item in first] == [1, 2]
+    assert [item["id"] for item in second] == [1, 2]
+    _reset_settings()
+
+
+def test_small_reranker_handles_timeout(monkeypatch):
+    _reset_settings()
+    monkeypatch.setenv("RERANK_PROVIDER", "small")
+
+    items = [
+        {"id": 1, "title": "Alpha", "overview": "Heroic quest."},
+        {"id": 2, "title": "Bravo", "overview": "Mystery tale."},
+    ]
+
+    cancelled = {"flag": False}
+
+    class DummyFuture:
+        def result(self, timeout=None):
+            raise reranker.FuturesTimeout()
+
+        def cancel(self):
+            cancelled["flag"] = True
+
+    class DummyExecutor:
+        def submit(self, *args, **kwargs):
+            return DummyFuture()
+
+    monkeypatch.setattr(reranker, "_SMALL_RERANK_EXECUTOR", DummyExecutor())
+    monkeypatch.setattr(
+        reranker,
+        "encode_texts",
+        lambda texts: np.ones((len(texts), 2), dtype="float32"),
+    )
+
+    result = reranker.rerank_with_explanations(
+        items, intent=None, query="adventure", user={"user_id": "timeout"}
+    )
+
+    assert cancelled["flag"] is True
+    assert [item["id"] for item in result[:2]] == [1, 2]
+    _reset_settings()
+
+
+def test_low_signal_penalty_reduces_score(monkeypatch):
+    monkeypatch.setattr(reranker, "_HEURISTIC_MIN_VOTE_COUNT", 100, raising=False)
+    monkeypatch.setattr(reranker, "_HEURISTIC_LOW_VOTE_PENALTY", 0.5, raising=False)
+    monkeypatch.setattr(reranker, "_HEURISTIC_MIN_POPULARITY", 50.0, raising=False)
+    monkeypatch.setattr(
+        reranker, "_HEURISTIC_LOW_POPULARITY_PENALTY", 0.5, raising=False
+    )
+
+    current_year = reranker._current_year()
+
+    low_signal = {
+        "retrieval_score": 0.8,
+        "popularity": 5.0,
+        "vote_average": 8.5,
+        "vote_count": 4.0,
+        "trending_rank": None,
+        "popular_rank": None,
+        "release_year": current_year,
+    }
+    strong_signal = dict(low_signal)
+    strong_signal["popularity"] = 120.0
+    strong_signal["vote_count"] = 5000.0
+
+    score_low, _ = reranker._heuristic_score(low_signal, 0, current_year)
+    score_high, _ = reranker._heuristic_score(strong_signal, 0, current_year)
+
+    assert score_low < score_high
+
+
+def test_low_signal_items_are_dropped(monkeypatch):
+    monkeypatch.setattr(
+        reranker, "_HEURISTIC_MIN_SIGNAL_MULTIPLIER", 0.9, raising=False
+    )
+
+    low_signal_item = {
+        "id": 1,
+        "title": "Low Signal",
+        "retrieval_score": 0.9,
+        "popularity": 10.0,
+        "vote_average": 5.5,
+        "vote_count": 5.0,
+        "release_year": reranker._current_year(),
+    }
+    strong_item = {
+        "id": 2,
+        "title": "Trusted",
+        "retrieval_score": 0.9,
+        "popularity": 150.0,
+        "vote_average": 8.5,
+        "vote_count": 5000.0,
+        "release_year": reranker._current_year(),
+    }
+
+    ranked = reranker._with_default_explanations(
+        [low_signal_item, strong_item], intent=None, query=None
+    )
+    assert [item["id"] for item in ranked] == [2]
+
+
+def test_low_signal_drop_disabled(monkeypatch):
+    monkeypatch.setattr(
+        reranker, "_HEURISTIC_MIN_SIGNAL_MULTIPLIER", 0.9, raising=False
+    )
+    low_signal_item = {
+        "id": 1,
+        "title": "Low Signal",
+        "retrieval_score": 0.9,
+        "popularity": 0.0,
+        "vote_average": 0.0,
+        "vote_count": 0.0,
+        "release_year": reranker._current_year(),
+    }
+    strong_item = {
+        "id": 2,
+        "title": "Trusted",
+        "retrieval_score": 0.9,
+        "popularity": 150.0,
+        "vote_average": 8.5,
+        "vote_count": 5000.0,
+        "release_year": reranker._current_year(),
+    }
+
+    ranked = reranker._with_default_explanations(
+        [low_signal_item, strong_item], intent=None, query=None, apply_low_signal=False
+    )
+    assert [item["id"] for item in ranked] == [1, 2]
+
+
+def test_build_small_rerank_query_includes_filters():
+    intent = IntentFilters(
+        raw_query="emotional mystery",
+        genres=["Drama"],
+        media_types=["tv"],
+        min_runtime=90,
+        max_runtime=120,
+        maturity_rating_max="PG-13",
+    )
+    query_text = reranker._build_small_rerank_query(intent, "emotional mystery")
+    assert "emotional mystery" in query_text
+    assert "Genres: Drama" in query_text
+    assert "Media: tv" in query_text
+    assert "Runtime >=90m" in query_text
+    assert "Rating ≤ PG-13" in query_text
+
+
+def test_build_small_rerank_documents_adds_metadata():
+    documents = reranker._build_small_rerank_documents(
+        [
+            {
+                "id": 1,
+                "title": "Alpha",
+                "overview": "Explorers chart the unknown.",
+                "genres": [{"name": "Science Fiction"}],
+                "media_type": "movie",
+                "runtime": 118,
+                "release_year": 2021,
+            }
+        ]
+    )
+    assert len(documents) == 1
+    doc = documents[0]
+    assert "Alpha" in doc
+    assert "Genres" in doc
+    assert "Runtime" in doc
+    assert "Released: 2021" in doc
+
+
+def test_execute_small_rerank(monkeypatch):
+    monkeypatch.setattr(
+        reranker,
+        "encode_texts",
+        lambda texts: np.array(
+            [
+                [1.0, 0.0],
+                [0.9, 0.0],
+                [0.1, 0.0],
+            ],
+            dtype="float32",
+        ),
+    )
+    items = [{"id": 1, "title": "Alpha"}, {"id": 2, "title": "Beta"}]
+    result = reranker._execute_small_rerank("space adventure", items)
+    assert result[0][0] == 1
+    assert result[1][0] == 2
 
 
 def test_call_openai_reranker_requires_api_key():

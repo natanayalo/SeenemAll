@@ -32,6 +32,7 @@ from api.core.llm_parser import rewrite_query, linked_media_types
 from api.core.embeddings import encode_texts
 from api.core.user_profile import NEGATIVE_EVENT_TYPES, _event_weight
 from api.core.maturity import rating_level
+from api.core.rewrite import Rewrite
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
 logger = logging.getLogger(__name__)
@@ -88,10 +89,12 @@ _HYBRID_POPULARITY_WEIGHT = _float_from_env("HYBRID_POPULARITY_WEIGHT", 0.25)
 _HYBRID_TRENDING_WEIGHT = _float_from_env("HYBRID_TRENDING_WEIGHT", 0.4)
 _HYBRID_MIN_ANN_WEIGHT = 0.05
 _REWRITE_BLEND_ALPHA = 0.5
+_REWRITE_BLEND_ALPHA_QUERY = _float_from_env("REWRITE_BLEND_ALPHA_QUERY", 0.2)
 _COLLAB_HISTORY_LIMIT_MULTIPLIER = 4
 _MIXER_COLLAB_WEIGHT = _float_from_env("MIXER_COLLAB_WEIGHT", 0.3)
 _MIXER_TRENDING_WEIGHT = _float_from_env("MIXER_TRENDING_WEIGHT", 0.2)
 _MIXER_NOVELTY_WEIGHT = _float_from_env("MIXER_NOVELTY_WEIGHT", 0.1)
+_HYBRID_VOTE_WEIGHT = _float_from_env("HYBRID_VOTE_WEIGHT", 0.2)
 
 _SERENDIPITY_RATIO_RAW = _float_from_env("SERENDIPITY_RATIO", 0.15)
 if _SERENDIPITY_RATIO_RAW <= 0.0:
@@ -99,12 +102,91 @@ if _SERENDIPITY_RATIO_RAW <= 0.0:
 else:
     _SERENDIPITY_RATIO = max(0.1, min(0.2, _SERENDIPITY_RATIO_RAW))
 
+_ANN_DESCRIPTION_WEIGHT = _float_from_env("ANN_DESCRIPTION_WEIGHT", 1.2)
+_REWRITE_TEXT_WEIGHT = _float_from_env("REWRITE_TEXT_WEIGHT", 1.0)
+
+
+def _append_weighted_text(
+    text: str | None,
+    weight_override: float | None,
+    default_weight: float,
+    texts: List[str],
+    weights: List[float],
+) -> float:
+    normalized = (text or "").strip()
+    if not normalized:
+        return 0.0
+    weight = default_weight if weight_override is None else weight_override
+    weight = max(0.0, weight)
+    if weight <= 0.0:
+        return 0.0
+    texts.append(normalized)
+    weights.append(weight)
+    return weight
+
 
 @dataclass
 class PrefilterDecision:
     allowed_ids: List[int] | None
     boost_ids: List[int]
     enforce_genres: bool
+
+
+def _build_rewrite_vector(
+    rewrite_text: str | None,
+    ann_description: str | None,
+    ann_weight_override: float | None = None,
+    rewrite_weight_override: float | None = None,
+) -> np.ndarray | None:
+    texts: List[str] = []
+    weights: List[float] = []
+
+    description_weight = _append_weighted_text(
+        ann_description,
+        ann_weight_override,
+        _ANN_DESCRIPTION_WEIGHT,
+        texts,
+        weights,
+    )
+    rewrite_weight = _append_weighted_text(
+        rewrite_text,
+        rewrite_weight_override,
+        _REWRITE_TEXT_WEIGHT,
+        texts,
+        weights,
+    )
+
+    if not texts:
+        return None
+
+    vectors = encode_texts(texts)
+    if not isinstance(vectors, np.ndarray) or vectors.size == 0:
+        return None
+
+    combined = np.zeros(vectors.shape[1], dtype=np.float32)
+    total_weight = 0.0
+    for vec, weight in zip(vectors, weights):
+        if weight <= 0.0:
+            continue
+        combined += weight * vec
+        total_weight += weight
+
+    if total_weight <= 0.0:
+        return None
+
+    norm = float(np.linalg.norm(combined))
+    if norm == 0.0 or not np.isfinite(norm):
+        return None
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "Rewrite vector sources | description=%s rewrite=%s desc_weight=%.3f rewrite_weight=%.3f total_weight=%.3f",
+            bool(description_weight),
+            bool(rewrite_weight),
+            description_weight,
+            rewrite_weight,
+            total_weight,
+        )
+    return combined / norm
 
 
 def _parse_llm_intent(
@@ -304,6 +386,62 @@ async def recommend(
     ),
     diversify: bool = Query(True, description="Whether to diversify recommendations."),
     profile: str | None = Query(None, description="Optional profile identifier"),
+    use_llm_intent: bool = Query(
+        True,
+        description="Enable the LLM intent parser (set to false for manual overrides).",
+    ),
+    ann_description_override: str | None = Query(
+        None,
+        description="Manual ANN description override to blend into the rewrite vector.",
+    ),
+    rewrite_override: str | None = Query(
+        None,
+        description="Manual rewrite text override (skips rewrite_query when provided).",
+    ),
+    ann_weight_override: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override weight for the ANN description component.",
+    ),
+    rewrite_weight_override: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override weight for the rewrite text component.",
+    ),
+    genre_override: str | None = Query(
+        None,
+        description="Comma-separated manual genres to enforce (e.g., 'Drama, Sci-Fi').",
+    ),
+    mixer_ann_weight: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override hybrid ANN weight (default from HYBRID_ANN_WEIGHT).",
+    ),
+    mixer_collab_weight: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override collaborative weight (default MIXER_COLLAB_WEIGHT).",
+    ),
+    mixer_trending_weight: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override trending weight (default HYBRID_TRENDING_WEIGHT).",
+    ),
+    mixer_popularity_weight: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override popularity weight (default HYBRID_POPULARITY_WEIGHT).",
+    ),
+    mixer_vote_weight: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override vote-count weight (default HYBRID_VOTE_WEIGHT).",
+    ),
+    mixer_novelty_weight: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override novelty weight (default MIXER_NOVELTY_WEIGHT).",
+    ),
     db: Session = Depends(get_db),
 ):
     canonical_id = canonical_profile_id(user_id, profile)
@@ -317,7 +455,15 @@ async def recommend(
             linked_entities = await entity_linker.link_entities(query)
 
     llm_user_context = {"user_id": canonical_id, "profile_id": profile}
-    llm_intent = _parse_llm_intent(query, llm_user_context, linked_entities)
+    if use_llm_intent:
+        llm_intent = _parse_llm_intent(query, llm_user_context, linked_entities)
+    else:
+        llm_intent = Intent()
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "LLM intent parser disabled for user %s; using manual/default intent.",
+                canonical_id,
+            )
     if logger.isEnabledFor(logging.DEBUG):
         intent_snapshot = {
             key: value
@@ -332,6 +478,11 @@ async def recommend(
             }
             logger.debug("Linked entity counts: %s", entity_counts)
     intent = _intent_filters_from_llm(query, llm_intent)
+    if genre_override:
+        custom_genres = [g.strip() for g in genre_override.split(",") if g.strip()]
+        if custom_genres:
+            intent.genres = custom_genres
+            llm_intent.include_genres = custom_genres
     preferred_services = _normalize_streaming_services(llm_intent.streaming_providers)
     llm_media_types = list(intent.media_types or [])
     legacy_filters = legacy_parse_intent(query) if query else None
@@ -353,6 +504,8 @@ async def recommend(
                 canonical_id,
                 sorted(preferred_services),
             )
+    if ann_description_override:
+        llm_intent.ann_description = ann_description_override.strip()
     candidate_limit = min(500, max(limit, limit * 3))
     if intent.has_filters():
         candidate_limit = min(500, max(candidate_limit, limit * 5))
@@ -365,22 +518,61 @@ async def recommend(
     # Carry the stricter genre requirement forward so downstream filtering
     # (ann_candidates + item_matches_intent) stays aligned with the prefilter.
     enforce_genres = prefilter.enforce_genres
+    rewrite_result = None
+    rewrite_vec: np.ndarray | None = None
+    manual_rewrite_text = (rewrite_override or "").strip() if rewrite_override else ""
+    if manual_rewrite_text:
+        manual_rewrite_text = " ".join(manual_rewrite_text.split()[:8])
+        rewrite_result = Rewrite(rewritten_text=manual_rewrite_text)
+    elif query:
+        rewrite_result = rewrite_query(query or "", llm_intent)
+    rewrite_vec = _build_rewrite_vector(
+        getattr(rewrite_result, "rewritten_text", None),
+        getattr(llm_intent, "ann_description", None),
+        ann_weight_override,
+        rewrite_weight_override,
+    )
+
     if cold_start:
-        logger.info("Using cold-start candidates for user %s", canonical_id)
-        ids = _cold_start_candidates(db, intent, candidate_limit, allowlist)
-        logger.debug(
-            "Cold-start retrieval | candidate_count=%d allowlist_size=%s enforce_genres=%s",
-            len(ids),
-            len(allowlist) if allowlist is not None else None,
-            enforce_genres,
-        )
+        rewrite_used = False
+        if rewrite_vec is not None:
+            vec_norm = float(np.linalg.norm(rewrite_vec))
+            if vec_norm > 0 and np.isfinite(vec_norm):
+                ann_ids = ann_candidates(
+                    db,
+                    rewrite_vec,
+                    exclude,
+                    limit=candidate_limit,
+                    allowed_ids=allowlist,
+                )
+                if ann_ids:
+                    logger.info(
+                        "Using rewrite ANN candidates for cold-start user %s",
+                        canonical_id,
+                    )
+                    logger.debug(
+                        "Rewrite ANN retrieval | candidate_count=%d allowlist_size=%s",
+                        len(ann_ids),
+                        len(allowlist) if allowlist is not None else None,
+                    )
+                    ids = ann_ids
+                    rewrite_used = True
+
+        if not rewrite_used:
+            logger.info("Using cold-start candidates for user %s", canonical_id)
+            ids = _cold_start_candidates(db, intent, candidate_limit, allowlist)
+            logger.debug(
+                "Cold-start retrieval | candidate_count=%d allowlist_size=%s enforce_genres=%s",
+                len(ids),
+                len(allowlist) if allowlist is not None else None,
+                enforce_genres,
+            )
     else:
         logger.info("Using ANN candidates for user %s", canonical_id)
         assert short_v is not None
-        rewrite = rewrite_query(query or "", llm_intent)
-        if rewrite.rewritten_text:
-            rewrite_vec = encode_texts([rewrite.rewritten_text])[0]
-            alpha = _REWRITE_BLEND_ALPHA
+        if rewrite_vec is not None:
+            alpha = _REWRITE_BLEND_ALPHA_QUERY if query else _REWRITE_BLEND_ALPHA
+            alpha = max(0.0, min(1.0, alpha))
             q_vec = (alpha * short_v) + ((1 - alpha) * rewrite_vec)
             q_vec = q_vec / np.linalg.norm(q_vec)
         else:
@@ -389,12 +581,13 @@ async def recommend(
         ids = ann_candidates(
             db, q_vec, exclude, limit=candidate_limit, allowed_ids=allowlist
         )
+        rewrite_applied = bool(rewrite_vec is not None)
         logger.debug(
             "ANN retrieval | candidate_count=%d allowlist_size=%s enforce_genres=%s rewrite=%s",
             len(ids),
             len(allowlist) if allowlist is not None else None,
             enforce_genres,
-            bool(rewrite.rewritten_text),
+            rewrite_applied,
         )
 
     collab_results = _collaborative_candidates(
@@ -425,24 +618,25 @@ async def recommend(
             merged_scores.setdefault(iid, {})["collab"] = score / max_collab
 
     trending_results: List[Tuple[int, float]] = []
-    if cold_start or ann_scores or collab_scores or boost_ids:
-        trending_results = _trending_prior_candidates(
-            db,
-            intent,
-            exclude,
-            candidate_limit,
-            allowed_ids=allowlist,
-        )
-        logger.debug(
-            "Trending prior retrieval | candidate_count=%d allowlist_size=%s",
-            len(trending_results),
-            len(allowlist) if allowlist is not None else None,
-        )
-        trending_scores = {iid: score for iid, score in trending_results}
-        if trending_scores:
-            max_trending = max(trending_scores.values()) or 1.0
-            for iid, score in trending_scores.items():
-                merged_scores.setdefault(iid, {})["trending"] = score / max_trending
+    if not query:
+        if cold_start or ann_scores or collab_scores or boost_ids:
+            trending_results = _trending_prior_candidates(
+                db,
+                intent,
+                exclude,
+                candidate_limit,
+                allowed_ids=allowlist,
+            )
+            logger.debug(
+                "Trending prior retrieval | candidate_count=%d allowlist_size=%s",
+                len(trending_results),
+                len(allowlist) if allowlist is not None else None,
+            )
+            trending_scores = {iid: score for iid, score in trending_results}
+            if trending_scores:
+                max_trending = max(trending_scores.values()) or 1.0
+                for iid, score in trending_scores.items():
+                    merged_scores.setdefault(iid, {})["trending"] = score / max_trending
 
     collab_ids = [iid for iid, _ in collab_results]
     trending_ids = [iid for iid, _ in trending_results]
@@ -474,26 +668,29 @@ async def recommend(
             priority.append(candidate)
             seen_priority.add(candidate)
 
-        combined: List[int] = list(priority)
-        seen_all = set(seen_priority)
-        for candidate in ids:
-            if candidate in seen_all:
-                continue
-            combined.append(candidate)
-            seen_all.add(candidate)
+        if priority:
+            priority = [cand for cand in priority if cand in ids]
+            if priority:
+                combined: List[int] = list(priority)
+                seen_all = set(priority)
+                for candidate in ids:
+                    if candidate in seen_all:
+                        continue
+                    combined.append(candidate)
+                    seen_all.add(candidate)
 
-        ids = combined
-        for idx, candidate in enumerate(priority):
-            score = 1.0 / (1.0 + idx)
-            scores = merged_scores.setdefault(candidate, {})
-            current = scores.get("ann")
-            if current is None or score > current:
-                scores["ann"] = score
-        logger.debug(
-            "Boost reordering applied | boost_count=%d merged_length=%d",
-            len(priority),
-            len(ids),
-        )
+                ids = combined
+                for idx, candidate in enumerate(priority):
+                    score = 1.0 / (1.0 + idx)
+                    scores = merged_scores.setdefault(candidate, {})
+                    current = scores.get("ann")
+                    if current is None or score > current:
+                        scores["ann"] = score
+                logger.debug(
+                    "Boost reordering applied | boost_count=%d merged_length=%d",
+                    len(priority),
+                    len(ids),
+                )
 
     ids = ids[:candidate_limit]
 
@@ -626,7 +823,32 @@ async def recommend(
 
     if diversify:
         ordered = _apply_franchise_cap(ordered)
-    _apply_mixer_scores(ordered)
+    ann_weight_override = mixer_ann_weight
+    collab_weight_override = mixer_collab_weight
+    trending_weight_override = mixer_trending_weight
+    popularity_weight_override = mixer_popularity_weight
+    vote_weight_override = mixer_vote_weight
+    novelty_weight_override = mixer_novelty_weight
+
+    if query:
+        if trending_weight_override is None:
+            trending_weight_override = 0.0
+        if popularity_weight_override is None:
+            popularity_weight_override = 0.0
+        if vote_weight_override is None:
+            vote_weight_override = 0.0
+        if novelty_weight_override is None:
+            novelty_weight_override = 0.0
+
+    _apply_mixer_scores(
+        ordered,
+        ann_weight_override=ann_weight_override,
+        collab_weight_override=collab_weight_override,
+        trending_weight_override=trending_weight_override,
+        popularity_weight_override=popularity_weight_override,
+        vote_weight_override=vote_weight_override,
+        novelty_weight_override=novelty_weight_override,
+    )
     ordered = apply_business_rules(ordered, intent=intent)
     if not ordered:
         return _empty_response()
@@ -677,7 +899,16 @@ async def recommend(
     return payload
 
 
-def _apply_mixer_scores(candidates: List[Dict[str, Any]]) -> None:
+def _apply_mixer_scores(
+    candidates: List[Dict[str, Any]],
+    *,
+    ann_weight_override: float | None = None,
+    collab_weight_override: float | None = None,
+    trending_weight_override: float | None = None,
+    popularity_weight_override: float | None = None,
+    vote_weight_override: float | None = None,
+    novelty_weight_override: float | None = None,
+) -> None:
     if not candidates:
         return
 
@@ -688,10 +919,33 @@ def _apply_mixer_scores(candidates: List[Dict[str, Any]]) -> None:
         (float(item.get("vote_count") or 0.0) for item in candidates), default=0.0
     )
 
-    ann_weight = max(_HYBRID_MIN_ANN_WEIGHT, _HYBRID_ANN_WEIGHT)
-    collab_weight = _MIXER_COLLAB_WEIGHT
-    trending_weight = _MIXER_TRENDING_WEIGHT
-    novelty_weight = _MIXER_NOVELTY_WEIGHT
+    base_ann_weight = (
+        _HYBRID_ANN_WEIGHT if ann_weight_override is None else ann_weight_override
+    )
+    ann_weight = max(_HYBRID_MIN_ANN_WEIGHT, base_ann_weight)
+    collab_weight = (
+        _MIXER_COLLAB_WEIGHT
+        if collab_weight_override is None
+        else collab_weight_override
+    )
+    trending_weight = (
+        _MIXER_TRENDING_WEIGHT
+        if trending_weight_override is None
+        else trending_weight_override
+    )
+    pop_weight = (
+        _HYBRID_POPULARITY_WEIGHT
+        if popularity_weight_override is None
+        else popularity_weight_override
+    )
+    vote_weight = (
+        _HYBRID_VOTE_WEIGHT if vote_weight_override is None else vote_weight_override
+    )
+    novelty_weight = (
+        _MIXER_NOVELTY_WEIGHT
+        if novelty_weight_override is None
+        else novelty_weight_override
+    )
 
     for item in candidates:
         ann_rank = float(item.get("ann_rank", item.get("original_rank", 0)))
@@ -718,7 +972,9 @@ def _apply_mixer_scores(candidates: List[Dict[str, Any]]) -> None:
         retrieval_score = (
             ann_weight * ann_score
             + collab_weight * collab_score
-            + trending_weight * max(trending_source, pop_score)
+            + trending_weight * trending_source
+            + pop_weight * pop_score
+            + vote_weight * vote_bonus
             + novelty_weight * novelty_score
         )
         item["retrieval_score"] = retrieval_score
@@ -958,9 +1214,11 @@ def _prefilter_allowed_ids(
         intent.media_types,
         intent.effective_genres(),
     )
+    boost_cap = max(5, min(limit, 15))
+
     if len(strict_ids) >= threshold:
         logger.debug("Prefilter returning strict allowlist.")
-        return PrefilterDecision(strict_ids, strict_ids, True)
+        return PrefilterDecision(strict_ids, strict_ids[:boost_cap], True)
 
     relaxed_ids = _run_prefilter_query(
         db,
@@ -985,7 +1243,7 @@ def _prefilter_allowed_ids(
         len(relaxed_ids),
         len(strict_ids),
     )
-    return PrefilterDecision(None, strict_ids, False)
+    return PrefilterDecision(None, strict_ids[:boost_cap], False)
 
 
 def _run_prefilter_query(

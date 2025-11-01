@@ -62,5 +62,16 @@ class TMDBClient:
         path = f"/search/{media_type}" if media_type else "/search/multi"
         return await self._get(path, params)
 
+    async def discover(self, media_type: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Discover movies or TV shows."""
+        path = f"/discover/{media_type}"
+        return await self._get(path, params)
+
+    async def search_person(self, query: str) -> Dict[str, Any]:
+        """Search for a person."""
+        params = {"query": query}
+        path = "/search/person"
+        return await self._get(path, params)
+
     async def aclose(self):
         await self._client.aclose()
