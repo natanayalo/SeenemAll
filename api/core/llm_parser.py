@@ -870,13 +870,16 @@ def rewrite_query(query: str, intent: Intent) -> Rewrite:
 
     _log_metrics(_increment_metric("rewrite_misses"), cache="rewrite")
 
+    description = (getattr(intent, "ann_description", "") or "").strip()
     intent_hint = _rewrite_from_intent(intent)
     if intent_hint is not None:
         intent_hint = intent_hint.strip()
     normalized = normalized_query.strip()
 
     base_text = ""
-    if intent_hint:
+    if description:
+        base_text = description
+    elif intent_hint:
         base_text = intent_hint
     else:
         heuristic = _heuristic_rewrite(normalized)

@@ -211,14 +211,15 @@ def rerank_with_explanations(
     if not items:
         return []
 
-    base = _with_default_explanations(items, intent, query)
     settings = _get_settings()
     if not settings.enabled:
         logger.warning(
             "Reranker(%s) disabled (missing credentials or RERANK_ENABLED=0); returning ANN order.",
             settings.provider,
         )
-        return base
+        return _with_default_explanations(items, intent, query, apply_low_signal=False)
+
+    base = _with_default_explanations(items, intent, query)
 
     try:
         if settings.provider == "small":
@@ -487,6 +488,8 @@ def _with_default_explanations(
     items: Sequence[Dict[str, Any]],
     intent: IntentFilters | None,
     query: str | None,
+    *,
+    apply_low_signal: bool = True,
 ) -> List[Dict[str, Any]]:
     enriched: List[Dict[str, Any]] = []
     intent_genres: List[str] = intent.effective_genres() if intent else []
@@ -497,7 +500,8 @@ def _with_default_explanations(
         score, heuristics = _heuristic_score(copy_item, idx, current_year)
         copy_item["score"] = score
         if (
-            _HEURISTIC_MIN_SIGNAL_MULTIPLIER > 0.0
+            apply_low_signal
+            and _HEURISTIC_MIN_SIGNAL_MULTIPLIER > 0.0
             and heuristics.get("signal_multiplier", 1.0)
             < _HEURISTIC_MIN_SIGNAL_MULTIPLIER
         ):
@@ -524,13 +528,15 @@ def _low_signal_multiplier(popularity: float, vote_count: float) -> float:
 
     vote_floor = max(1, _HEURISTIC_MIN_VOTE_COUNT)
     raw_votes = max(0.0, vote_count)
+    raw_popularity = max(0.0, popularity)
+    if raw_votes <= 0.0 and raw_popularity <= 0.0:
+        return multiplier
     if vote_floor > 0 and raw_votes < vote_floor:
         deficit = vote_floor - raw_votes
         fraction = min(1.0, deficit / vote_floor)
         multiplier *= max(0.0, 1.0 - _HEURISTIC_LOW_VOTE_PENALTY * fraction)
 
     popularity_floor = max(1.0, _HEURISTIC_MIN_POPULARITY)
-    raw_popularity = max(0.0, popularity)
     if raw_popularity < popularity_floor:
         deficit = popularity_floor - raw_popularity
         fraction = min(1.0, deficit / popularity_floor)

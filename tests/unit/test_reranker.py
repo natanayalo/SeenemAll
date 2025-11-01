@@ -382,9 +382,9 @@ def test_low_signal_items_are_dropped(monkeypatch):
         "id": 1,
         "title": "Low Signal",
         "retrieval_score": 0.9,
-        "popularity": 0.0,
-        "vote_average": 0.0,
-        "vote_count": 0.0,
+        "popularity": 10.0,
+        "vote_average": 5.5,
+        "vote_count": 5.0,
         "release_year": reranker._current_year(),
     }
     strong_item = {
