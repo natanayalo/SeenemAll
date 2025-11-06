@@ -30,3 +30,9 @@ htmlcov/
 
 # LLM cache (persisted intents/rewrites)
 .cache/
+
+# Evaluation artifacts
+evaluation/evaluation_results*.csv
+evaluation/evaluation_scores*.csv
+evaluation/report.html
+tmp_report.html
