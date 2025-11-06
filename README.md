@@ -1,277 +1,268 @@
 # 🎬 Seen’emAll
 
-AI-powered movie & TV recommender that learns your taste from what you’ve already seen.
-Built with **FastAPI**, **Postgres + pgvector**, and **sentence-transformers**.
+AI-powered movie & TV recommendations with on-demand evaluations, rich catalog metadata, and intent-aware hybrid search.
 
 ---
 
-## ⚙️ Stack
-- **FastAPI** backend
-- **Postgres** (with `pgvector` extension)
-- **sentence-transformers MiniLM-L6-v2** for embeddings (configurable)
-- **TMDB API** for metadata ingestion
-- **Docker Compose** for one-command setup
-- Collaborative neighbor blend powered by pgvector
-- Optional LLM reranking (OpenAI / Gemini compatible)
+## 🧭 Overview
+
+Seen’emAll is a multi-agent recommendation stack:
+
+| Agent | Purpose | Key Module |
+|-------|---------|------------|
+| **ETL** | Pull TMDB / JustWatch metadata into Postgres (cast, crew, keywords, spoken languages, availability) | `etl/tmdb_sync.py`, `etl/justwatch_sync.py` |
+| **Embedding** | Encode catalog titles with MiniLM-L6-v2, keep historical versions | `etl/compute_embeddings.py` |
+| **User Profile** | Maintain long/short vectors, neighbor cache, negative feedback | `api/core/user_profile.py` |
+| **Candidate Generator** | Blend ANN (Elasticsearch) + collaborative + trending + business rules | `api/core/candidate_gen.py`, `api/routes/recommend.py` |
+| **Reranker** | Produce explanations (LLM) or lightweight MiniLM rerank | `api/core/reranker.py` |
+| **Evaluation** | Offline evaluation, title resolution, Evidently report | `evaluation/evaluate.py` |
+
+The system runs entirely in Docker Compose and exposes a single `/recommend` endpoint with rich query semantics.
 
 ---
 
-## 🏗️ High-Level Architecture
+## 🏗️ Architecture
 
 ```mermaid
 graph TD
     Client["Client<br/>(Frontend / API Consumer)"]
-    API["FastAPI Service"]
-    Profiles["User Profile Agent<br/>(vectors + neighbors)"]
-    Candidates["Candidate Generator<br/>(pgvector ANN)"]
-    Rules["Business Rules<br/>(JSON config)"]
-    Reranker["LLM Reranker<br/>(OpenAI / Gemini)"]
-    DB[(Postgres + pgvector)]
-    TMDBETL["TMDB Sync<br/>(ETL Agent)"]
-    Embedder["Embedding Worker<br/>(MiniLM)"]
-    JustWatch["JustWatch Sync<br/>(Streaming Agent)"]
+    API["FastAPI Service<br/>/recommend"]
+    Matcher["Query Filter Matcher<br/>(spaCy)"]
+    Profiles["User Profile Agent<br/>(vectors, negatives, neighbors)"]
+    Prefilter["SQL Prefilter<br/>(media/genre/provider)"]
+    Candidates["Candidate Generator<br/>(ANN + fallbacks)"]
+    Rules["Business Rules<br/>(boosts & filters)"]
+    Reranker["Reranker<br/>(LLM or small model)"]
+    History[(Postgres + pgvector)]
+    ES[(Elasticsearch kNN index)]
+    TMDB["TMDB ETL"]
+    JustWatch["JustWatch ETL"]
+    Embedder["Embedding Worker<br/>MiniLM-L6-v2"]
 
     Client --> API
+    API --> Matcher
     API --> Profiles
-    API --> Candidates
-    Profiles --> DB
-    Candidates --> DB
+    Profiles --> History
+    Matcher --> Prefilter
+    Prefilter --> Candidates
+    Candidates --> ES
+    Candidates --> History
     API --> Rules
-    API --> Reranker
+    Rules --> Reranker
     Reranker --> API
     API --> Client
 
-    TMDBETL --> DB
-    Embedder --> DB
-    JustWatch --> DB
+    TMDB --> History
+    JustWatch --> History
+    Embedder --> History
 ```
 
 ---
 
-## 🔄 Request Lifecycle
+## ⚙️ Stack & Dependencies
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant A as FastAPI / Recommend Route
-    participant P as User Profile Loader
-    participant G as ANN Candidate Gen
-    participant B as Business Rules
-    participant D as MMR Diversifier
-    participant R as LLM Reranker
-
-    C->>A: GET /recommend (query, limit, profile)
-    A->>P: load_user_state(user_id::profile)
-    P-->>A: short_vec, long_vec, exclusions, metadata
-    A->>A: parse_intent(query)
-    A->>G: ann_candidates(short_vec, exclusions, allowlist)
-    G->>A: ranked candidate ids
-    A->>A: hydrate metadata + vectors
-    A->>B: apply filters & boosts
-    B-->>A: scored candidate list
-    A->>D: diversify_with_mmr(list, limit)
-    D-->>A: diversified list
-    A->>R: rerank_with_explanations(items, intent, user context)
-    R-->>A: ordered items + rationales
-    A-->>C: JSON response (top N)
-```
+- **FastAPI** + **Pydantic** backend
+- **Postgres** with `pgvector` (user embeddings + metadata)
+- **Elasticsearch 8** (HNSW kNN, manual RRF hybrid)
+- **sentence-transformers MiniLM-L6-v2** embeddings
+- **spaCy** (`en_core_web_sm`) matcher for languages/genres/people/keywords
+- **Docker Compose** (API, DB, Elasticsearch, optional frontend)
+- Optional: **OpenAI** or **Gemini** for LLM reranking
+- **Evidently** for evaluation reporting (optional install)
 
 ---
 
 ## 🚀 Quick Start
 
 ```bash
-# 1. Unpack & enter
-unzip SeenemAll.zip -d .
+git clone <repo>
 cd SeenemAll
 
-# 2. Configure
 cp .env.example .env
-# edit TMDB_API_KEY=your_tmdb_key
-# optional: set RERANK_PROVIDER (openai | gemini | small) + RERANK_API_KEY when needed
-# optional: tweak USER_PROFILE_DECAY_HALF_LIFE, EMBED_MODEL/EMBED_BATCH, EMBED_VERSION/TEMPLATE
+# Set TMDB_API_KEY, optional RERANK_PROVIDER/API keys, tweak ANN/Rerank knobs.
 
-# 3. Launch stack
-docker compose up -d --build
-# (rerun with --build after frontend changes to refresh the static bundle)
+docker compose up -d --build         # API, Postgres, Elasticsearch (and frontend if enabled)
 
-# 4. Run migrations
-make migrate
+make migrate                         # Alembic migrations (includes cast/crew/keywords schema)
+make es-setup                        # Create Elasticsearch index (run with FORCE=1 on schema change)
+make etl-tmdb                        # Pull TMDB catalog (supports SINCE=2024-01-01T00:00:00Z)
+make embed                           # MiniLM embeddings (EMBED_VERSION, EMBED_BATCH, etc.)
+make es-sync                         # Push catalog to Elasticsearch (BATCH=250, REFRESH=1 optional)
+make etl-justwatch                   # Populate availability (optional)
+```
 
-# 5. Populate catalog
-make etl-tmdb
+Seed user history:
 
-# 6. Generate embeddings
-make embed
-
-# 7. Sync streaming availability (optional)
-make etl-justwatch
-
-# 8. Create sample user history (profiles + explicit event types supported)
+```bash
 curl -X POST http://localhost:8000/user/history \
   -H "content-type: application/json" \
-  -d '{"user_id":"u1","profile":"main","items":[1,2,3,4,5],"event_type":"watched"}'
+  -d '{"user_id":"u1","profile":"main","items":[603,155,1207],"event_type":"watched"}'
+```
 
-# 9. Record negative feedback (optional)
-curl -X POST http://localhost:8000/user/history \
-  -H "content-type: application/json" \
-  -d '{"user_id":"u1","profile":"kids","items":[42],"event_type":"not_interested"}'
+Request recommendations:
 
-# 10. Get recommendations (profile-aware)
-curl "http://localhost:8000/recommend?user_id=u1&profile=main&limit=10"
-
-# 11. Continue with cursor pagination (optional)
-# Response payload includes {"items": [...], "next_cursor": "..."}
-curl "http://localhost:8000/recommend?user_id=u1&profile=main&limit=10&cursor=eyJyYW5rIjoxMH0"
-````
+```bash
+curl "http://localhost:8000/recommend?user_id=u1&profile=main&query=fantasy%20TV%20epics%20like%20The%20Witcher&limit=10&diversify=false"
+```
 
 ---
 
-## 🔁 LLM Reranker
+## 🔁 Request Lifecycle Diagram
 
-- Hosted options:
-  - `RERANK_PROVIDER=openai` with `RERANK_API_KEY` (or `OPENAI_API_KEY` fallback).
-  - `RERANK_PROVIDER=gemini` with a compatible Google Generative AI key.
-  - Defaults: `RERANK_MODEL=gpt-4o-mini` (OpenAI) and `gemini-2.0-flash-exp` (Gemini).
-- Lightweight option: `RERANK_PROVIDER=small` activates the new MiniLM-L6-v2 reranker
-  that runs locally, caps the input window at 40 items, and returns the best 12 without
-  calling an external API. No API key is required; it reuses the embedding pipeline.
-- Small-model knobs (all optional, see `.env.example` for defaults):
-  `SMALL_RERANK_INPUT_WINDOW`, `SMALL_RERANK_OUTPUT_LIMIT`,
-  `SMALL_RERANK_TIMEOUT`, `SMALL_RERANK_CACHE_TTL`, `SMALL_RERANK_CACHE_MAXSIZE`,
-  and `SMALL_RERANK_RANK_WEIGHT` (bias toward original ANN order).
-- To drop unrated catalog rows entirely, set `HEURISTIC_MIN_SIGNAL_MULTIPLIER`
-  (>0). Leaving it at `0` (default) keeps the old behavior but still logs the
-  signal multiplier for debugging.
-- Disable any provider with `RERANK_ENABLED=0`; when disabled or misconfigured, we fall
-  back to ANN ordering plus heuristic explanations automatically.
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as FastAPI /recommend
+    participant P as User Profile Loader
+    participant M as Intent & Matcher
+    participant F as SQL Prefilter
+    participant G as ANN Candidates
+    participant B as Business Rules
+    participant D as Diversifier (MMR)
+    participant R as Reranker
 
----
-
-## 🧠 Recommendation Pipeline Details
-
-The `/recommend` route orchestrates several retrieval streams before reranking:
-
-- **Entity linker** – `api/core/entity_linker.py` resolves people and titles via TMDB.
-  The singleton linker is created during `FastAPI` lifespan startup (`api/main.py`) and
-  attached to `app.state.entity_linker`, so every request shares the same cache and
-  client. Intent parsing receives the resolved IDs so prompts and downstream filters
-  can respect explicit “more like *Interstellar*” style queries.
-
-- **Hybrid query rewrite** – when a short-term embedding exists, we blend it with the
-  rewrite vector returned by `rewrite_query(...)`. The mix is controlled by
-  `_REWRITE_BLEND_ALPHA` (default `0.5`) and produces a normalized vector that goes into
-  `ann_candidates(...)`. Cold-start users skip the blend entirely and fall back to
-  `_cold_start_candidates(...)`, which prefers popularity/trending ranks for the given
-  intent filters. If the user has no history but a natural-language query is present,
-  we still run ANN retrieval directly on the rewrite vector so “like Squid Game” style
-  prompts can pull in semantically similar titles even before the profile warms up.
-  When `INTENT_ENABLE_ANN_DESCRIPTION=1`, the rewrite vector blends the short
-  `ann_description` sentence with the structured rewrite; tune the contribution via
-  `ANN_DESCRIPTION_WEIGHT` (default `1.2`). For local tuning, you can also pass
-  per-request overrides such as `use_llm_intent=false`,
-  `ann_description_override=...`, `rewrite_override=...`, and the weight knobs
-  `ann_weight_override` / `rewrite_weight_override`. Likewise, mixer weights can be
-  overridden with `mixer_ann_weight`, `mixer_collab_weight`,
-  `mixer_trending_weight`, `mixer_popularity_weight`, and `mixer_novelty_weight`
-  (the React UI exposes sliders for all of these debug controls).
-
-- **Collaborative recall** – neighbor metadata captured in `users.neighbors` (see
-  `api/core/user_profile.py`) identifies similar users and the items they recently liked.
-  `_collaborative_candidates(...)` scores those titles and injects them alongside ANN
-  results while respecting exclusions and allow-lists.
-
-- **Trending prior** – `_trending_prior_candidates(...)` pulls from `Item.popularity`,
-  `popular_rank`, and `trending_rank`. The helper protects tests and stubs by gracefully
-  handling rows that lack full columns; when running without a real database (as in the
-  unit suite), it simply returns an empty list.
-
-- **Mixer scoring** – `_apply_mixer_scores(...)` combines ANN relevance, collaborative
-  similarity, trending boosts, and a novelty bonus. The weights can be tuned via
-  environment variables:
-  - `MIXER_COLLAB_WEIGHT` (default `0.3`)
-  - `MIXER_TRENDING_WEIGHT` (default `0.2`)
-  - `MIXER_NOVELTY_WEIGHT` (default `0.1`)
-  - ANN keeps the existing `_HYBRID_ANN_WEIGHT` with a minimum floor.
-
-These sources all feed into business rules, optional MMR diversification, and the LLM
-reranker (when enabled), producing the final explanations and ordering.
+    C->>A: GET /recommend (user_id, query, params)
+    A->>P: load_user_state(user_id::profile)
+    P-->>A: vectors, negatives, providers
+    A->>M: parse_intent + spaCy matcher + linked entities
+    M-->>A: IntentFilters & SearchFilters
+    A->>F: prefilter_allowed_ids(intent, limit)
+    F-->>A: allowlist / boost IDs / enforce_genres flag
+    A->>G: ann_candidates(vector, filters, allowlist)
+    G-->>A: candidate ids
+    A->>A: hydrate metadata (Postgres)
+    A->>B: apply_business_rules(items)
+    B-->>A: scored candidates
+    A->>D: diversify_with_mmr(items, limit)
+    D-->>A: diversified list
+    A->>R: rerank_with_explanations(items, intent, user context)
+    R-->>A: ordered items + rationales
+    A-->>C: JSON response (items, next_cursor)
+```
 
 ---
 
-## 🧱 Business Rules & Caching
+## 🔁 Request Flow (Detailed Steps)
 
-- Tweak ranking behaviour via `config/business_rules.json` (or point `BUSINESS_RULES_PATH`
-  to an environment-specific file). Filters/boosts reload automatically when the file changes.
-- Recommendation responses are cached in-memory per `(user, profile, query, limit, diversify)`
-  with optional TTL (override via `RECOMMEND_CACHE_TTL_SECONDS`, default 300s). The cache
-  is invalidated after `/user/history` updates so profile changes take effect immediately.
-- `GET /recommend` now returns `{"items": [...], "next_cursor": "..."}`; pass the returned
-  cursor back in `cursor=` to fetch the next page without recomputing the ranking pipeline.
+1. **Profile Load** – `load_user_state` fetches short/long vectors, neighbors, negative items, provider preferences.
+2. **Intent Parsing**
+   - Entity linker captures explicit titles/people.
+   - LLM parser (`use_llm_intent=true`) or legacy stub extracts genres/media types/runtime bounds.
+   - spaCy matcher adds languages, normalized genres (maps “fantasy” → `Fantasy`, `Sci-Fi & Fantasy`), keywords, cast/crew, and “reference titles” (phrases like “like *The Witcher*”).
+3. **Prefilter (SQL)** – `_prefilter_allowed_ids` runs a strict (media type + genres + providers) and relaxed pass to produce `allowed_ids`, `boost_ids`, and `enforce_genres`.
+4. **Rewrite Vector** – `_build_rewrite_vector` blends ANN description, rewrites, and extracted titles. Even cold-start users get a query-driven vector for ANN.
+5. **ANN Retrieval**
+   - **Elasticsearch** (default): kNN + multi_match query; manual Reciprocal Rank Fusion merges ANN and keyword search. Filters include media types, genres, languages, keywords, cast/crew.
+   - **pgvector** (fallback): cosine similarity in Postgres.
+6. **Cold-start Safeguards** – If ANN returns nothing and the request has cast/crew filters, we retry without the allowlist, then fall back to a direct SQL lookup to ensure actor/creator queries always return something. Otherwise, `_cold_start_candidates` orders catalog titles by trending/popularity or top-rated heuristics.
+7. **Collaborative & Trending** – Neighbor scores, business-rule boosts, and trending priors merge with the ANN results up to `candidate_limit`.
+8. **Post-filtering** – We hydrate metadata, enforce media type/genre/runtime/maturity, and strictly reapply cast/crew filters even if we relaxed them earlier. Provider filtering trims watch options unless we need fallback options to fill `limit`.
+9. **Diversification & Scoring** – Optional `diversify=true` runs franchise cap/MMR. Mixer weights are controlled via env vars or query overrides (`mixer_ann_weight`, etc.).
+10. **Reranker** – `RERANK_ENABLED=1` uses the configured LLM provider for explanations; `RERANK_PROVIDER=small` runs a local MiniLM reranker; `RERANK_ENABLED=0` falls back to heuristic explanations.
+11. **Response** – JSON payload with ranked `items`, each including metadata, watch options, source scores, and explanations (`explanation`, `reason` fields), plus optional cursor for pagination.
 
----
-
-## 🌍 Streaming Availability
-
-- Configure `JUSTWATCH_COUNTRY` (default `IL`) to control the locale for offers.
-- Optional: tweak `JUSTWATCH_LANGUAGE` (default `en`) and `JUSTWATCH_PLATFORM` (default `WEB`) for different JustWatch markets.
-- Run `make etl-justwatch` to populate the `availability` table with per-service links.
-- Data is refreshed by replacing rows per item/country, keeping the table idempotent.
-
----
-
-## 👤 Profiles & Feedback
-
-- `profile` is optional on `/user/history` and `/recommend`; if supplied we store vectors under `user_id::profile`.
-- Supported event types: `watched` (default), `liked`, `rated`, plus negative signals `not_interested` / `disliked`.
-- Negative items are excluded from vector updates and automatically filtered from recommendation candidates.
-- Tune long/short recency with `USER_PROFILE_DECAY_HALF_LIFE` (default `10` recent items).
-- Reranker context now includes genre preferences, collaborative neighbor diagnostics, and negative item IDs for richer explanations.
+Logging highlights important fallback decisions (e.g., classic-top-rated heuristics, allowlist relaxation for people filters).
 
 ---
 
-## 🔗 Watch Links
+## 🔧 Request Parameters & Modes
 
-- Get a redirect to a streaming service with `/watch-link/{item_id}`.
-- Query params: `service` (e.g., `nfx`), `country` (e.g., `US`).
-- Example:
-  ```bash
-  curl "http://localhost:8000/watch-link/335984?service=nfx&country=US"
-  ```
-
----
-
-## ❤️ Feedback
-
-- Send recommendation feedback (impressions, clicks) to the `/feedback` endpoint.
-- Example:
-  ```bash
-  curl -X POST http://localhost:8000/feedback \
-    -H "content-type: application/json" \
-    -d '{"user_id":"u1","item_id":335984,"event_type":"click","meta":{"rank":5}}'
-  ```
+- `query` – natural-language text (“gritty street-level superhero TV shows”)
+- `profile` – pick a profile (`user_id::profile`)
+- `limit`, `cursor` – pagination controls
+- `diversify=true|false` – toggles franchise cap/MMR
+- `use_llm_intent=true|false` – choose LLM parser vs legacy stub
+- `rewrite_override` – custom ANN rewrite text
+- `ann_backend_override=elasticsearch|pgvector`
+- `mixer_*` weights – fine-tune ANN/collab/trending/popularity/vote signals
+- `classic_top_rated=true|false` – force the top-rated blend
+- Negative feedback (`event_type="not_interested"`) automatically excludes items per user/profile
 
 ---
 
-## 🧠 Agents
+## 📊 Evaluation Toolkit
 
-See [AGENTS.md](./AGENTS.md) for roles and flow.
+Run the hybrid evaluation CLI and generate Evidently reports:
+
+```bash
+make eval                                 # ID-based gold set (evaluation/evaluation_set.json)
+make eval-report                          # Generates evaluation/report.html (if Evidently installed)
+python -m evaluation.evaluate --help      # CLI flags: --k, --resolve-titles, --dataset, --set, --titles-set
+```
+
+Features:
+- Dual gold-set input: ID-based (`evaluation_set.json`) or title-based (`evaluation_set.titles.json`) resolved against Postgres.
+- Optional `--dataset=movielens20m` stub ready for future public datasets.
+- Per-rank CSV (`evaluation_results.csv`) with `query_id`, `rank`, `item_id`, `relevant`.
+- Summary CSV (`evaluation_scores*.csv`) capturing Precision@K, Recall@K, MAP, nDCG@K per query and backend.
+- Evidently ranking report stored at `evaluation/report.html`.
+- Helper scripts:
+  - `evaluation/build_golden.py` – generate candidate gold lists from TMDB for manual curation.
+  - `evaluation/merge_candidates.py` – merge evaluation runs.
+  - Sweep CSVs (`evaluation/sweep_*.csv`) demonstrate parameter search experiments.
 
 ---
 
-## ✅ Progress
+## 🔍 Catalog & Metadata
 
-See [TASKS.md](./TASKS.md) for the up-to-date roadmap.
+The TMDB ETL fetches:
+- Cast (top 5), directors (top 2), producers (top 2), writers (top 2)
+- Keywords (mapped into Elasticsearch filters)
+- Spoken languages (used by the matcher)
+- Runtime, release year, popularity, vote counts/rankings
+
+Availability (`etl/justwatch_sync.py`) keeps per-country provider data—usable in prefilters and watch option filtering.
+
+Elasticsearch documents include the above fields so both ANN and the reranker can leverage them. Mapping updates are defined in `etl/elasticsearch_index.py`.
 
 ---
 
-## ⚖️ Attribution
+## 🧪 Testing & Tooling
 
-> This product uses the TMDB API but is not endorsed or certified by TMDB.
-> Data provided by [The Movie Database (TMDB)](https://www.themoviedb.org).
+- `./.venv/bin/python -m pytest` for unit/integration tests (coverage gate: 85%)
+- `tests/unit/test_filter_matcher.py` verifies the spaCy matcher (languages, genres, people, reference titles)
+- `tests/unit/test_elasticsearch_search.py` asserts dual-search fusion and filter placement
+- `make lint` (if configured) for static checks
 
 ---
 
-## 📄 License
+## 🛠️ Common Tasks
 
-MIT © Natan Ayalo
+- **Recreate Elasticsearch index**: `make es-setup FORCE=1 && make es-sync`
+- **Backfill embeddings**: `make embed EMBED_VERSION=v2`
+- **Run cold-start milestone**: use `--resolve-titles` to test natural-language queries against sparse catalogs.
+- **Switch ANN backend**: set `ANN_BACKEND=pgvector` in `.env` to force Postgres retrieval (useful for benchmarking).
+- **Reranker small model**: `RERANK_PROVIDER=small` for local MiniLM reranker without external keys.
+
+---
+
+## 🧊 Cold-Start Strategy
+
+- If the user has no vector, we still build a rewrite vector solely from the query (including reference titles like “The Witcher”) and run ANN.
+- People filters trigger relaxed allowlists and a catalogue fallback to ensure actor-based queries never return empty lists.
+- `_cold_start_candidates` orders catalog rows by trending / popularity when ANN fails (still respecting media types, genres, and provider constraints from the query).
+
+---
+
+## ⚠️ Notes & Troubleshooting
+
+- If ANN returns nothing, check logs for “Relaxed ANN filters…” or “Using catalogue fallback…” messages. Tight genre/provider filters may leave no viable rows.
+- Mapping (genre → catalog name) is controlled in `_GENRE_CANONICAL_TO_CATALOG` (e.g., “fantasy” maps to `["Fantasy", "Sci-Fi & Fantasy"]`).
+- The entity linker uses TMDB data; restart the API after large ETL runs so caches refresh.
+- LLM reranker grace-degrades to ANN ordering with explanations (`RERANK_ENABLED=0` or missing API key).
+- Evaluation requires Postgres access (`EVAL_DB_DSN`; defaults to `postgresql+psycopg2://app:app@localhost:5432/reco`).
+
+---
+
+## 📂 Key Paths
+
+- `/recommend` implementation: `api/routes/recommend.py`
+- Intent parsing & matcher: `api/core/llm_parser.py`, `api/core/filter_matcher.py`
+- Candidate retrieval: `api/core/candidate_gen.py`, `api/core/elasticsearch_search.py`
+- Evaluation suite: `evaluation/`
+- ETL jobs: `etl/`
+- Business rules: `api/core/business_rules.py`
+
+---
+
+Happy recommending! 🎥✨

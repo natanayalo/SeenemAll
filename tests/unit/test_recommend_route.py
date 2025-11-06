@@ -20,6 +20,7 @@ from api.core.legacy_intent_parser import IntentFilters
 from api.core.entity_linker import ENTITY_LINKER_CACHE
 from api.core.intent_parser import Intent
 from api.core.rewrite import Rewrite
+from api.core.filter_matcher import QueryFiltersResult
 
 ORIGINAL_PREFILTER = recommend_routes._prefilter_allowed_ids
 
@@ -65,7 +66,7 @@ def _reset_prefilter(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             None, [], True
         ),
     )
@@ -87,6 +88,16 @@ def _disable_trending_prior(monkeypatch, request):
         recommend_routes,
         "_trending_prior_candidates",
         lambda *args, **kwargs: [],
+    )
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _stub_query_filters(monkeypatch):
+    monkeypatch.setattr(
+        recommend_routes,
+        "get_query_filters",
+        lambda query: QueryFiltersResult((), (), (), (), (), (), (), (), query or ""),
     )
     yield
 
@@ -116,7 +127,7 @@ def test_recommend_returns_empty_when_no_candidates(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [],
     )
 
     with TestClient(app) as client:
@@ -317,7 +328,10 @@ def test_recommend_includes_reranker_output(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1,
+            2,
+        ],
     )
 
     def fake_rerank(items_payload, intent, query, user):
@@ -406,7 +420,10 @@ def test_recommend_paginates_with_cursor(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1,
+            2,
+        ],
     )
 
     monkeypatch.setattr(
@@ -480,14 +497,23 @@ def test_recommend_prefilter_passes_allowed_ids(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             [101, 202], [101, 202], True
         ),
     )
 
     recorded = {}
 
-    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        text_query=None,
+    ):
         recorded["allowed"] = allowed_ids
         return [1]
 
@@ -545,14 +571,16 @@ def test_recommend_relaxed_prefilter_allows_mismatched_genres(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             None, [], False
         ),
     )
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [sci_fi_item.id],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            sci_fi_item.id
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -664,7 +692,10 @@ def test_recommend_merges_collaborative_candidates(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1,
+            2,
+        ],
     )
 
     monkeypatch.setattr(
@@ -783,7 +814,11 @@ def test_recommend_mixer_scores_items(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2, 3],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1,
+            2,
+            3,
+        ],
     )
 
     def fake_rerank(items_payload, intent, query, user):
@@ -873,7 +908,9 @@ def test_recommend_injects_serendipity_items(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [item.id for item in items],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            item.id for item in items
+        ],
     )
 
     monkeypatch.setattr(
@@ -934,7 +971,7 @@ def test_recommend_supports_profile_parameter(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [],
     )
 
     with TestClient(app) as client:
@@ -985,7 +1022,9 @@ def test_recommend_filters_negative_items(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -1056,7 +1095,9 @@ def test_recommend_filters_streaming_providers(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [item.id for item in items],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            item.id for item in items
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -1138,7 +1179,9 @@ def test_recommend_provider_fallback_when_insufficient(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [item.id for item in items],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            item.id for item in items
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -1216,7 +1259,12 @@ def test_recommend_applies_franchise_cap_when_diversify_enabled(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2, 3, 4],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1,
+            2,
+            3,
+            4,
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -1282,7 +1330,12 @@ def test_recommend_skips_franchise_cap_when_diversify_disabled(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2, 3, 4],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1,
+            2,
+            3,
+            4,
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -1404,7 +1457,7 @@ def test_prefilter_allowed_ids_returns_ordered_unique(monkeypatch):
     assert isinstance(result, PrefilterDecision)
     assert result.allowed_ids is None
     assert result.boost_ids == [2, 1]
-    assert result.enforce_genres is False
+    assert result.enforce_genres is True
     assert session.last_statement is not None
 
 
@@ -1478,7 +1531,16 @@ def test_recommend_uses_entity_linker_and_blends_query_vector(
             recorded["searched_query"] = query
             return {"movie": [101], "tv": [], "person": []}
 
-    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        text_query=None,
+    ):
         recorded["allowed_ids"] = allowed_ids
         recorded["q_vec"] = vec
         return [1, 2]
@@ -1493,7 +1555,7 @@ def test_recommend_uses_entity_linker_and_blends_query_vector(
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             [1], [1], True
         ),
     )
@@ -1576,7 +1638,7 @@ def test_recommend_logs_cold_start_path(monkeypatch, caplog):
     monkeypatch.setattr(
         recommend_routes,
         "_cold_start_candidates",
-        lambda db, intent, limit, allowlist: [1],
+        lambda db, intent, limit, allowlist, prefer_top_rated=False: [1],
     )
 
     monkeypatch.setattr(
@@ -1635,7 +1697,7 @@ def test_recommend_cold_start_uses_rewrite_ann(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             [1], [], True
         ),
     )
@@ -1651,12 +1713,21 @@ def test_recommend_cold_start_uses_rewrite_ann(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_build_rewrite_vector",
-        lambda rewrite_text, ann_desc, ann_w, rewrite_w: rewrite_vec,
+        lambda rewrite_text, ann_desc, ann_w, rewrite_w, reference_titles=None: rewrite_vec,
     )
 
     ann_called = {}
 
-    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        text_query=None,
+    ):
         ann_called["vec"] = vec
         return [1]
 
@@ -1730,7 +1801,16 @@ def test_recommend_skips_llm_when_disabled(monkeypatch):
 
     monkeypatch.setattr(recommend_routes, "_parse_llm_intent", fail_parse)
 
-    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        text_query=None,
+    ):
         return [1]
 
     monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
@@ -1754,7 +1834,7 @@ def test_recommend_skips_llm_when_disabled(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             [1], [], True
         ),
     )
@@ -1822,7 +1902,16 @@ def test_recommend_manual_rewrite_override(monkeypatch):
 
     ann_calls = {"count": 0}
 
-    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        text_query=None,
+    ):
         ann_calls["count"] += 1
         assert vec.shape[0] == 384
         return [1]
@@ -1836,7 +1925,7 @@ def test_recommend_manual_rewrite_override(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             [1], [], True
         ),
     )
@@ -1913,7 +2002,9 @@ def test_recommend_query_resets_mixer_weights(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,

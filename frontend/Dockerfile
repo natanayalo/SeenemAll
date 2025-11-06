@@ -16,11 +16,12 @@ RUN npm run build
 FROM node:18-alpine
 WORKDIR /app
 
-# Install serve to run the built app
-RUN npm install -g serve
+COPY package*.json ./
+RUN npm install --omit=dev --prefer-offline
 
-# Copy built assets from builder stage
+# Copy built assets and server
 COPY --from=builder /app/build ./build
+COPY server.js ./server.js
 
 EXPOSE 3000
-CMD ["serve", "-s", "build", "-l", "3000"]
+CMD ["node", "server.js"]

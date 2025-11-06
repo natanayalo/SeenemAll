@@ -1,77 +1,385 @@
 [
   {
-    "query": "mind-bending sci-fi movies like Inception",
+    "query": "anime sci-fi movies",
     "golden_set": [
       {
-        "id": 27205,
-        "title": "Inception"
+        "id": 149,
+        "title": "Akira"
+      },
+      {
+        "id": 9323,
+        "title": "Ghost in the Shell"
+      },
+      {
+        "id": 4977,
+        "title": "Paprika"
+      },
+      {
+        "id": 372058,
+        "title": "Your Name."
+      }
+    ],
+    "genre_override": "Animation"
+  },
+  {
+    "query": "best heist movies",
+    "description": "High-stakes films centered on elaborate robberies and the crafty criminals who execute them.",
+    "genre_override": "Crime",
+    "golden_set": [
+      {
+        "id": 949,
+        "title": "Heat"
+      },
+      {
+        "id": 161,
+        "title": "Ocean's Eleven"
+      },
+      {
+        "id": 629,
+        "title": "The Usual Suspects"
+      },
+      {
+        "id": 500,
+        "title": "Reservoir Dogs"
+      },
+      {
+        "id": 339403,
+        "title": "Baby Driver"
+      }
+    ]
+  },
+  {
+    "query": "best science fiction movies of all time",
+    "genre_override": "Science Fiction",
+    "golden_set": [
+      {
+        "id": 62,
+        "title": "2001: A Space Odyssey"
+      },
+      {
+        "id": 78,
+        "title": "Blade Runner"
+      },
+      {
+        "id": 11,
+        "title": "Star Wars: Episode IV – A New Hope"
       },
       {
         "id": 157336,
         "title": "Interstellar"
       },
       {
-        "id": 1124,
-        "title": "The Prestige"
+        "id": 603,
+        "title": "The Matrix"
       },
       {
-        "id": 329865,
-        "title": "Arrival"
+        "id": 348,
+        "title": "Alien"
       },
       {
-        "id": 577922,
-        "title": "Tenet"
+        "id": 280,
+        "title": "Terminator 2: Judgment Day"
+      },
+      {
+        "id": 329,
+        "title": "Jurassic Park"
+      },
+      {
+        "id": 264660,
+        "title": "Ex Machina"
       }
-    ],
-    "genre_override": "Science Fiction"
+    ]
   },
   {
-    "query": "time-travel thrillers",
+    "query": "classic comedy movies",
+    "genre_override": "Comedy",
     "golden_set": [
       {
-        "id": 59967,
-        "title": "Looper"
+        "id": 762,
+        "title": "Monty Python and the Holy Grail"
+      },
+      {
+        "id": 813,
+        "title": "Airplane!"
+      },
+      {
+        "id": 935,
+        "title": "Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb"
+      },
+      {
+        "id": 115,
+        "title": "The Big Lebowski"
+      },
+      {
+        "id": 137,
+        "title": "Groundhog Day"
+      },
+      {
+        "id": 620,
+        "title": "Ghostbusters"
+      }
+    ]
+  },
+  {
+    "query": "classic sci-fi TV shows",
+    "genre_override": "Science Fiction",
+    "golden_set": [
+      {
+        "id": 655,
+        "title": "Star Trek: The Next Generation"
+      },
+      {
+        "id": 4087,
+        "title": "The X-Files"
+      },
+      {
+        "id": 1972,
+        "title": "Battlestar Galactica"
+      },
+      {
+        "id": 6357,
+        "title": "The Twilight Zone"
+      },
+      {
+        "id": 42009,
+        "title": "Black Mirror"
+      },
+      {
+        "id": 1437,
+        "title": "Firefly"
+      },
+      {
+        "id": 4629,
+        "title": "Stargate SG-1"
+      }
+    ]
+  },
+  {
+    "query": "classic western movies",
+    "genre_override": "Western",
+    "golden_set": [
+      {
+        "id": 429,
+        "title": "The Good, the Bad and the Ugly"
+      },
+      {
+        "id": 335,
+        "title": "Once Upon a Time in the West"
+      },
+      {
+        "id": 33,
+        "title": "Unforgiven"
+      },
+      {
+        "id": 68718,
+        "title": "Django Unchained"
+      }
+    ]
+  },
+  {
+    "query": "dark cyberpunk sci-fi movies",
+    "description": "Visually striking stories set in high-tech, dystopian futures exploring AI, cybernetics, and society.",
+    "genre_override": "Science Fiction",
+    "golden_set": [
+      {
+        "id": 78,
+        "title": "Blade Runner"
+      },
+      {
+        "id": 603,
+        "title": "The Matrix"
+      },
+      {
+        "id": 149,
+        "title": "Akira"
+      },
+      {
+        "id": 180,
+        "title": "Minority Report"
+      }
+    ]
+  },
+  {
+    "query": "epic fantasy adventure movies",
+    "genre_override": "Fantasy",
+    "golden_set": [
+      {
+        "id": 120,
+        "title": "The Lord of the Rings: The Fellowship of the Ring"
+      },
+      {
+        "id": 121,
+        "title": "The Lord of the Rings: The Two Towers"
+      },
+      {
+        "id": 122,
+        "title": "The Lord of the Rings: The Return of the King"
+      },
+      {
+        "id": 671,
+        "title": "Harry Potter and the Sorcerer's Stone"
+      }
+    ]
+  },
+  {
+    "query": "epic war movies",
+    "genre_override": "War",
+    "golden_set": [
+      {
+        "id": 857,
+        "title": "Saving Private Ryan"
+      },
+      {
+        "id": 28,
+        "title": "Apocalypse Now"
+      },
+      {
+        "id": 424,
+        "title": "Schindler's List"
+      },
+      {
+        "id": 600,
+        "title": "Full Metal Jacket"
+      },
+      {
+        "id": 374720,
+        "title": "Dunkirk"
+      }
+    ]
+  },
+  {
+    "query": "fantasy TV epics like The Witcher",
+    "genre_override": "Sci-Fi & Fantasy",
+    "golden_set": [
+      {
+        "id": 1399,
+        "title": "Game of Thrones"
+      },
+      {
+        "id": 94997,
+        "title": "House of the Dragon"
+      },
+      {
+        "id": 71914,
+        "title": "The Wheel of Time"
+      },
+      {
+        "id": 71912,
+        "title": "The Witcher"
+      },
+      {
+        "id": 84773,
+        "title": "The Lord of the Rings: The Rings of Power"
+      }
+    ]
+  },
+  {
+    "query": "feel-good comedy movies under 2 hours",
+    "golden_set": [
+      {
+        "id": 122906,
+        "title": "About Time"
+      },
+      {
+        "id": 212778,
+        "title": "Chef"
+      },
+      {
+        "id": 369557,
+        "title": "Sing Street"
+      },
+      {
+        "id": 120467,
+        "title": "The Grand Budapest Hotel"
+      },
+      {
+        "id": 77338,
+        "title": "The Intouchables"
+      }
+    ],
+    "genre_override": "Drama"
+  },
+  {
+    "query": "fun time-travel adventure movies",
+    "description": "Thrilling films where characters journey through time to alter destinies and confront paradoxes.",
+    "genre_override": "Science Fiction",
+    "golden_set": [
+      {
+        "id": 105,
+        "title": "Back to the Future"
+      },
+      {
+        "id": 218,
+        "title": "The Terminator"
+      },
+      {
+        "id": 63,
+        "title": "Twelve Monkeys"
       },
       {
         "id": 137113,
         "title": "Edge of Tomorrow"
-      },
-      {
-        "id": 60948,
-        "title": "12 Monkeys"
-      },
-      {
-        "id": 45612,
-        "title": "Source Code"
-      },
-      {
-        "id": 1954,
-        "title": "The Butterfly Effect"
       }
-    ],
-    "genre_override": "Science Fiction"
+    ]
   },
   {
-    "query": "psychological thrillers about money and greed",
-    "description": "Desperate people are pushed to their limits when offered a chance to win an enormous amount of money through increasingly dangerous challenges.",
+    "query": "gripping crime TV dramas",
+    "genre_override": "Crime",
     "golden_set": [
       {
-        "id": 496243,
-        "title": "Parasite"
+        "id": 1438,
+        "title": "The Wire"
       },
       {
-        "id": 1359,
-        "title": "American Psycho"
+        "id": 1398,
+        "title": "The Sopranos"
       },
       {
-        "id": 303858,
-        "title": "Money Monster"
+        "id": 1396,
+        "title": "Breaking Bad"
+      },
+      {
+        "id": 60059,
+        "title": "Better Call Saul"
+      },
+      {
+        "id": 1414,
+        "title": "The Shield"
+      },
+      {
+        "id": 46648,
+        "title": "True Detective"
+      },
+      {
+        "id": 60574,
+        "title": "Peaky Blinders"
       }
-    ],
-    "genre_override": "Thriller"
+    ]
   },
   {
-    "query": "heist TV series",
+    "query": "gritty street-level superhero TV shows",
+    "golden_set": [
+      {
+        "id": 9480,
+        "title": "Daredevil"
+      },
+      {
+        "id": 76479,
+        "title": "The Boys"
+      },
+      {
+        "id": 13183,
+        "title": "Watchmen"
+      },
+      {
+        "id": 62650,
+        "title": "Jessica Jones"
+      }
+    ],
+    "genre_override": "Action"
+  },
+  {
+    "query": "heist TV shows",
     "golden_set": [
       {
         "id": 71446,
@@ -96,9 +404,195 @@
       {
         "id": 64199,
         "title": "Sneaky Pete"
+      },
+      {
+        "id": 2288,
+        "title": "Prison Break"
+      },
+      {
+        "id": 104,
+        "title": "Hustle"
       }
     ],
     "genre_override": "Crime"
+  },
+  {
+    "query": "intense crime drama movies",
+    "genre_override": "Crime",
+    "golden_set": [
+      {
+        "id": 238,
+        "title": "The Godfather"
+      },
+      {
+        "id": 240,
+        "title": "The Godfather Part II"
+      },
+      {
+        "id": 680,
+        "title": "Pulp Fiction"
+      },
+      {
+        "id": 769,
+        "title": "Goodfellas"
+      },
+      {
+        "id": 807,
+        "title": "Se7en"
+      },
+      {
+        "id": 949,
+        "title": "Heat"
+      },
+      {
+        "id": 1422,
+        "title": "The Departed"
+      }
+    ]
+  },
+  {
+    "query": "light-hearted space opera TV shows",
+    "golden_set": [
+      {
+        "id": 71738,
+        "title": "The Orville"
+      },
+      {
+        "id": 1437,
+        "title": "Firefly"
+      },
+      {
+        "id": 4629,
+        "title": "Stargate SG-1"
+      },
+      {
+        "id": 30991,
+        "title": "Cowboy Bebop"
+      },
+      {
+        "id": 4271,
+        "title": "Farscape"
+      },
+      {
+        "id": 103516,
+        "title": "Star Trek: Strange New Worlds"
+      }
+    ],
+    "genre_override": "Sci-Fi & Fantasy"
+  },
+  {
+    "query": "long-form epic fantasy TV series",
+    "description": "Immersive fantasy series with sprawling worlds, magic, and epic adventures on the small screen.",
+    "genre_override": "Fantasy",
+    "golden_set": [
+      {
+        "id": 1399,
+        "title": "Game of Thrones"
+      },
+      {
+        "id": 94997,
+        "title": "House of the Dragon"
+      },
+      {
+        "id": 71912,
+        "title": "The Witcher"
+      }
+    ]
+  },
+  {
+    "query": "mind-bending sci-fi movies like Inception",
+    "golden_set": [
+      {
+        "id": 27205,
+        "title": "Inception"
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar"
+      },
+      {
+        "id": 1124,
+        "title": "The Prestige"
+      },
+      {
+        "id": 329865,
+        "title": "Arrival"
+      },
+      {
+        "id": 577922,
+        "title": "Tenet"
+      },
+      {
+        "id": 603,
+        "title": "The Matrix"
+      },
+      {
+        "id": 38,
+        "title": "Eternal Sunshine of the Spotless Mind"
+      }
+    ],
+    "genre_override": "Science Fiction"
+  },
+  {
+    "query": "mind-bending mystery movies with twists",
+    "description": "Twisty, cerebral mysteries that challenge perception and keep audiences guessing until the end.",
+    "genre_override": "Mystery",
+    "golden_set": [
+      {
+        "id": 27205,
+        "title": "Inception"
+      },
+      {
+        "id": 550,
+        "title": "Fight Club"
+      },
+      {
+        "id": 77,
+        "title": "Memento"
+      },
+      {
+        "id": 141,
+        "title": "Donnie Darko"
+      },
+      {
+        "id": 11324,
+        "title": "Shutter Island"
+      }
+    ]
+  },
+  {
+    "query": "must-watch horror movies",
+    "genre_override": "Horror",
+    "golden_set": [
+      {
+        "id": 694,
+        "title": "The Shining"
+      },
+      {
+        "id": 955,
+        "title": "The Exorcist"
+      },
+      {
+        "id": 948,
+        "title": "Halloween"
+      },
+      {
+        "id": 539,
+        "title": "Psycho"
+      },
+      {
+        "id": 1091,
+        "title": "The Thing"
+      },
+      {
+        "id": 10331,
+        "title": "Night of the Living Dead"
+      },
+      {
+        "id": 274,
+        "title": "The Silence of the Lambs"
+      }
+    ]
   },
   {
     "query": "neo-noir crime movies",
@@ -138,39 +632,17 @@
       {
         "id": 395834,
         "title": "Wind River"
+      },
+      {
+        "id": 78,
+        "title": "Blade Runner"
+      },
+      {
+        "id": 474,
+        "title": "Blue Velvet"
       }
     ],
     "genre_override": "Thriller"
-  },
-  {
-    "query": "space-opera TV (not too dark)",
-    "golden_set": [
-      {
-        "id": 71738,
-        "title": "The Orville"
-      },
-      {
-        "id": 1437,
-        "title": "Firefly"
-      },
-      {
-        "id": 4629,
-        "title": "Stargate SG-1"
-      },
-      {
-        "id": 30991,
-        "title": "Cowboy Bebop"
-      },
-      {
-        "id": 4271,
-        "title": "Farscape"
-      },
-      {
-        "id": 103516,
-        "title": "Star Trek: Strange New Worlds"
-      }
-    ],
-    "genre_override": "Sci-Fi & Fantasy"
   },
   {
     "query": "post-apocalyptic TV shows",
@@ -191,55 +663,53 @@
     "genre_override": "Drama"
   },
   {
-    "query": "feel-good comedies under 105 minutes",
+    "query": "psychological horror movies that get in your head",
+    "description": "Intense horror films that disturb and unsettle through mind games, tension, and emotional terror.",
+    "genre_override": "Horror",
     "golden_set": [
       {
-        "id": 122906,
-        "title": "About Time"
+        "id": 493922,
+        "title": "Hereditary"
       },
       {
-        "id": 212778,
-        "title": "Chef"
+        "id": 310131,
+        "title": "The Witch"
       },
       {
-        "id": 369557,
-        "title": "Sing Street"
-      },
-      {
-        "id": 120467,
-        "title": "The Grand Budapest Hotel"
-      },
-      {
-        "id": 77338,
-        "title": "The Intouchables"
+        "id": 419430,
+        "title": "Get Out"
       }
-    ],
-    "genre_override": "Drama"
+    ]
   },
   {
-    "query": "anime sci-fi films",
+    "query": "psychological thrillers about money and greed",
+    "description": "Desperate people are pushed to their limits when offered a chance to win an enormous amount of money through increasingly dangerous challenges.",
     "golden_set": [
       {
-        "id": 149,
-        "title": "Akira"
+        "id": 496243,
+        "title": "Parasite"
       },
       {
-        "id": 9323,
-        "title": "Ghost in the Shell"
+        "id": 1359,
+        "title": "American Psycho"
       },
       {
-        "id": 4977,
-        "title": "Paprika"
+        "id": 303858,
+        "title": "Money Monster"
       },
       {
-        "id": 372058,
-        "title": "Your Name."
+        "id": 473033,
+        "title": "Uncut Gems"
+      },
+      {
+        "id": 106646,
+        "title": "The Wolf of Wall Street"
       }
     ],
-    "genre_override": "Animation"
+    "genre_override": "Thriller"
   },
   {
-    "query": "rom-coms from the 2000s",
+    "query": "rom-com movies from the 2000s",
     "golden_set": [
       {
         "id": 19913,
@@ -265,43 +735,97 @@
     "genre_override": "Comedy"
   },
   {
-    "query": "gritty superhero TV (street-level)",
+    "query": "spy thriller movies with espionage",
+    "description": "Spy thrillers filled with covert missions, double agents, and international intrigue.",
+    "genre_override": "Thriller",
     "golden_set": [
       {
-        "id": 9480,
-        "title": "Daredevil"
+        "id": 37724,
+        "title": "Skyfall"
       },
       {
-        "id": 76479,
-        "title": "The Boys"
+        "id": 36557,
+        "title": "Casino Royale"
       },
       {
-        "id": 13183,
-        "title": "Watchmen"
+        "id": 447332,
+        "title": "Mission: Impossible - Fallout"
       }
-    ],
-    "genre_override": "Action"
+    ]
   },
   {
-    "query": "fantasy epics like The Witcher",
+    "query": "time-travel thriller movies",
     "golden_set": [
       {
-        "id": 1399,
-        "title": "Game of Thrones"
+        "id": 59967,
+        "title": "Looper"
       },
       {
-        "id": 94997,
-        "title": "House of the Dragon"
+        "id": 137113,
+        "title": "Edge of Tomorrow"
       },
       {
-        "id": 71914,
-        "title": "The Wheel of Time"
+        "id": 60948,
+        "title": "12 Monkeys"
       },
       {
-        "id": 71912,
-        "title": "The Witcher"
+        "id": 45612,
+        "title": "Source Code"
+      },
+      {
+        "id": 1954,
+        "title": "The Butterfly Effect"
       }
     ],
-    "genre_override": "Sci-Fi & Fantasy"
+    "genre_override": "Science Fiction"
+  },
+  {
+    "query": "top-tier animated movies",
+    "genre_override": "Animation",
+    "golden_set": [
+      {
+        "id": 129,
+        "title": "Spirited Away"
+      },
+      {
+        "id": 862,
+        "title": "Toy Story"
+      },
+      {
+        "id": 10681,
+        "title": "WALL·E"
+      },
+      {
+        "id": 10020,
+        "title": "Beauty and the Beast"
+      },
+      {
+        "id": 14160,
+        "title": "Up"
+      }
+    ]
+  },
+  {
+    "query": "zombie apocalypse movies and shows",
+    "description": "End-of-the-world scenarios featuring swarms of the undead and the desperate struggle for survival.",
+    "genre_override": "Horror",
+    "golden_set": [
+      {
+        "id": 10331,
+        "title": "Night of the Living Dead"
+      },
+      {
+        "id": 170,
+        "title": "28 Days Later"
+      },
+      {
+        "id": 19908,
+        "title": "Zombieland"
+      },
+      {
+        "id": 396535,
+        "title": "Train to Busan"
+      }
+    ]
   }
 ]

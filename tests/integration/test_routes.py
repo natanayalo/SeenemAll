@@ -15,6 +15,7 @@ from api.routes.recommend import PrefilterDecision
 from tests.helpers import FakeResult
 from api.core import reranker
 from api.core import business_rules
+from api.core.filter_matcher import QueryFiltersResult
 
 
 @pytest.fixture(autouse=True)
@@ -28,11 +29,20 @@ def _disable_prefilters(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             None, [], True
         ),
     )
     monkeypatch.setattr(business_rules, "load_rules", lambda: {})
+
+
+@pytest.fixture(autouse=True)
+def _stub_query_filters(monkeypatch):
+    monkeypatch.setattr(
+        recommend_routes,
+        "get_query_filters",
+        lambda query: QueryFiltersResult((), (), (), (), (), (), (), (), query or ""),
+    )
 
 
 class _HistorySession:
@@ -202,7 +212,16 @@ def test_recommend_endpoint_returns_ranked_items(monkeypatch):
             {"genre_prefs": {}, "neighbors": [], "negative_items": []},
         )
 
-    def fake_ann_candidates(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann_candidates(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        text_query=None,
+    ):
         assert np.allclose(vec, np.array([0.3, 0.7], dtype="float32"))
         return [items[1].id, items[0].id]
 
@@ -245,7 +264,9 @@ def test_recommend_endpoint_handles_cold_start(monkeypatch):
 
     monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_user_state)
 
-    def fake_cold_start_candidates(db, intent, limit, allowlist):
+    def fake_cold_start_candidates(
+        db, intent, limit, allowlist, prefer_top_rated=False
+    ):
         assert limit >= 2
         return [items[1].id, items[0].id]
 
@@ -283,7 +304,16 @@ def test_recommend_endpoint_diversifies_items(monkeypatch):
             {"genre_prefs": {}, "neighbors": [], "negative_items": []},
         )
 
-    def fake_ann_candidates(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann_candidates(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        text_query=None,
+    ):
         return [items[1].id, items[0].id]
 
     called = {}
@@ -340,7 +370,7 @@ def test_recommend_endpoint_honors_profile(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [],
     )
 
     with TestClient(app) as client:
@@ -380,7 +410,10 @@ def test_recommend_endpoint_provides_cursors(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [items[0].id, items[1].id],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            items[0].id,
+            items[1].id,
+        ],
     )
 
     with TestClient(app) as client:

@@ -157,6 +157,7 @@ class IntentFilters:
     min_runtime: Optional[int] = None
     max_runtime: Optional[int] = None
     maturity_rating_max: Optional[str] = None
+    required_genres: List[str] = field(default_factory=list)
 
     def effective_genres(self) -> List[str]:
         seen: set[str] = set()
@@ -272,6 +273,16 @@ def item_matches_intent(
             item_genres = _item_genre_names(item)
             if not item_genres & effective_genres:
                 return False
+
+    required_genres = {
+        g.lower()
+        for g in getattr(filters, "required_genres", [])
+        if isinstance(g, str) and g.strip()
+    }
+    if required_genres:
+        item_genres = _item_genre_names(item)
+        if not required_genres.issubset(item_genres):
+            return False
 
     return True
 

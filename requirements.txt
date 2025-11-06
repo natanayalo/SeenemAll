@@ -11,5 +11,7 @@ sentence-transformers==3.0.1
 torch==2.3.1
 pytest==8.3.2
 pytest-cov==5.0.0
+spacy==3.7.4
 cachetools==5.3.3
 types-cachetools==6.2.0.20250827
+elasticsearch==8.13.0

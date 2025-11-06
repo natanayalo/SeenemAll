@@ -1,4 +1,6 @@
-.PHONY: up down logs sh migrate rev head alembic-init etl-tmdb embed etl-justwatch eval
+.PHONY: up down logs sh migrate rev head alembic-init etl-tmdb embed etl-justwatch eval eval-report es-setup es-sync
+
+EVAL_PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,python)
 
 up:
 	docker compose up -d --build
@@ -31,4 +33,27 @@ etl-justwatch:
 	docker compose exec api python scripts/run_justwatch_sync.py
 
 eval:
-	docker compose exec api python evaluation/evaluate.py
+	$(EVAL_PYTHON) -m evaluation.evaluate --k=10 --set evaluation/evaluation_set.json
+
+eval-report:
+	@if [ -f evaluation/evaluation_set.titles.json ]; then \
+		$(EVAL_PYTHON) -m evaluation.evaluate --k=10 --resolve-titles --titles-set evaluation/evaluation_set.titles.json; \
+	else \
+		$(EVAL_PYTHON) -m evaluation.evaluate --k=10 --set evaluation/evaluation_set.json; \
+	fi
+	@if [ -f evaluation/report.html ]; then \
+		echo "Report ready at evaluation/report.html (open it with your browser)."; \
+	else \
+		echo "evaluation/report.html not generated (check Evidently installation)"; \
+	fi
+
+es-setup:
+	docker compose exec api python scripts/setup_elasticsearch.py $(if $(FORCE),--force,)
+
+es-sync:
+	docker compose exec api python scripts/run_elasticsearch_sync.py \
+		$(if $(BATCH),--batch-size $(BATCH),) \
+		$(if $(MAX),--max-items $(MAX),) \
+		$(if $(SINCE),--since $(SINCE),) \
+		$(if $(EMBED_VERSION),--embed-version $(EMBED_VERSION),) \
+		$(if $(REFRESH),--refresh,)

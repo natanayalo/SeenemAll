@@ -5,12 +5,13 @@ import json
 import os
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Sequence, Set
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Sequence, Set
 
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, or_, cast
+from sqlalchemy import select, func, or_, cast, bindparam
+from sqlalchemy.types import Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -19,6 +20,8 @@ from api.db.models import Item, ItemEmbedding, Availability, UserHistory
 from api.config import COUNTRY_DEFAULT
 from api.core.user_utils import load_user_state, canonical_profile_id
 from api.core.candidate_gen import ann_candidates
+from api.core.elasticsearch_search import SearchFilters
+from api.core.filter_matcher import get_query_filters
 from api.core import llm_parser
 from api.core.intent_parser import Intent
 from api.core.legacy_intent_parser import (
@@ -48,6 +51,143 @@ _STREAMING_PROVIDER_ALIASES: Dict[str, Set[str]] = {
 }
 
 
+_SUPPORTED_ANN_BACKENDS = {"elasticsearch", "pgvector"}
+
+_TOP_QUERY_KEYWORDS = {
+    "best",
+    "best of",
+    "must watch",
+    "must-watch",
+    "must see",
+    "must-see",
+    "essential",
+    "top",
+    "top-rated",
+    "top rated",
+    "epic",
+    "classic",
+    "classics",
+    "all-time",
+    "all time",
+}
+
+
+def _has_people_filters(filters: SearchFilters | None) -> bool:
+    if not filters:
+        return False
+    return any(
+        (
+            filters.cast,
+            filters.directors,
+            filters.producers,
+            filters.writers,
+        )
+    )
+
+
+def _item_matches_people_filters(item: Item, filters: SearchFilters) -> bool:
+    def _extract_names(payload: Any) -> Set[str]:
+        names: Set[str] = set()
+        if not payload:
+            return names
+        if isinstance(payload, list):
+            for entry in payload:
+                if isinstance(entry, str):
+                    names.add(entry.strip().lower())
+                elif isinstance(entry, Mapping):
+                    name = entry.get("name")
+                    if isinstance(name, str):
+                        names.add(name.strip().lower())
+        return names
+
+    cast_names = _extract_names(getattr(item, "cast", None))
+    if filters.cast:
+        if not any(name.strip().lower() in cast_names for name in filters.cast):
+            return False
+
+    director_names = _extract_names(getattr(item, "directors", None))
+    if filters.directors:
+        if not any(
+            name.strip().lower() in director_names for name in filters.directors
+        ):
+            return False
+
+    producer_names = _extract_names(getattr(item, "producers", None))
+    if filters.producers:
+        if not any(
+            name.strip().lower() in producer_names for name in filters.producers
+        ):
+            return False
+
+    writer_names = _extract_names(getattr(item, "writers", None))
+    if filters.writers:
+        if not any(name.strip().lower() in writer_names for name in filters.writers):
+            return False
+
+    return True
+
+
+def _relax_filters_for_people(filters: SearchFilters | None) -> SearchFilters | None:
+    if not filters:
+        return None
+    return SearchFilters(
+        include_item_ids=filters.include_item_ids,
+        media_types=filters.media_types,
+        providers=filters.providers,
+        maturity=filters.maturity,
+        languages=filters.languages,
+        keywords=filters.keywords,
+        cast=filters.cast,
+        directors=filters.directors,
+        producers=filters.producers,
+        writers=filters.writers,
+        release_year_gte=filters.release_year_gte,
+        release_year_lte=filters.release_year_lte,
+        runtime_gte=filters.runtime_gte,
+        runtime_lte=filters.runtime_lte,
+        exclude_item_ids=filters.exclude_item_ids,
+    )
+
+
+def _people_only_candidate_ids(
+    db: Session,
+    filters: SearchFilters,
+    *,
+    limit: int,
+) -> List[int]:
+    if not _has_people_filters(filters):
+        return []
+
+    name_conditions = []
+    params: Dict[str, str] = {}
+    text_cast_expr = func.lower(cast(Item.cast, Text))
+    text_directors_expr = func.lower(cast(Item.directors, Text))
+    text_producers_expr = func.lower(cast(Item.producers, Text))
+    text_writers_expr = func.lower(cast(Item.writers, Text))
+
+    def _add_conditions(values: Sequence[str], expr, prefix: str) -> None:
+        for idx, value in enumerate(values or [], start=1):
+            key = f"{prefix}_{idx}"
+            params[key] = f"%{value.strip().lower()}%"
+            name_conditions.append(expr.like(bindparam(key)))
+
+    _add_conditions(filters.cast, text_cast_expr, "cast")
+    _add_conditions(filters.directors, text_directors_expr, "director")
+    _add_conditions(filters.producers, text_producers_expr, "producer")
+    _add_conditions(filters.writers, text_writers_expr, "writer")
+
+    if not name_conditions:
+        return []
+
+    stmt = select(Item.id).where(or_(*name_conditions))
+    if filters.media_types:
+        stmt = stmt.where(Item.media_type.in_(filters.media_types))
+    stmt = stmt.limit(limit)
+
+    rows = db.execute(stmt, params).scalars().all()
+    return [int(row) for row in rows]
+
+
 def _normalize_streaming_services(
     providers: Sequence[str] | None,
 ) -> Set[str]:
@@ -71,6 +211,16 @@ def _normalize_streaming_services(
         if not matched:
             normalized.add(key)
     return normalized
+
+
+def _matches_keywords(text: str | None, keywords: Set[str]) -> bool:
+    if not text:
+        return False
+    lowered = text.lower()
+    for keyword in keywords:
+        if keyword in lowered:
+            return True
+    return False
 
 
 def _float_from_env(name: str, default: float) -> float:
@@ -104,6 +254,7 @@ else:
 
 _ANN_DESCRIPTION_WEIGHT = _float_from_env("ANN_DESCRIPTION_WEIGHT", 1.2)
 _REWRITE_TEXT_WEIGHT = _float_from_env("REWRITE_TEXT_WEIGHT", 1.0)
+_REFERENCE_TITLE_WEIGHT = _float_from_env("REFERENCE_TITLE_WEIGHT", 0.8)
 
 
 def _append_weighted_text(
@@ -137,6 +288,7 @@ def _build_rewrite_vector(
     ann_description: str | None,
     ann_weight_override: float | None = None,
     rewrite_weight_override: float | None = None,
+    reference_titles: Sequence[str] | None = None,
 ) -> np.ndarray | None:
     texts: List[str] = []
     weights: List[float] = []
@@ -155,6 +307,16 @@ def _build_rewrite_vector(
         texts,
         weights,
     )
+    reference_weight = 0.0
+    if reference_titles:
+        for title in reference_titles:
+            reference_weight += _append_weighted_text(
+                title,
+                None,
+                _REFERENCE_TITLE_WEIGHT,
+                texts,
+                weights,
+            )
 
     if not texts:
         return None
@@ -179,11 +341,13 @@ def _build_rewrite_vector(
         return None
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
-            "Rewrite vector sources | description=%s rewrite=%s desc_weight=%.3f rewrite_weight=%.3f total_weight=%.3f",
+            "Rewrite vector sources | description=%s rewrite=%s references=%d desc_weight=%.3f rewrite_weight=%.3f reference_weight=%.3f total_weight=%.3f",
             bool(description_weight),
             bool(rewrite_weight),
+            len(reference_titles or ()),
             description_weight,
             rewrite_weight,
+            reference_weight,
             total_weight,
         )
     return combined / norm
@@ -204,15 +368,16 @@ def _parse_llm_intent(
 
 
 def _intent_filters_from_llm(query: str | None, llm_intent: Intent) -> IntentFilters:
-    genres = list(llm_intent.include_genres or [])
+    genres = llm_parser._normalize_genre_names(list(llm_intent.include_genres or []))
     filters = IntentFilters(
         raw_query=query or "",
-        genres=genres,
+        genres=list(genres),
         moods=[],
         media_types=[],
         min_runtime=llm_intent.runtime_minutes_min,
         max_runtime=llm_intent.runtime_minutes_max,
         maturity_rating_max=llm_intent.maturity_rating_max,
+        required_genres=[],
     )
     return filters
 
@@ -223,12 +388,24 @@ def _merge_with_legacy_filters(
     if not fallback:
         return primary
 
+    # Ensure required genres remain unique and anchored to LLM output
+    if hasattr(primary, "required_genres"):
+        dedup_required: List[str] = []
+        seen_required: set[str] = set()
+        for genre in primary.required_genres:
+            if genre and genre not in seen_required:
+                dedup_required.append(genre)
+                seen_required.add(genre)
+        primary.required_genres = dedup_required
+
     # Merge genres with order preservation
     seen_genres = {genre for genre in primary.genres}
-    for genre in fallback.genres:
+    for genre in llm_parser._normalize_genre_names(fallback.genres):
         if genre and genre not in seen_genres:
             primary.genres.append(genre)
             seen_genres.add(genre)
+
+    primary.genres = llm_parser._normalize_genre_names(primary.genres)
 
     if not primary.moods and fallback.moods:
         primary.moods = list(fallback.moods)
@@ -241,6 +418,11 @@ def _merge_with_legacy_filters(
 
     if primary.max_runtime is None and fallback.max_runtime is not None:
         primary.max_runtime = fallback.max_runtime
+
+    if hasattr(primary, "required_genres") and primary.required_genres:
+        primary.required_genres = llm_parser._normalize_genre_names(
+            primary.required_genres
+        )
 
     _merge_maturity_rating(primary, fallback)
 
@@ -371,6 +553,41 @@ def _apply_serendipity_slot(
     return deduped
 
 
+def _prioritize_boosted_items(
+    items: Sequence[Dict[str, Any]], boost_ids: Sequence[int]
+) -> List[Dict[str, Any]]:
+    if not items or not boost_ids:
+        return list(items)
+
+    lookup: Dict[int, Dict[str, Any]] = {}
+    ordered: List[Dict[str, Any]] = []
+    seen: set[int] = set()
+
+    for item in items:
+        ident = item.get("id")
+        if isinstance(ident, int):
+            lookup[ident] = item
+
+    for candidate in boost_ids:
+        boosted_item = lookup.get(candidate)
+        if boosted_item is None:
+            continue
+        ident = boosted_item.get("id")
+        if isinstance(ident, int) and ident not in seen:
+            ordered.append(boosted_item)
+            seen.add(ident)
+
+    for item in items:
+        ident = item.get("id")
+        if isinstance(ident, int) and ident in seen:
+            continue
+        ordered.append(item)
+        if isinstance(ident, int):
+            seen.add(ident)
+
+    return ordered
+
+
 @router.get("")
 async def recommend(
     request: Request,
@@ -408,9 +625,21 @@ async def recommend(
         ge=0.0,
         description="Override weight for the rewrite text component.",
     ),
+    ann_backend_override: str | None = Query(
+        None,
+        description="Force ANN backend ('elasticsearch' or 'pgvector') for this request.",
+    ),
     genre_override: str | None = Query(
         None,
         description="Comma-separated manual genres to enforce (e.g., 'Drama, Sci-Fi').",
+    ),
+    classic_top_rated: bool | None = Query(
+        None,
+        description=(
+            "Prioritize top-rated catalog titles over trending suggestions. "
+            "When omitted, a heuristic may enable this automatically for "
+            "queries like 'best classic movies'."
+        ),
     ),
     mixer_ann_weight: float | None = Query(
         None,
@@ -448,6 +677,19 @@ async def recommend(
     long_v, short_v, exclude, profile_meta = load_user_state(db, canonical_id)
     cold_start = short_v is None
 
+    backend_override_normalized: str | None = None
+    if ann_backend_override:
+        candidate_backend = ann_backend_override.strip().lower()
+        if candidate_backend and candidate_backend not in _SUPPORTED_ANN_BACKENDS:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Unsupported ann_backend_override. "
+                    "Valid options: 'elasticsearch', 'pgvector'."
+                ),
+            )
+        backend_override_normalized = candidate_backend or None
+
     linked_entities = None
     if query:
         entity_linker = getattr(request.app.state, "entity_linker", None)
@@ -484,6 +726,84 @@ async def recommend(
             intent.genres = custom_genres
             llm_intent.include_genres = custom_genres
     preferred_services = _normalize_streaming_services(llm_intent.streaming_providers)
+    prefer_top_rated = (
+        bool(classic_top_rated) if classic_top_rated is not None else False
+    )
+    heuristic_applied = False
+    if classic_top_rated is None and _matches_keywords(query, _TOP_QUERY_KEYWORDS):
+        prefer_top_rated = True
+        heuristic_applied = True
+    if prefer_top_rated:
+        if diversify:
+            diversify = False
+        if mixer_ann_weight is None:
+            mixer_ann_weight = 0.2
+        if mixer_collab_weight is None:
+            mixer_collab_weight = 0.2
+        if mixer_trending_weight is None:
+            mixer_trending_weight = 0.0
+        if mixer_popularity_weight is None:
+            mixer_popularity_weight = 0.0
+        if mixer_vote_weight is None:
+            mixer_vote_weight = 1.2
+        if mixer_novelty_weight is None:
+            mixer_novelty_weight = 0.0
+        if ann_weight_override is None:
+            ann_weight_override = 0.2
+        if heuristic_applied and logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "Auto-enabled classic_top_rated for query '%s' due to keyword match.",
+                query,
+            )
+
+    query_filter_result = get_query_filters(query)
+    providers_list = sorted(preferred_services) if preferred_services else []
+    genre_filters = list(query_filter_result.genres)
+    for genre in intent.effective_genres() if intent else []:
+        if genre and genre not in genre_filters:
+            genre_filters.append(genre)
+    media_type_filters = list(query_filter_result.media_types)
+    for media_type in intent.media_types or []:
+        normalized = media_type.lower()
+        if normalized and normalized not in media_type_filters:
+            media_type_filters.append(normalized)
+    structured_search_filters: SearchFilters | None = None
+    if providers_list or any(
+        len(seq)
+        for seq in (
+            query_filter_result.languages,
+            query_filter_result.keywords,
+            genre_filters,
+            media_type_filters,
+            query_filter_result.cast,
+            query_filter_result.directors,
+            query_filter_result.producers,
+            query_filter_result.writers,
+        )
+    ):
+        structured_search_filters = SearchFilters(
+            providers=tuple(providers_list),
+            languages=query_filter_result.languages,
+            keywords=query_filter_result.keywords,
+            genres=tuple(genre_filters),
+            media_types=tuple(media_type_filters),
+            cast=query_filter_result.cast,
+            directors=query_filter_result.directors,
+            producers=query_filter_result.producers,
+            writers=query_filter_result.writers,
+        )
+    es_text_query: str | None = query_filter_result.residual_text.strip() or None
+    if query_filter_result.reference_titles:
+        titles_blob = " ".join(query_filter_result.reference_titles)
+        if titles_blob:
+            es_text_query = (
+                f"{es_text_query} {titles_blob}".strip()
+                if es_text_query
+                else titles_blob
+            )
+    if query:
+        es_text_query = es_text_query or query
+    has_people_filters = _has_people_filters(structured_search_filters)
     llm_media_types = list(intent.media_types or [])
     legacy_filters = legacy_parse_intent(query) if query else None
     if legacy_filters:
@@ -506,12 +826,27 @@ async def recommend(
             )
     if ann_description_override:
         llm_intent.ann_description = ann_description_override.strip()
+    include_people = list(dict.fromkeys(llm_intent.include_people or []))
+    if include_people:
+        people_phrase = ", ".join(include_people)
+        if llm_intent.ann_description:
+            if people_phrase not in llm_intent.ann_description:
+                llm_intent.ann_description = (
+                    f"{llm_intent.ann_description.rstrip('.')}. "
+                    f"Featuring {people_phrase}."
+                )
+        else:
+            llm_intent.ann_description = f"Featuring {people_phrase}."
     candidate_limit = min(500, max(limit, limit * 3))
     if intent.has_filters():
         candidate_limit = min(500, max(candidate_limit, limit * 5))
 
     prefilter = _prefilter_allowed_ids(
-        db, intent, candidate_limit, preferred_services=preferred_services
+        db,
+        intent,
+        candidate_limit,
+        preferred_services=preferred_services,
+        prefer_top_rated=prefer_top_rated,
     )
     allowlist = prefilter.allowed_ids
     boost_ids = prefilter.boost_ids or []
@@ -531,6 +866,7 @@ async def recommend(
         getattr(llm_intent, "ann_description", None),
         ann_weight_override,
         rewrite_weight_override,
+        query_filter_result.reference_titles,
     )
 
     if cold_start:
@@ -538,13 +874,45 @@ async def recommend(
         if rewrite_vec is not None:
             vec_norm = float(np.linalg.norm(rewrite_vec))
             if vec_norm > 0 and np.isfinite(vec_norm):
-                ann_ids = ann_candidates(
-                    db,
-                    rewrite_vec,
-                    exclude,
-                    limit=candidate_limit,
-                    allowed_ids=allowlist,
-                )
+                try:
+                    ann_ids = ann_candidates(
+                        db,
+                        rewrite_vec,
+                        exclude,
+                        limit=candidate_limit,
+                        allowed_ids=allowlist,
+                        backend_override=backend_override_normalized,
+                        search_filters=structured_search_filters,
+                        text_query=es_text_query,
+                    )
+                except ValueError as exc:
+                    raise HTTPException(status_code=400, detail=str(exc)) from exc
+                if not ann_ids and has_people_filters:
+                    relaxed_filters = _relax_filters_for_people(
+                        structured_search_filters
+                    )
+                    if relaxed_filters:
+                        structured_search_filters = relaxed_filters
+                        try:
+                            ann_ids = ann_candidates(
+                                db,
+                                rewrite_vec,
+                                exclude,
+                                limit=candidate_limit,
+                                allowed_ids=None,
+                                backend_override=backend_override_normalized,
+                                search_filters=structured_search_filters,
+                                text_query=es_text_query,
+                            )
+                        except ValueError as exc:
+                            raise HTTPException(
+                                status_code=400, detail=str(exc)
+                            ) from exc
+                        if ann_ids and logger.isEnabledFor(logging.INFO):
+                            logger.info(
+                                "Relaxed ANN filters for user %s due to people filters.",
+                                canonical_id,
+                            )
                 if ann_ids:
                     logger.info(
                         "Using rewrite ANN candidates for cold-start user %s",
@@ -557,10 +925,30 @@ async def recommend(
                     )
                     ids = ann_ids
                     rewrite_used = True
+                elif has_people_filters and structured_search_filters:
+                    fallback_ids = _people_only_candidate_ids(
+                        db,
+                        structured_search_filters,
+                        limit=candidate_limit,
+                    )
+                    if fallback_ids:
+                        ids = fallback_ids
+                        rewrite_used = True
+                        if logger.isEnabledFor(logging.INFO):
+                            logger.info(
+                                "Using catalogue fallback for user %s due to people filters.",
+                                canonical_id,
+                            )
 
         if not rewrite_used:
             logger.info("Using cold-start candidates for user %s", canonical_id)
-            ids = _cold_start_candidates(db, intent, candidate_limit, allowlist)
+            ids = _cold_start_candidates(
+                db,
+                intent,
+                candidate_limit,
+                allowlist,
+                prefer_top_rated=prefer_top_rated,
+            )
             logger.debug(
                 "Cold-start retrieval | candidate_count=%d allowlist_size=%s enforce_genres=%s",
                 len(ids),
@@ -578,9 +966,54 @@ async def recommend(
         else:
             q_vec = short_v
 
-        ids = ann_candidates(
-            db, q_vec, exclude, limit=candidate_limit, allowed_ids=allowlist
-        )
+        try:
+            ids = ann_candidates(
+                db,
+                q_vec,
+                exclude,
+                limit=candidate_limit,
+                allowed_ids=allowlist,
+                backend_override=backend_override_normalized,
+                search_filters=structured_search_filters,
+                text_query=es_text_query,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not ids and has_people_filters:
+            relaxed_filters = _relax_filters_for_people(structured_search_filters)
+            if relaxed_filters:
+                structured_search_filters = relaxed_filters
+                try:
+                    ids = ann_candidates(
+                        db,
+                        q_vec,
+                        exclude,
+                        limit=candidate_limit,
+                        allowed_ids=None,
+                        backend_override=backend_override_normalized,
+                        search_filters=structured_search_filters,
+                        text_query=es_text_query,
+                    )
+                except ValueError as exc:
+                    raise HTTPException(status_code=400, detail=str(exc)) from exc
+                if ids and logger.isEnabledFor(logging.INFO):
+                    logger.info(
+                        "Relaxed ANN filters for user %s due to people filters.",
+                        canonical_id,
+                    )
+        if not ids and has_people_filters and structured_search_filters:
+            fallback_ids = _people_only_candidate_ids(
+                db,
+                structured_search_filters,
+                limit=candidate_limit,
+            )
+            if fallback_ids:
+                ids = fallback_ids
+                if logger.isEnabledFor(logging.INFO):
+                    logger.info(
+                        "Using catalogue fallback for user %s due to people filters.",
+                        canonical_id,
+                    )
         rewrite_applied = bool(rewrite_vec is not None)
         logger.debug(
             "ANN retrieval | candidate_count=%d allowlist_size=%s enforce_genres=%s rewrite=%s",
@@ -669,28 +1102,30 @@ async def recommend(
             seen_priority.add(candidate)
 
         if priority:
-            priority = [cand for cand in priority if cand in ids]
-            if priority:
-                combined: List[int] = list(priority)
-                seen_all = set(priority)
-                for candidate in ids:
-                    if candidate in seen_all:
-                        continue
-                    combined.append(candidate)
-                    seen_all.add(candidate)
+            combined: List[int] = list(priority)
+            seen_all = set(priority)
+            for candidate in ids:
+                if candidate in seen_all:
+                    continue
+                combined.append(candidate)
+                seen_all.add(candidate)
+                if len(combined) >= candidate_limit:
+                    break
 
-                ids = combined
-                for idx, candidate in enumerate(priority):
-                    score = 1.0 / (1.0 + idx)
-                    scores = merged_scores.setdefault(candidate, {})
-                    current = scores.get("ann")
-                    if current is None or score > current:
-                        scores["ann"] = score
-                logger.debug(
-                    "Boost reordering applied | boost_count=%d merged_length=%d",
-                    len(priority),
-                    len(ids),
-                )
+            ids = combined[:candidate_limit]
+            for idx, candidate in enumerate(priority):
+                if candidate not in ids:
+                    continue
+                score = 1.0 / (1.0 + idx)
+                scores = merged_scores.setdefault(candidate, {})
+                current = scores.get("ann")
+                if current is None or score > current:
+                    scores["ann"] = score
+            logger.debug(
+                "Boost reordering applied | boost_count=%d merged_length=%d",
+                len(priority),
+                len(ids),
+            )
 
     ids = ids[:candidate_limit]
 
@@ -730,6 +1165,7 @@ async def recommend(
     fallback_candidates: List[Dict[str, Any]] = []
     max_candidates = min(candidate_limit, max(limit * 2, 25))
     skipped_intent = 0
+    skipped_people = 0
     rank_counter = 0
     for iid in ids:
         it, vec, watch_options = items_with_data.get(iid, (None, None, None))
@@ -738,6 +1174,10 @@ async def recommend(
         if not item_matches_intent(it, intent, enforce_genres=enforce_genres):
             skipped_intent += 1
             continue
+        if structured_search_filters and _has_people_filters(structured_search_filters):
+            if not _item_matches_people_filters(it, structured_search_filters):
+                skipped_people += 1
+                continue
 
         sources = merged_scores.get(iid, {})
 
@@ -814,12 +1254,18 @@ async def recommend(
 
     if not ordered:
         return _empty_response()
-    if skipped_intent and logger.isEnabledFor(logging.DEBUG):
-        logger.debug(
-            "Post-filter dropped %d candidates due to intent match (enforce_genres=%s)",
-            skipped_intent,
-            enforce_genres,
-        )
+    if logger.isEnabledFor(logging.DEBUG):
+        if skipped_intent:
+            logger.debug(
+                "Post-filter dropped %d candidates due to intent match (enforce_genres=%s)",
+                skipped_intent,
+                enforce_genres,
+            )
+        if skipped_people:
+            logger.debug(
+                "Post-filter dropped %d candidates due to people filters",
+                skipped_people,
+            )
 
     if diversify:
         ordered = _apply_franchise_cap(ordered)
@@ -873,6 +1319,8 @@ async def recommend(
             "negative_items": profile_meta.get("negative_items"),
         },
     )
+    if boost_ids:
+        reranked = _prioritize_boosted_items(reranked, boost_ids)
 
     start_index = _decode_cursor(cursor)
     if start_index < 0:
@@ -1112,6 +1560,8 @@ def _trending_prior_candidates(
         Item.trending_rank,
         Item.popular_rank,
         Item.popularity,
+        Item.vote_average,
+        Item.vote_count,
     )
 
     filters = []
@@ -1130,9 +1580,17 @@ def _trending_prior_candidates(
     if intent:
         genres = intent.effective_genres()
         if genres:
-            genre_filters = [
-                _genre_contains_clause(db, genre) for genre in genres if genre
-            ]
+            mapped_genres = []
+            for genre in genres:
+                normalized = llm_parser._normalize_genre_names([genre])
+                if normalized:
+                    mapped_genres.extend(normalized)
+            if mapped_genres:
+                genre_filters = [
+                    _genre_contains_clause(db, genre)
+                    for genre in dict.fromkeys(mapped_genres)
+                    if genre
+                ]
             if genre_filters:
                 filters.append(or_(*genre_filters))
 
@@ -1143,6 +1601,8 @@ def _trending_prior_candidates(
         Item.trending_rank.asc().nullslast(),
         Item.popular_rank.asc().nullslast(),
         Item.popularity.desc().nullslast(),
+        Item.vote_average.desc().nullslast(),
+        Item.vote_count.desc().nullslast(),
         Item.id.asc(),
     ).limit(limit)
 
@@ -1150,8 +1610,25 @@ def _trending_prior_candidates(
     if not rows:
         return []
 
-    scored: List[Tuple[int, float, float]] = []
-    for item_id, trending_rank, popular_rank, popularity in rows:
+    scored: List[Tuple[int, float, float, float]] = []
+    for row in rows:
+        try:
+            (
+                item_id,
+                trending_rank,
+                popular_rank,
+                popularity,
+                vote_average,
+                vote_count,
+            ) = row
+        except ValueError:
+            # Backwards compatibility for older test fixtures that only provide 4 columns.
+            partial = tuple(row)
+            if len(partial) < 4:
+                continue
+            item_id, trending_rank, popular_rank, popularity = partial[:4]
+            vote_average = getattr(row, "vote_average", None)
+            vote_count = getattr(row, "vote_count", None)
         if item_id is None:
             continue
 
@@ -1162,27 +1639,46 @@ def _trending_prior_candidates(
         if not isinstance(popularity, (int, float)):
             popularity = None
 
+        vote_avg_val = (
+            float(vote_average) if isinstance(vote_average, (int, float)) else 0.0
+        )
+        vote_count_val = (
+            float(vote_count) if isinstance(vote_count, (int, float)) else 0.0
+        )
+
         rank_score = 0.0
         if trending_rank and trending_rank > 0:
             rank_score += 1.0 / (1.0 + float(trending_rank))
         if popular_rank and popular_rank > 0:
             rank_score += 0.5 / (1.0 + float(popular_rank))
         pop_score = float(popularity) if popularity is not None else 0.0
-        scored.append((int(item_id), rank_score, pop_score))
+        vote_quality = max((vote_avg_val - 6.5) / 3.5, 0.0)
+        vote_volume = min(vote_count_val / 5000.0, 1.0)
+        vote_score = vote_quality * (0.5 + 0.5 * vote_volume)
+        scored.append((int(item_id), rank_score, pop_score, vote_score))
 
     max_rank = max((entry[1] for entry in scored), default=0.0)
     max_pop = max((entry[2] for entry in scored), default=0.0)
+    max_vote = max((entry[3] for entry in scored), default=0.0)
     if max_rank <= 0:
         max_rank = 1.0
     if max_pop <= 0:
         max_pop = 1.0
+    if max_vote <= 0:
+        max_vote = 1.0
 
     results: List[Tuple[int, float]] = []
-    for item_id, rank_score, pop_score in scored:
+    for item_id, rank_score, pop_score, vote_score in scored:
         normalized_rank = rank_score / max_rank if max_rank > 0 else 0.0
         normalized_pop = pop_score / max_pop if max_pop > 0 else 0.0
-        combined = 0.7 * normalized_rank + 0.3 * normalized_pop
+        normalized_vote = vote_score / max_vote if max_vote > 0 else 0.0
+        combined = 0.5 * normalized_rank + 0.3 * normalized_pop + 0.2 * normalized_vote
         results.append((item_id, combined))
+    if not results:
+        return results
+    max_combined = max(score for _, score in results)
+    if max_combined > 0:
+        results = [(item_id, score / max_combined) for item_id, score in results]
     return results
 
 
@@ -1191,6 +1687,7 @@ def _prefilter_allowed_ids(
     intent: IntentFilters | None,
     limit: int,
     preferred_services: Set[str] | None = None,
+    prefer_top_rated: bool = False,
 ) -> PrefilterDecision:
     if intent is None or not intent.has_filters():
         # Nothing to prefilter: leave the allowlist unset, but keep genre enforcement
@@ -1206,6 +1703,7 @@ def _prefilter_allowed_ids(
         fetch_limit=fetch_limit,
         include_genres=True,
         required_services=preferred_services,
+        prefer_top_rated=prefer_top_rated,
     )
     logger.debug(
         "Prefilter strict run | threshold=%d strict_count=%d media_types=%s genres=%s",
@@ -1215,10 +1713,27 @@ def _prefilter_allowed_ids(
         intent.effective_genres(),
     )
     boost_cap = max(5, min(limit, 15))
+    if prefer_top_rated and strict_ids:
+        boost_cap = min(len(strict_ids), max(boost_cap, min(limit, 25)))
 
-    if len(strict_ids) >= threshold:
+    def _unique_slice(values: Sequence[int], cap: int | None = None) -> List[int]:
+        seen: set[int] = set()
+        result: List[int] = []
+        for value in values:
+            if value in seen:
+                continue
+            seen.add(value)
+            result.append(value)
+            if cap is not None and len(result) >= cap:
+                break
+        return result
+
+    if len(strict_ids) >= threshold or prefer_top_rated:
         logger.debug("Prefilter returning strict allowlist.")
-        return PrefilterDecision(strict_ids, strict_ids[:boost_cap], True)
+        unique_strict = _unique_slice(strict_ids)
+        return PrefilterDecision(
+            unique_strict, _unique_slice(unique_strict, boost_cap), True
+        )
 
     relaxed_ids = _run_prefilter_query(
         db,
@@ -1226,6 +1741,7 @@ def _prefilter_allowed_ids(
         fetch_limit=fetch_limit,
         include_genres=False,
         required_services=preferred_services,
+        prefer_top_rated=prefer_top_rated,
     )
 
     if len(relaxed_ids) >= threshold:
@@ -1235,15 +1751,23 @@ def _prefilter_allowed_ids(
             len(relaxed_ids),
             len(strict_ids),
         )
-        return PrefilterDecision(relaxed_ids, strict_ids, False)
+        unique_relaxed = _unique_slice(relaxed_ids)
+        return PrefilterDecision(
+            unique_relaxed, _unique_slice(strict_ids, boost_cap), False
+        )
 
-    # Fall back to ANN-first retrieval. Preserve genre matches as soft boosts.
+    # Fall back to ANN-first retrieval. Preserve genre matches as soft boosts and keep
+    # genre enforcement when the intent explicitly requested it so we don't surface
+    # irrelevant results (e.g., animation queries returning live-action titles).
     logger.debug(
         "Prefilter falling back to ANN-first | relaxed_count=%d strict_count=%d",
         len(relaxed_ids),
         len(strict_ids),
     )
-    return PrefilterDecision(None, strict_ids[:boost_cap], False)
+    enforce_on_fallback = bool(intent.effective_genres())
+    return PrefilterDecision(
+        None, _unique_slice(strict_ids, boost_cap), enforce_on_fallback
+    )
 
 
 def _run_prefilter_query(
@@ -1253,6 +1777,7 @@ def _run_prefilter_query(
     fetch_limit: int,
     include_genres: bool,
     required_services: Set[str] | None = None,
+    prefer_top_rated: bool = False,
 ) -> List[int]:
     stmt = select(Item.id)
 
@@ -1274,9 +1799,38 @@ def _run_prefilter_query(
     if include_genres:
         genres = intent.effective_genres()
         if genres:
-            filters = [_genre_contains_clause(db, genre) for genre in genres if genre]
-            if filters:
-                stmt = stmt.where(or_(*filters))
+            mapped_genres = []
+            for genre in genres:
+                normalized = llm_parser._normalize_genre_names([genre])
+                if normalized:
+                    mapped_genres.extend(normalized)
+            genre_filters = []
+            if mapped_genres:
+                genre_filters = [
+                    _genre_contains_clause(db, genre)
+                    for genre in dict.fromkeys(mapped_genres)
+                    if genre
+                ]
+            if genre_filters:
+                stmt = stmt.where(or_(*genre_filters))
+
+    if prefer_top_rated:
+        stmt = stmt.order_by(
+            Item.top_rated_rank.asc().nullslast(),
+            Item.vote_average.desc().nullslast(),
+            Item.vote_count.desc().nullslast(),
+            Item.popular_rank.asc().nullslast(),
+            Item.id.asc(),
+        )
+    else:
+        stmt = stmt.order_by(
+            Item.trending_rank.asc().nullslast(),
+            Item.popular_rank.asc().nullslast(),
+            Item.popularity.desc().nullslast(),
+            Item.vote_average.desc().nullslast(),
+            Item.vote_count.desc().nullslast(),
+            Item.id.asc(),
+        )
 
     rows = db.execute(stmt.limit(fetch_limit)).scalars().all()
     return _ordered_unique(rows)
@@ -1320,6 +1874,7 @@ def _cold_start_candidates(
     intent: IntentFilters,
     limit: int,
     allowlist: List[int] | None,
+    prefer_top_rated: bool = False,
 ) -> List[int]:
     stmt = select(Item.id).join(ItemEmbedding, ItemEmbedding.item_id == Item.id)
 
@@ -1338,12 +1893,25 @@ def _cold_start_candidates(
             if genre_filters:
                 stmt = stmt.where(or_(*genre_filters))
 
-    stmt = stmt.order_by(
-        Item.popular_rank.asc().nullslast(),
-        Item.trending_rank.asc().nullslast(),
-        Item.popularity.desc().nullslast(),
-        Item.id.asc(),
-    ).limit(limit)
+    if prefer_top_rated:
+        stmt = stmt.order_by(
+            Item.top_rated_rank.asc().nullslast(),
+            Item.vote_average.desc().nullslast(),
+            Item.vote_count.desc().nullslast(),
+            Item.popular_rank.asc().nullslast(),
+            Item.id.asc(),
+        )
+    else:
+        stmt = stmt.order_by(
+            Item.popular_rank.asc().nullslast(),
+            Item.trending_rank.asc().nullslast(),
+            Item.popularity.desc().nullslast(),
+            Item.vote_average.desc().nullslast(),
+            Item.vote_count.desc().nullslast(),
+            Item.id.asc(),
+        )
+
+    stmt = stmt.limit(limit)
 
     rows = db.execute(stmt).scalars().all()
     seen: set[int] = set()

@@ -27,3 +27,6 @@ htmlcov/
 
 # Logs
 *.log
+
+# LLM cache (persisted intents/rewrites)
+.cache/

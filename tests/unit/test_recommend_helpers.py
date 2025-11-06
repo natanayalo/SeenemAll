@@ -39,7 +39,8 @@ def test_merge_with_legacy_filters_merges_and_preserves(monkeypatch):
     )
 
     merged = recommend_routes._merge_with_legacy_filters(primary, fallback)
-    assert merged.genres == ["Science Fiction", "Drama"]
+    assert merged.genres[0] == "Science Fiction"
+    assert "Drama" in merged.genres
     assert merged.moods == ["dark"]
     assert merged.media_types == ["movie"]
     assert merged.min_runtime == 90

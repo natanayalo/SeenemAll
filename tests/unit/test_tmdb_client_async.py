@@ -115,7 +115,7 @@ def test_details_delegates_to_get(monkeypatch):
             assert path == "/movie/9"
             assert params == {
                 "language": "en-US",
-                "append_to_response": "release_dates",
+                "append_to_response": "release_dates,credits,keywords",
             }
             return {"id": 9}
 
@@ -136,7 +136,7 @@ def test_details_tv_includes_content_ratings(monkeypatch):
             assert path == "/tv/42"
             assert params == {
                 "language": "en-US",
-                "append_to_response": "content_ratings",
+                "append_to_response": "content_ratings,credits,keywords",
             }
             return {"id": 42}
 

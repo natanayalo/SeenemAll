@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 from api.db.models import Item
 from etl import tmdb_sync as mod
@@ -27,6 +28,52 @@ def test_map_item_payload_handles_movie_fields():
                 "trending_rank": 5,
                 "top_rated_rank": 4,
             },
+            "spoken_languages": [
+                {"iso_639_1": "en", "english_name": "English"},
+                {"iso_639_1": "fr", "english_name": "French"},
+            ],
+            "keywords": {
+                "keywords": [
+                    {"id": 10, "name": "hero"},
+                    {"id": 11, "name": "world saving"},
+                ]
+            },
+            "credits": {
+                "cast": [
+                    {
+                        "id": 201,
+                        "name": "Lead Actor",
+                        "order": 0,
+                        "character": "Hero",
+                    },
+                    {
+                        "id": 202,
+                        "name": "Second Actor",
+                        "order": 1,
+                        "character": "Sidekick",
+                    },
+                ],
+                "crew": [
+                    {
+                        "id": 301,
+                        "name": "Director Name",
+                        "job": "Director",
+                        "department": "Directing",
+                    },
+                    {
+                        "id": 302,
+                        "name": "Producer Name",
+                        "job": "Producer",
+                        "department": "Production",
+                    },
+                    {
+                        "id": 303,
+                        "name": "Writer Name",
+                        "job": "Writer",
+                        "department": "Writing",
+                    },
+                ],
+            },
         }
     )
 
@@ -41,6 +88,14 @@ def test_map_item_payload_handles_movie_fields():
     assert payload["popular_rank"] == 2
     assert payload["trending_rank"] == 5
     assert payload["top_rated_rank"] == 4
+    assert payload["cast"][:1] == [
+        {"id": 201, "name": "Lead Actor", "character": "Hero", "order": 0}
+    ]
+    assert payload["directors"][0]["name"] == "Director Name"
+    assert payload["producers"][0]["name"] == "Producer Name"
+    assert payload["writers"][0]["name"] == "Writer Name"
+    assert payload["keywords"][0]["name"] == "hero"
+    assert payload["spoken_languages"][0]["iso_639_1"] == "en"
 
 
 def test_map_item_payload_falls_back_for_tv_runtime_and_name():
@@ -73,8 +128,12 @@ def test_upsert_items_inserts_and_updates(monkeypatch):
             self.session = session
             self.tmdb_id = None
 
-        def filter(self, expr):
-            self.tmdb_id = getattr(expr.right, "value", None)
+        def filter(self, *exprs):
+            for expr in exprs:
+                value = getattr(getattr(expr, "right", None), "value", None)
+                if value is not None:
+                    self.tmdb_id = value
+                    break
             return self
 
         def update(self, payload):
@@ -89,7 +148,7 @@ def test_upsert_items_inserts_and_updates(monkeypatch):
         def execute(self, stmt):
             self.calls += 1
             if self.calls == 1:
-                return DummyResult([(1,)])
+                return DummyResult([SimpleNamespace(tmdb_id=1, media_type="movie")])
             return DummyResult([])
 
         def bulk_insert_mappings(self, model, payload):
