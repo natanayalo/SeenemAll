@@ -145,3 +145,19 @@ def test_apply_serendipity_slot_returns_current_when_disabled(monkeypatch):
     monkeypatch.setattr(recommend_routes, "_SERENDIPITY_RATIO", 0.2, raising=False)
     current = [{"id": 1, "original_rank": 0}]
     assert recommend_routes._apply_serendipity_slot(current, [], limit=0) == current
+
+
+def test_filter_excluded_candidate_ids_removes_matches():
+    exclude_set = {2}
+    assert recommend_routes._filter_excluded_candidate_ids([1, 2, 3], exclude_set) == [
+        1,
+        3,
+    ]
+    assert recommend_routes._filter_excluded_candidate_ids([], exclude_set) == []
+    assert recommend_routes._filter_excluded_candidate_ids([4], set()) == [4]
+
+
+def test_prioritize_boosted_items_moves_priority_first():
+    items = [{"id": 1}, {"id": 2}, {"id": 3}]
+    reordered = recommend_routes._prioritize_boosted_items(items, [3, 1])
+    assert [item["id"] for item in reordered] == [3, 1, 2]

@@ -188,6 +188,16 @@ def _people_only_candidate_ids(
     return [int(row) for row in rows]
 
 
+def _filter_excluded_candidate_ids(
+    candidates: Sequence[int], exclude_set: Set[int]
+) -> List[int]:
+    if not candidates:
+        return []
+    if not exclude_set:
+        return list(candidates)
+    return [candidate for candidate in candidates if candidate not in exclude_set]
+
+
 def _normalize_streaming_services(
     providers: Sequence[str] | None,
 ) -> Set[str]:
@@ -675,6 +685,7 @@ async def recommend(
 ):
     canonical_id = canonical_profile_id(user_id, profile)
     long_v, short_v, exclude, profile_meta = load_user_state(db, canonical_id)
+    exclude_set: Set[int] = set(exclude or [])
     cold_start = short_v is None
 
     backend_override_normalized: str | None = None
@@ -931,8 +942,11 @@ async def recommend(
                         structured_search_filters,
                         limit=candidate_limit,
                     )
-                    if fallback_ids:
-                        ids = fallback_ids
+                    filtered_fallback = _filter_excluded_candidate_ids(
+                        fallback_ids, exclude_set
+                    )
+                    if filtered_fallback:
+                        ids = filtered_fallback
                         rewrite_used = True
                         if logger.isEnabledFor(logging.INFO):
                             logger.info(
@@ -1007,8 +1021,11 @@ async def recommend(
                 structured_search_filters,
                 limit=candidate_limit,
             )
-            if fallback_ids:
-                ids = fallback_ids
+            filtered_fallback = _filter_excluded_candidate_ids(
+                fallback_ids, exclude_set
+            )
+            if filtered_fallback:
+                ids = filtered_fallback
                 if logger.isEnabledFor(logging.INFO):
                     logger.info(
                         "Using catalogue fallback for user %s due to people filters.",
@@ -1092,7 +1109,6 @@ async def recommend(
     # Limit applied after boost reordering
 
     if boost_ids:
-        exclude_set = set(exclude or [])
         priority: List[int] = []
         seen_priority: set[int] = set()
         for candidate in boost_ids:
@@ -1306,6 +1322,9 @@ async def recommend(
 
     ordered = _apply_serendipity_slot(ordered, serendipity_context, limit)
 
+    if boost_ids:
+        ordered = _prioritize_boosted_items(ordered, boost_ids)
+
     reranked = rerank_with_explanations(
         ordered,
         intent=intent,
@@ -1319,8 +1338,6 @@ async def recommend(
             "negative_items": profile_meta.get("negative_items"),
         },
     )
-    if boost_ids:
-        reranked = _prioritize_boosted_items(reranked, boost_ids)
 
     start_index = _decode_cursor(cursor)
     if start_index < 0:
