@@ -161,3 +161,16 @@ def test_prioritize_boosted_items_moves_priority_first():
     items = [{"id": 1}, {"id": 2}, {"id": 3}]
     reordered = recommend_routes._prioritize_boosted_items(items, [3, 1])
     assert [item["id"] for item in reordered] == [3, 1, 2]
+
+
+def test_strict_required_genres_prefers_custom_and_legacy():
+    intent = IntentFilters(raw_query="", genres=["Science Fiction", "Animation"])
+    legacy = IntentFilters(raw_query="", genres=["Animation", "Science Fiction"])
+    strict = recommend_routes._strict_required_genres(["Animation"], legacy, intent)
+    assert strict == ["Animation", "Science Fiction", "Sci-Fi & Fantasy"]
+
+
+def test_strict_required_genres_falls_back_to_intent():
+    intent = IntentFilters(raw_query="", genres=["Comedy"])
+    strict = recommend_routes._strict_required_genres([], None, intent)
+    assert strict == ["Comedy"]

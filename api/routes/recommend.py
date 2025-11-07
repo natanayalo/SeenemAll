@@ -233,6 +233,29 @@ def _matches_keywords(text: str | None, keywords: Set[str]) -> bool:
     return False
 
 
+def _strict_required_genres(
+    custom_genres: Sequence[str],
+    legacy_filters: IntentFilters | None,
+    intent: IntentFilters,
+) -> List[str]:
+    strict_genres: List[str] = []
+    strict_genres.extend(custom_genres)
+    if legacy_filters and legacy_filters.genres:
+        strict_genres.extend(legacy_filters.genres)
+    if not strict_genres:
+        strict_genres.extend(intent.genres)
+    normalized_required = llm_parser._normalize_genre_names(strict_genres)
+    if not normalized_required:
+        return []
+    seen: set[str] = set()
+    deduped: List[str] = []
+    for genre in normalized_required:
+        if genre and genre not in seen:
+            deduped.append(genre)
+            seen.add(genre)
+    return deduped
+
+
 def _float_from_env(name: str, default: float) -> float:
     raw = os.getenv(name)
     if raw is None:
@@ -681,6 +704,10 @@ async def recommend(
         ge=0.0,
         description="Override novelty weight (default MIXER_NOVELTY_WEIGHT).",
     ),
+    strict_filters: bool = Query(
+        False,
+        description="Require items to satisfy every inferred genre (AND semantics).",
+    ),
     db: Session = Depends(get_db),
 ):
     canonical_id = canonical_profile_id(user_id, profile)
@@ -731,6 +758,7 @@ async def recommend(
             }
             logger.debug("Linked entity counts: %s", entity_counts)
     intent = _intent_filters_from_llm(query, llm_intent)
+    custom_genres: List[str] = []
     if genre_override:
         custom_genres = [g.strip() for g in genre_override.split(",") if g.strip()]
         if custom_genres:
@@ -819,6 +847,10 @@ async def recommend(
     legacy_filters = legacy_parse_intent(query) if query else None
     if legacy_filters:
         intent = _merge_with_legacy_filters(intent, legacy_filters)
+    if strict_filters:
+        strict_required = _strict_required_genres(custom_genres, legacy_filters, intent)
+        if strict_required:
+            intent.required_genres = strict_required
     entity_media_types = linked_media_types(linked_entities)
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
@@ -852,12 +884,16 @@ async def recommend(
     if intent.has_filters():
         candidate_limit = min(500, max(candidate_limit, limit * 5))
 
+    prefilter_kwargs: Dict[str, Any] = {}
+    if strict_filters:
+        prefilter_kwargs["require_all_genres"] = True
     prefilter = _prefilter_allowed_ids(
         db,
         intent,
         candidate_limit,
         preferred_services=preferred_services,
         prefer_top_rated=prefer_top_rated,
+        **prefilter_kwargs,
     )
     allowlist = prefilter.allowed_ids
     boost_ids = prefilter.boost_ids or []
@@ -1705,6 +1741,7 @@ def _prefilter_allowed_ids(
     limit: int,
     preferred_services: Set[str] | None = None,
     prefer_top_rated: bool = False,
+    require_all_genres: bool = False,
 ) -> PrefilterDecision:
     if intent is None or not intent.has_filters():
         # Nothing to prefilter: leave the allowlist unset, but keep genre enforcement
@@ -1721,6 +1758,7 @@ def _prefilter_allowed_ids(
         include_genres=True,
         required_services=preferred_services,
         prefer_top_rated=prefer_top_rated,
+        require_all_genres=require_all_genres,
     )
     logger.debug(
         "Prefilter strict run | threshold=%d strict_count=%d media_types=%s genres=%s",
@@ -1759,6 +1797,7 @@ def _prefilter_allowed_ids(
         include_genres=False,
         required_services=preferred_services,
         prefer_top_rated=prefer_top_rated,
+        require_all_genres=False,
     )
 
     if len(relaxed_ids) >= threshold:
@@ -1795,6 +1834,7 @@ def _run_prefilter_query(
     include_genres: bool,
     required_services: Set[str] | None = None,
     prefer_top_rated: bool = False,
+    require_all_genres: bool = False,
 ) -> List[int]:
     stmt = select(Item.id)
 
@@ -1829,7 +1869,11 @@ def _run_prefilter_query(
                     if genre
                 ]
             if genre_filters:
-                stmt = stmt.where(or_(*genre_filters))
+                if require_all_genres:
+                    for clause in genre_filters:
+                        stmt = stmt.where(clause)
+                else:
+                    stmt = stmt.where(or_(*genre_filters))
 
     if prefer_top_rated:
         stmt = stmt.order_by(

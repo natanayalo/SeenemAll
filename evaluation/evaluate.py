@@ -271,6 +271,11 @@ def default_param_grid() -> (
             if entry.get("genre_override")
             else None
         ),
+        "strict": lambda entry: {
+            "use_llm_intent": True,
+            "strict_filters": True,
+            "genre_override": entry.get("genre_override"),
+        },
     }
 
 
