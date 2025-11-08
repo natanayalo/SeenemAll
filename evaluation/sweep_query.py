@@ -75,6 +75,11 @@ def iter_param_grid(args: argparse.Namespace) -> Iterable[Tuple[OverrideParams, 
         value in {"1", "true", "yes"} for value in bool_options or ["false", "true"]
     ]
 
+    strict_options = [
+        value.strip().lower() in {"1", "true", "yes"}
+        for value in getattr(args, "strict_filters_options", ["false"])
+    ]
+
     grid_def: List[Tuple[str, GridOptions]] = [
         ("ann_weight_override", _as_float_list(cast(Sequence[float], args.ann_weight))),
         (
@@ -106,6 +111,7 @@ def iter_param_grid(args: argparse.Namespace) -> Iterable[Tuple[OverrideParams, 
             _as_float_list(cast(Sequence[float], args.mixer_novelty_weight)),
         ),
         ("classic_top_rated", classic_options),
+        ("strict_filters", strict_options),
     ]
     grid_values: List[GridOptions] = [options for _, options in grid_def]
     total = 1
@@ -134,6 +140,7 @@ def fetch_recommendations(
     limit: int,
     use_llm_intent: bool,
     overrides: Dict[str, Any],
+    serendipity_ratio: float | None = None,
 ) -> List[Dict[str, Any]]:
     params: Dict[str, Any] = {
         "user_id": user_id,
@@ -141,6 +148,9 @@ def fetch_recommendations(
         "limit": limit,
         "use_llm_intent": str(use_llm_intent).lower(),
     }
+    if serendipity_ratio is not None:
+        params["serendipity_ratio"] = serendipity_ratio
+
     for key, value in overrides.items():
         if isinstance(value, bool):
             params[key] = "true" if value else "false"
@@ -213,7 +223,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--user-id", default="u_eval", help="User id for API calls.")
     parser.add_argument(
-        "--limit", type=int, default=20, help="Number of recs to fetch."
+        "--limit", type=int, default=10, help="Number of recs to fetch."
+    )
+    parser.add_argument(
+        "--serendipity-ratio",
+        type=float,
+        default=0.0,
+        help="Override SERENDIPITY_RATIO for sweep requests (default disables).",
     )
     parser.add_argument(
         "--use-llm-intent",
@@ -236,7 +252,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-combinations",
         type=int,
-        default=200,
+        default=512,
         help="Safety limit for the total number of parameter combinations.",
     )
 
@@ -249,19 +265,25 @@ def parse_args() -> argparse.Namespace:
             help=f"Values to try for {name.replace('_', ' ')}.",
         )
 
-    add_float_grid_arg("ann_weight", (0.4, 0.7))
-    add_float_grid_arg("rewrite_weight", (0.2, 0.4))
-    add_float_grid_arg("mixer_ann_weight", (0.3, 0.5))
-    add_float_grid_arg("mixer_trending_weight", (0.0, 0.1))
-    add_float_grid_arg("mixer_vote_weight", (0.6, 1.0))
-    add_float_grid_arg("mixer_popularity_weight", (0.2,))
-    add_float_grid_arg("mixer_collab_weight", (0.3,))
-    add_float_grid_arg("mixer_novelty_weight", (0.05,))
+    add_float_grid_arg("ann_weight", (0.4,))
+    add_float_grid_arg("rewrite_weight", (0.2,))
+    add_float_grid_arg("mixer_ann_weight", (0.3,))
+    add_float_grid_arg("mixer_trending_weight", (0.0,))
+    add_float_grid_arg("mixer_vote_weight", (0.6, 1.2))
+    add_float_grid_arg("mixer_popularity_weight", (0.0, 0.2))
+    add_float_grid_arg("mixer_collab_weight", (0.2,))
+    add_float_grid_arg("mixer_novelty_weight", (0.0, 0.1))
     parser.add_argument(
         "--classic-top-rated-options",
         nargs="+",
         default=["false", "true"],
         help="Boolean values to try for classic_top_rated (e.g., false true).",
+    )
+    parser.add_argument(
+        "--strict-filters-options",
+        nargs="+",
+        default=["false", "true"],
+        help="Boolean values to try for strict_filters (default: false true).",
     )
     return parser.parse_args()
 
@@ -305,6 +327,7 @@ def main() -> None:
                     args.limit,
                     args.use_llm_intent,
                     overrides,
+                    args.serendipity_ratio,
                 )
             except httpx.HTTPError as exc:
                 print(f"[error] API call failed for {label}: {exc}")

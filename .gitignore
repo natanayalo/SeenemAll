@@ -35,4 +35,5 @@ htmlcov/
 evaluation/evaluation_results*.csv
 evaluation/evaluation_scores*.csv
 evaluation/report.html
+evaluation/sweep_*.csv
 tmp_report.html

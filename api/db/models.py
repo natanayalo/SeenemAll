@@ -138,3 +138,13 @@ class Feedback(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+
+class CatalogMetadata(Base):
+    __tablename__ = "catalog_metadata"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    data: Mapped[dict] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

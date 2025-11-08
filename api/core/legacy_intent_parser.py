@@ -158,6 +158,9 @@ class IntentFilters:
     max_runtime: Optional[int] = None
     maturity_rating_max: Optional[str] = None
     required_genres: List[str] = field(default_factory=list)
+    keywords: List[str] = field(default_factory=list)
+    genre_keywords: List[str] = field(default_factory=list)
+    reference_titles: List[str] = field(default_factory=list)
 
     def effective_genres(self) -> List[str]:
         seen: set[str] = set()
@@ -190,6 +193,7 @@ class IntentFilters:
             or self.max_runtime is not None
             or self.effective_genres()
             or self.maturity_rating_max
+            or self.keywords
         )
 
 

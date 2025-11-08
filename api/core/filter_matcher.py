@@ -167,10 +167,6 @@ class QueryFilterMatcher:
             if isinstance(writers, list):
                 writer_entries = [e for e in writers if isinstance(e, Mapping)]
                 _ingest_people(writer_entries, "writers")
-            if isinstance(keywords, list):
-                for entry in keywords:
-                    if isinstance(entry, Mapping):
-                        _ingest_genre(entry)
 
         self._language_map = language_terms
         self._keyword_map = keyword_terms
@@ -280,12 +276,13 @@ class QueryFilterMatcher:
                 container.append(value)
 
         for match_id, start, end in sorted_matches:
-            if any(i in used_tokens for i in range(start, end)):
-                continue
             span = doc[start:end]
             text = span.text
             lower = text.lower()
             label = self._nlp.vocab.strings[match_id]
+            allow_overlap = label == "KEYWORD"
+            if not allow_overlap and any(i in used_tokens for i in range(start, end)):
+                continue
             if label == "LANGUAGE":
                 canonical = self._language_map.get(lower)
                 _append_unique(languages, canonical)
@@ -309,13 +306,20 @@ class QueryFilterMatcher:
                         _append_unique(producers, text)
                     elif role == "writers":
                         _append_unique(writers, text)
-            used_tokens.update(range(start, end))
+            if not allow_overlap:
+                used_tokens.update(range(start, end))
 
         reference_titles = self._extract_reference_titles(doc, used_tokens)
 
         residual = "".join(
             token.text_with_ws for i, token in enumerate(doc) if i not in used_tokens
         ).strip()
+        if keywords:
+            keyword_blob = " ".join(keyword for keyword in keywords if keyword)
+            if keyword_blob:
+                residual = (
+                    f"{residual} {keyword_blob}".strip() if residual else keyword_blob
+                )
 
         return QueryFiltersResult(
             tuple(languages),

@@ -70,3 +70,53 @@ def test_query_filter_matcher_extracts_reference_titles(monkeypatch):
 
     assert list(filters.reference_titles) == ["The Witcher"]
     assert "witcher" not in filters.residual_text.lower()
+
+
+def test_query_filter_matcher_keeps_keywords_in_residual(monkeypatch):
+    rows = [
+        (
+            [],
+            [{"name": "Classic Western"}],
+            [],
+            [],
+            [],
+            [],
+            [],
+        )
+    ]
+
+    monkeypatch.setattr(
+        "api.core.filter_matcher.get_sessionmaker",
+        lambda: lambda: DummySession(rows),
+    )
+
+    matcher = QueryFilterMatcher()
+    filters = matcher.match("classic western movies")
+
+    assert list(filters.keywords) == ["Classic Western"]
+    assert "classic western" in filters.residual_text.lower()
+
+
+def test_query_filter_matcher_extracts_genre_even_with_keyword_overlap(monkeypatch):
+    rows = [
+        (
+            [],
+            [{"name": "Classic Western"}],
+            [{"name": "Western"}],
+            [],
+            [],
+            [],
+            [],
+        )
+    ]
+
+    monkeypatch.setattr(
+        "api.core.filter_matcher.get_sessionmaker",
+        lambda: lambda: DummySession(rows),
+    )
+
+    matcher = QueryFilterMatcher()
+    filters = matcher.match("classic western movies")
+
+    assert list(filters.genres) == ["Western"]
+    assert list(filters.keywords) == ["Classic Western"]

@@ -78,6 +78,7 @@ def _build_filter_clauses(
 
     clauses: List[Mapping[str, Any]] = []
     must_not: List[Mapping[str, Any]] = []
+    keyword_should: List[Mapping[str, Any]] = []
 
     for field, values in (
         ("item_id", filters.include_item_ids),
@@ -86,7 +87,6 @@ def _build_filter_clauses(
         ("streaming_providers", filters.providers),
         ("maturity", filters.maturity),
         ("spoken_languages", filters.languages),
-        ("keywords", filters.keywords),
         ("cast", filters.cast),
         ("directors", filters.directors),
         ("producers", filters.producers),
@@ -95,6 +95,10 @@ def _build_filter_clauses(
         term_clause = _terms_filter(field, values)
         if term_clause:
             clauses.append(term_clause)
+
+    keyword_clause = _terms_filter("keywords", filters.keywords)
+    if keyword_clause:
+        keyword_should.append(keyword_clause)
 
     range_clause = _range_filter(
         "release_year",
@@ -120,6 +124,8 @@ def _build_filter_clauses(
         bool_filters["filter"] = clauses
     if must_not:
         bool_filters["must_not"] = must_not
+    if keyword_should:
+        bool_filters["keyword_should"] = keyword_should
     return bool_filters
 
 
@@ -228,11 +234,24 @@ def knn_search(
 
     hits = response.get("hits", {}).get("hits", [])
     text_hits: List[Mapping[str, Any]] = []
+    if logger.isEnabledFor(logging.DEBUG):
+        sample_ids = [
+            hit.get("_source", {}).get("item_id") or hit.get("_id") for hit in hits[:5]
+        ]
+        logger.debug(
+            "ES kNN search completed | filters=%s hit_count=%d sample_ids=%s",
+            bool_filters,
+            len(hits),
+            sample_ids,
+        )
 
     if text_query:
         text_bool: Dict[str, List[Mapping[str, Any]]] = {
             key: list(value) for key, value in bool_filters.items()
         }
+        keyword_should = text_bool.pop("keyword_should", [])
+        if keyword_should:
+            text_bool.setdefault("should", []).extend(keyword_should)
         text_bool.setdefault("must", []).append(
             {
                 "multi_match": {
@@ -267,6 +286,18 @@ def knn_search(
                 "Elasticsearch text query failed; continuing with kNN results: %s",
                 exc,
             )
+        else:
+            if logger.isEnabledFor(logging.DEBUG):
+                sample_text_ids = [
+                    hit.get("_source", {}).get("item_id") or hit.get("_id")
+                    for hit in text_hits[:5]
+                ]
+                logger.debug(
+                    "ES text search completed | query=%s hit_count=%d sample_ids=%s",
+                    text_query,
+                    len(text_hits),
+                    sample_text_ids,
+                )
 
     if text_hits:
         hits = _fuse_hits_rrf([hits, text_hits], max_size=effective_k)

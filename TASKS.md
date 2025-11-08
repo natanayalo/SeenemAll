@@ -137,3 +137,13 @@
 | **11.4** ANN/Hybrid query prototype | ✅ | `api/core/elasticsearch_search.py` wraps ES kNN + filters with tests for exclusions and keyword blending |
 | **11.5** API integration | ✅ | `ann_candidates` now queries Elasticsearch via kNN (allowlists/exclusions preserved) and feeds the existing mixer |
 | **11.6** Evaluation & rollout | ⏳ | Re-run `make eval`, capture metrics vs. current pipeline, monitor latency; update docs/env vars for staging/production deployment
+
+### 12. Query Filter Unification (Priority: Medium)
+
+| Task | Status | Notes |
+|---|---|---|
+| **12.1** Feed spaCy matcher signals into intent pipeline | ✅ | QueryFilterMatcher media types/genres/keywords now merge into the catalog-aware IntentFilters before Elasticsearch filters are built |
+| **12.2** Catalog-normalize matcher outputs | ✅ | Matcher-derived hints reuse `_normalize_genre_names` / `_strict_required_genres`, honoring per-media-type genre lists |
+| **12.3** Derive SearchFilters from normalized intent | ✅ | Elasticsearch filters/text queries now consume the normalized intent fields instead of raw matcher output |
+| **12.4** Extend legacy parser for titles/keywords | ✅ | IntentFilters track matcher-provided titles/keywords so strict filtering and ANN allowlists can enforce them |
+| **12.5** Tests & eval | ✅ | Added regression test covering anime query normalization and reran `evaluation/sweep_query` for anime sci-fi scenario |
