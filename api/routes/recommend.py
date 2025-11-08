@@ -311,6 +311,9 @@ _DEFAULT_TOP_QUERY_KEYWORDS = {
     "award-winning",
 }
 
+_DEBUG_ALLOWLIST_LIMIT = 250
+_DEBUG_BOOST_LIMIT = 50
+
 
 def _load_media_genres(db: Session) -> Dict[str, Set[str]]:
     global _MEDIA_GENRE_CACHE, _MEDIA_GENRE_CACHE_TS
@@ -452,14 +455,18 @@ def _merge_query_filter_hints(
     # This preserves pinning for queries like "horror movies" or
     # "best science fiction movies" that would otherwise have weak or no
     # keyword signal.
+    fallback_keywords_used = False
     if not non_top_keywords:
         _extend_unique(intent.keywords, filtered_keywords)
         _extend_unique(intent.keywords, genre_keywords)
+        fallback_keywords_used = True
     else:
         _extend_unique(intent.keywords, filtered_keywords)
 
     if processed_keywords:
         setattr(intent, "_query_keywords_merged", True)
+    if fallback_keywords_used:
+        setattr(intent, "_fallback_keywords_used", True)
 
     titles = [
         title.strip()
@@ -922,6 +929,7 @@ async def recommend(
         False,
         description="Require items to satisfy every inferred genre (AND semantics).",
     ),
+    debug: bool = Query(False, description="Include debug diagnostics in response."),
     db: Session = Depends(get_db),
 ):
     canonical_id = canonical_profile_id(user_id, profile)
@@ -982,12 +990,20 @@ async def recommend(
     preferred_services = _normalize_streaming_services(
         llm_intent.streaming_providers, provider_alias_map
     )
+    legacy_filters = legacy_parse_intent(query) if query else None
+    if legacy_filters:
+        intent = _merge_with_legacy_filters(intent, legacy_filters)
+    query_filter_result = get_query_filters(query)
+    _merge_query_filter_hints(intent, query_filter_result, db)
+
     prefer_top_rated = (
         bool(classic_top_rated) if classic_top_rated is not None else False
     )
     heuristic_applied = False
     top_query_keywords = _get_top_query_keywords(db)
-    if classic_top_rated is None and _matches_keywords(query, top_query_keywords):
+    has_top_keyword = _matches_keywords(query, top_query_keywords)
+    fallback_keywords_used = bool(getattr(intent, "_fallback_keywords_used", False))
+    if classic_top_rated is None and has_top_keyword and not fallback_keywords_used:
         prefer_top_rated = True
         heuristic_applied = True
     if prefer_top_rated:
@@ -1014,12 +1030,6 @@ async def recommend(
             )
 
     llm_media_types = list(intent.media_types or [])
-    legacy_filters = legacy_parse_intent(query) if query else None
-    if legacy_filters:
-        intent = _merge_with_legacy_filters(intent, legacy_filters)
-    query_filter_result = get_query_filters(query)
-    _merge_query_filter_hints(intent, query_filter_result, db)
-
     if hasattr(intent, "genre_keywords") and intent.genre_keywords:
         genre_keyword_text = " ".join(intent.genre_keywords)
         if llm_intent.ann_description:
@@ -1680,9 +1690,33 @@ async def recommend(
     if start_index + limit < len(reranked):
         next_cursor = _encode_cursor(start_index + limit)
 
+    debug_snapshot: Dict[str, Any] | None = None
+    if debug:
+        allow_sample = list((allowlist or [])[:_DEBUG_ALLOWLIST_LIMIT])
+        boost_sample = list(boost_ids[:_DEBUG_BOOST_LIMIT])
+        lookup_ids = set(allow_sample) | set(boost_sample)
+        tmdb_map: Dict[int, int | None] = {}
+        if lookup_ids:
+            rows = db.execute(
+                select(Item.id, Item.tmdb_id).where(Item.id.in_(lookup_ids))
+            ).all()
+            tmdb_map = {row.id: row.tmdb_id for row in rows}
+        debug_snapshot = {
+            "allowlist_len": len(allowlist or []),
+            "allowlist_ids": allow_sample,
+            "allowlist_tmdb_ids": [tmdb_map.get(item_id) for item_id in allow_sample],
+            "boost_len": len(boost_ids or []),
+            "boost_ids": boost_sample,
+            "boost_tmdb_ids": [tmdb_map.get(item_id) for item_id in boost_sample],
+            "classic_top_rated": prefer_top_rated,
+            "strict_filters": bool(prefilter_kwargs.get("require_all_genres")),
+        }
+
     payload: Dict[str, Any] = {"items": response}
     if next_cursor:
         payload["next_cursor"] = next_cursor
+    if debug_snapshot:
+        payload["debug"] = debug_snapshot
     return payload
 
 

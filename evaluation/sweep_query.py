@@ -141,12 +141,13 @@ def fetch_recommendations(
     use_llm_intent: bool,
     overrides: Dict[str, Any],
     serendipity_ratio: float | None = None,
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     params: Dict[str, Any] = {
         "user_id": user_id,
         "query": query,
         "limit": limit,
         "use_llm_intent": str(use_llm_intent).lower(),
+        "debug": "true",
     }
     if serendipity_ratio is not None:
         params["serendipity_ratio"] = serendipity_ratio
@@ -158,8 +159,7 @@ def fetch_recommendations(
             params[key] = value
     response = client.get(base_url, params=params)
     response.raise_for_status()
-    payload = response.json()
-    return payload.get("items", [])
+    return response.json()
 
 
 def compute_metrics(
@@ -319,7 +319,7 @@ def main() -> None:
     with httpx.Client(timeout=timeout) as client:
         for idx, (overrides, label) in enumerate(combos, start=1):
             try:
-                items = fetch_recommendations(
+                payload = fetch_recommendations(
                     client,
                     args.base_url,
                     args.query,
@@ -332,6 +332,8 @@ def main() -> None:
             except httpx.HTTPError as exc:
                 print(f"[error] API call failed for {label}: {exc}")
                 continue
+            items = payload.get("items", [])
+            debug_info = payload.get("debug") or {}
             recommended_ids: List[int] = []
             for item in items:
                 tmdb_id = item.get("tmdb_id")
@@ -339,6 +341,18 @@ def main() -> None:
                     recommended_ids.append(tmdb_id)
             metrics = compute_metrics(recommended_ids, golden_ids, args.limit)
             hits = [rid for rid in recommended_ids if rid in golden_lookup]
+            allowlist_tmdb = [
+                rid
+                for rid in debug_info.get("allowlist_tmdb_ids") or []
+                if isinstance(rid, int)
+            ]
+            boost_tmdb = [
+                rid
+                for rid in debug_info.get("boost_tmdb_ids") or []
+                if isinstance(rid, int)
+            ]
+            allowlist_hits = sum(1 for rid in allowlist_tmdb if rid in golden_lookup)
+            boost_hits = sum(1 for rid in boost_tmdb if rid in golden_lookup)
             rows.append(
                 {
                     **overrides,
@@ -347,6 +361,12 @@ def main() -> None:
                     "map": metrics["map"],
                     "ndcg": metrics["ndcg"],
                     "hits": len(hits),
+                    "allowlist_len": debug_info.get("allowlist_len"),
+                    "boost_len": debug_info.get("boost_len"),
+                    "allowlist_hits": allowlist_hits,
+                    "boost_hits": boost_hits,
+                    "classic_top_rated": debug_info.get("classic_top_rated"),
+                    "strict_filters": debug_info.get("strict_filters"),
                     "hit_titles": "; ".join(
                         f"{rid}:{golden_lookup.get(rid, '')}" for rid in hits
                     ),
@@ -360,7 +380,8 @@ def main() -> None:
             print(
                 f"[{idx:02}/{total:02}] {summary} "
                 f"P={metrics['precision']:.3f} R={metrics['recall']:.3f} "
-                f"MAP={metrics['map']:.3f} nDCG={metrics['ndcg']:.3f} hits={hit_display}"
+                f"MAP={metrics['map']:.3f} nDCG={metrics['ndcg']:.3f} "
+                f"hits={hit_display} allow_hits={allowlist_hits} boost_hits={boost_hits}"
             )
 
     if not rows:
