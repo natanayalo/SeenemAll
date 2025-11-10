@@ -11,6 +11,9 @@ logs:
 sh:
 	docker compose exec api bash
 
+test:
+	docker compose exec api pytest
+
 alembic-init:
 	docker compose exec api alembic init -t async migrations || true
 

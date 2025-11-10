@@ -36,4 +36,6 @@ evaluation/evaluation_results*.csv
 evaluation/evaluation_scores*.csv
 evaluation/report.html
 evaluation/sweep_*.csv
+evaluation/*.md
+*.csv
 tmp_report.html
