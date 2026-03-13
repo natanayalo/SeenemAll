@@ -7,6 +7,7 @@ description: Run the full test suite with coverage and cache isolation.
 ```bash
 # Activate .venv if not already active
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 2. Run all tests with coverage:
