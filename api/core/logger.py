@@ -49,23 +49,23 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         token = request_id_ctx.set(req_id)
 
         start_time = time.perf_counter()
+        # Define logging context early
+        path = request.url.path
+        method = request.method
+        logger = StructuredLogger("api.request")
+        status_code = 500  # Default fallback
 
         try:
             response = await call_next(request)
             response.headers["X-Request-ID"] = req_id
+            status_code = response.status_code
             return response
+        except Exception as e:
+            # Capture status code from common FastAPI/Starlette exceptions if available
+            status_code = getattr(e, "status_code", 500)
+            raise e
         finally:
             elapsed_ms = (time.perf_counter() - start_time) * 1000
-
-            logger = StructuredLogger("api.request")
-
-            # Mask PII or sensitive keys logic would go here if needed.
-            path = request.url.path
-            method = request.method
-
-            status_code = 500
-            if "response" in locals():
-                status_code = response.status_code
 
             if not path.startswith("/health"):  # Ignore health check spam
                 logger.info(
