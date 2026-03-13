@@ -110,11 +110,11 @@
 |---|---|---|
 | **9.1** `/recommend` strategy | ✅ | `strategy` integrated into main pipeline natively |
 | **9.2** Cursor pagination reuse | ✅ | Serve pages from cached candidate set |
-| **9.3** `/debug/recommend` | ⏳ | Surface intent JSON, rewrite, sources, MMR picks |
-| **9.4** Structured logs | ⏳ | Request-id logging with PII redaction |
-| **9.5** Cache layer | ⏳ | Intent/rewrite/candidate/reranker caches (TTL) |
-| **9.6** Cache invalidation | ⏳ | Clear on `/user/history` for same user/profile |
-| **9.7** Metrics & telemetry | ⏳ | ANN latency, cache hit rates, reranker %, MMR impact; Prometheus/log counters |
+| **9.3** `/debug/recommend` | ✅ | Surface intent JSON, rewrite, sources, MMR picks |
+| **9.4** Structured logs | ✅ | Request-id logging with PII redaction |
+| **9.5** Cache layer | ✅ | Intent/rewrite/candidate/reranker caches (TTL) |
+| **9.6** Cache invalidation | ✅ | Clear on `/user/history` for same user/profile |
+| **9.7** Metrics & telemetry | ✅ | ANN latency, cache hit rates, reranker %, MMR impact; Metric registry counters |
 
 ### 10. Testing & Evaluation (Priority: Medium)
 
