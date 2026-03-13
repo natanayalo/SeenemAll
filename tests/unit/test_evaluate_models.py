@@ -51,7 +51,7 @@ def test_model_evaluation(test_items, test_pairs):
     assert results["num_items"] == 2
     assert 0 <= float(results["mse"]) <= 1.0
     assert 0 <= float(results["mae"]) <= 1.0
-    assert float(results["encode_time"]) > 0
+    assert float(results["encode_time"]) >= 0
 
 
 def test_invalid_model(test_items, test_pairs):

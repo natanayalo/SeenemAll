@@ -22,6 +22,13 @@ def _ensure_torch_stub() -> None:
             return False
 
     torch_stub.cuda = _Cuda()  # type: ignore[attr-defined]
+    torch_stub.Tensor = type("Tensor", (), {}) # Scipy checks for torch.Tensor at import time
+    
+    # Also add it to the sys.modules so imports like `from torch import cuda` don't fail immediately
+    cuda_stub = types.ModuleType("torch.cuda")
+    cuda_stub.is_available = _Cuda.is_available
+    sys.modules["torch.cuda"] = cuda_stub
+    
     sys.modules["torch"] = torch_stub
 
 

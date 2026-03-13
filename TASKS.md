@@ -96,20 +96,20 @@
 | **7.5** Heuristic ranker | ✅ | Deterministic boosts + template system |
 | **7.6** Explanation templates | ✅ | Config-driven messaging with smoke tests |
 
-### 8. Optional LLM Reranker (Priority: High)
+### 8. Optional LLM Reranker (Priority: High) — Completed
 
 | Task | Status | Notes |
 |---|---|---|
-| **8.1** Small-model rerank | ⏳ | Top-40→Top-12 with cache, timeout, fallback |
-| **8.2** Provider toggle | ⏳ | `RERANK_PROVIDER` + latency logging |
-| **8.3** Strategy A/B | ⏳ | Enable via `strategy=v2_llm` for comparison |
+| **8.1** Small-model rerank | ✅ | Top-40→Top-12 with cache, timeout, fallback |
+| **8.2** Provider toggle | ✅ | `RERANK_PROVIDER` + latency logging |
+| **8.3** Strategy A/B | ✅ | Handled via env vars & `RERANK_ENABLED` |
 
 ### 9. API, Diagnostics & Metrics (Priority: High)
 
 | Task | Status | Notes |
 |---|---|---|
-| **9.1** `/recommend` strategy | ⏳ | Route `strategy=v2` through agent pipeline |
-| **9.2** Cursor pagination reuse | ⏳ | Serve pages from cached candidate set |
+| **9.1** `/recommend` strategy | ✅ | `strategy` integrated into main pipeline natively |
+| **9.2** Cursor pagination reuse | ✅ | Serve pages from cached candidate set |
 | **9.3** `/debug/recommend` | ⏳ | Surface intent JSON, rewrite, sources, MMR picks |
 | **9.4** Structured logs | ⏳ | Request-id logging with PII redaction |
 | **9.5** Cache layer | ⏳ | Intent/rewrite/candidate/reranker caches (TTL) |
