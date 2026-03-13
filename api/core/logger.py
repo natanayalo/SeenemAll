@@ -24,8 +24,8 @@ class StructuredLogger:
         # but stdlib json logging is enough for a lightweight setup.
         try:
             log_str = json.dumps(record, default=str)
-        except Exception:
-            # Fallback
+        except TypeError:
+            # Fallback for non-serializable values.
             log_str = f"{msg} | {kwargs}"
 
         self.logger.log(level, log_str)

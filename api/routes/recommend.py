@@ -5,7 +5,7 @@ import json
 import os
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Tuple, Sequence, Set
 import hashlib
 
@@ -69,25 +69,11 @@ def _get_cache_key(
     canonical_id: str,
     params: RecommendParams,
 ) -> str:
-    parts = [
-        canonical_id,
-        str(params.query or ""),
-        str(params.limit),
-        str(params.diversify),
-        str(params.use_llm_intent),
-        str(params.ann_description_override or ""),
-        str(params.rewrite_override or ""),
-        str(params.ann_weight_override),
-        str(params.rewrite_weight_override),
-        str(params.genre_override or ""),
-        str(params.mixer_ann_weight),
-        str(params.mixer_collab_weight),
-        str(params.mixer_trending_weight),
-        str(params.mixer_popularity_weight),
-        str(params.mixer_vote_weight),
-        str(params.mixer_novelty_weight),
-    ]
-    hash_payload = "|".join(parts)
+    # Serialize params canonically so future fields are automatically reflected in the key.
+    params_dict = asdict(params)
+    params_dict.pop("user_id", None)
+    params_dict.pop("profile", None)
+    hash_payload = json.dumps(params_dict, sort_keys=True, default=str)
     hashed = hashlib.sha256(hash_payload.encode("utf-8")).hexdigest()
     return f"{canonical_id}:{hashed}"
 

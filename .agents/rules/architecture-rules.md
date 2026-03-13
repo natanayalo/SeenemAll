@@ -15,7 +15,7 @@ This rule ensures that all AI agents maintain the "Seen’emAll" architectural i
 - **PEP 8**: Follow standard Python formatting.
 - **Async First**: Use `async/await` for all I/O bound operations (DB, LLM calls).
 - **Type Hints**: All new functions must include type annotations (Pydantic models preferred for API data).
-- **Path Handling**: Always use `os.path.join` or `.replace("\\", "/")` for cross-platform compatibility (Windows vs Unix).
+- **Path Handling**: Prefer `pathlib` for filesystem path manipulation to ensure cross-platform compatibility.
 
 ## 🧪 Testing Requirements
 - **90% Coverage**: New code must include unit tests. Check coverage with `pytest --cov=api tests/`.
