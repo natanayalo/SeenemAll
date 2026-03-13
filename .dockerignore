@@ -1,0 +1,24 @@
+# VCS
+.git
+.github
+
+# Local Python environments and caches
+.venv
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.pre-commit-cache/
+
+# Coverage and test artifacts
+.coverage
+htmlcov/
+
+# Local env/config secrets (compose passes env_file at runtime)
+.env
+.env.*
+
+# Frontend build artifacts not needed in API image context
+frontend/node_modules/
+frontend/build/
+frontend/.cache/
