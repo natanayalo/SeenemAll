@@ -3,7 +3,7 @@
 > Multi-agent roles that orchestrate data ingestion, embeddings, and recommendations.
 
 > [!NOTE]
-> AI Agents working on this project should refer to the [Gemini Guidelines](file:///c:/Users/Natan/Dev/SeenemAll/.agents/GEMINI.md) for project-specific best practices and pitfalls.
+> AI Agents working on this project should follow the [Architecture Rules](file:///c:/Users/Natan/Dev/SeenemAll/.agents/rules/architecture-rules.md) and use the available [Workflows](file:///c:/Users/Natan/Dev/SeenemAll/.agents/workflows/) and [Skills](file:///c:/Users/Natan/Dev/SeenemAll/.agents/skills/).
 
 > **Quality bar:** Maintain automated test coverage above 90% (enforced via pytest’s coverage gate).
 
