@@ -1,22 +1,23 @@
 from __future__ import annotations
 
+import asyncio
 import base64
+import hashlib
 import json
-import os
 import logging
+import os
 import time
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Tuple, Sequence, Set
-import hashlib
+from threading import Lock
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
+from cachetools import TTLCache
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_, cast
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
-from cachetools import TTLCache
-from threading import Lock
+from sqlalchemy.orm import Session
 
 from api.db.session import get_db
 from api.db.models import Item, ItemEmbedding, Availability, UserHistory
@@ -49,19 +50,49 @@ _RECOMMEND_CACHE: TTLCache[str, Dict[str, Any]] = TTLCache(
     maxsize=_RECOMMEND_CACHE_MAXSIZE, ttl=_RECOMMEND_CACHE_TTL_SECONDS
 )
 _RECOMMEND_CACHE_LOCK = Lock()
+_RECOMMEND_CACHE_USER_KEYS: Dict[str, Set[str]] = {}
+_INFLIGHT_RECOMMEND_TASKS: Dict[Tuple[int, str], asyncio.Task[ComputeResult]] = {}
+_INFLIGHT_TASKS_LOCK = Lock()
+
+
+def _cache_get(cache_key: str) -> Dict[str, Any] | None:
+    with _RECOMMEND_CACHE_LOCK:
+        return _RECOMMEND_CACHE.get(cache_key)
+
+
+def _cache_set(canonical_id: str, cache_key: str, items: List[Dict[str, Any]]) -> None:
+    with _RECOMMEND_CACHE_LOCK:
+        _RECOMMEND_CACHE[cache_key] = {"items": items}
+        user_keys = _RECOMMEND_CACHE_USER_KEYS.setdefault(canonical_id, set())
+        user_keys.add(cache_key)
+
+
+def _cache_remove_user(canonical_id: str) -> int:
+    with _RECOMMEND_CACHE_LOCK:
+        keys_to_remove = _RECOMMEND_CACHE_USER_KEYS.pop(canonical_id, set())
+        removed = 0
+        for cache_key in keys_to_remove:
+            if _RECOMMEND_CACHE.pop(cache_key, None) is not None:
+                removed += 1
+        return removed
+
+
+def _clear_recommend_cache_for_tests() -> None:
+    """Reset cache internals for test isolation."""
+    with _RECOMMEND_CACHE_LOCK:
+        _RECOMMEND_CACHE.clear()
+        _RECOMMEND_CACHE_USER_KEYS.clear()
+    with _INFLIGHT_TASKS_LOCK:
+        _INFLIGHT_RECOMMEND_TASKS.clear()
 
 
 def clear_user_cache(canonical_id: str) -> None:
     """Clear all cached recommendations for a specific user profile."""
-    prefix = f"{canonical_id}:"
-    with _RECOMMEND_CACHE_LOCK:
-        keys_to_remove = [k for k in _RECOMMEND_CACHE.keys() if k.startswith(prefix)]
-        for k in keys_to_remove:
-            _RECOMMEND_CACHE.pop(k, None)
+    removed = _cache_remove_user(canonical_id)
     logger.debug(
         "Cleared recommendation cache for %s (removed %d entries)",
         canonical_id,
-        len(keys_to_remove),
+        removed,
     )
 
 
@@ -968,20 +999,38 @@ async def recommend(
     canonical_id = canonical_profile_id(params.user_id, params.profile)
     cache_key = _get_cache_key(canonical_id, params)
 
-    with _RECOMMEND_CACHE_LOCK:
-        cached_result = _RECOMMEND_CACHE.get(cache_key)
+    cached_result = _cache_get(cache_key)
 
     if cached_result:
         METRICS.counter("recommend.cache_hit").inc()
         reranked = cached_result["items"]
         logger.debug("Served recommendation from cache (key=%s)", cache_key)
     else:
-        METRICS.counter("recommend.cache_miss").inc()
-        result = await _compute_recommendations_async(request, params, db)
+        loop_scoped_key = (id(asyncio.get_running_loop()), cache_key)
+        created_task = False
+        with _INFLIGHT_TASKS_LOCK:
+            task = _INFLIGHT_RECOMMEND_TASKS.get(loop_scoped_key)
+            if task is None:
+                METRICS.counter("recommend.cache_miss").inc()
+                task = asyncio.create_task(
+                    _compute_recommendations_async(request, params, db)
+                )
+                _INFLIGHT_RECOMMEND_TASKS[loop_scoped_key] = task
+                created_task = True
+            else:
+                METRICS.counter("recommend.cache_wait").inc()
+
+        try:
+            result = await task
+        finally:
+            if created_task:
+                with _INFLIGHT_TASKS_LOCK:
+                    if _INFLIGHT_RECOMMEND_TASKS.get(loop_scoped_key) is task:
+                        _INFLIGHT_RECOMMEND_TASKS.pop(loop_scoped_key, None)
+
         reranked = result.items
-        if reranked:
-            with _RECOMMEND_CACHE_LOCK:
-                _RECOMMEND_CACHE[cache_key] = {"items": reranked}
+        if created_task and reranked:
+            _cache_set(canonical_id, cache_key, reranked)
 
     start_index = _decode_cursor(cursor)
     if start_index < 0:

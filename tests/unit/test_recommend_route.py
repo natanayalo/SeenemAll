@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 import numpy as np
@@ -9,12 +10,13 @@ from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 from tests.helpers import FakeResult
 
 from api.main import app
 from api.db.session import get_db
 from api.routes import recommend as recommend_routes
-from api.routes.recommend import PrefilterDecision, _RECOMMEND_CACHE
+from api.routes.recommend import PrefilterDecision
 from api.core import business_rules
 from api.core.legacy_intent_parser import IntentFilters
 from api.core.entity_linker import ENTITY_LINKER_CACHE
@@ -26,9 +28,9 @@ ORIGINAL_PREFILTER = recommend_routes._prefilter_allowed_ids
 
 @pytest.fixture(autouse=True)
 def _clear_recommend_cache():
-    _RECOMMEND_CACHE.clear()
+    recommend_routes._clear_recommend_cache_for_tests()
     yield
-    _RECOMMEND_CACHE.clear()
+    recommend_routes._clear_recommend_cache_for_tests()
 
 
 @pytest.fixture(autouse=True)
@@ -1478,6 +1480,57 @@ def test_get_cache_key_tracks_all_recommendation_overrides():
         assert key != baseline_key
 
     assert recommend_routes._get_cache_key("u1:kids", baseline) != baseline_key
+
+
+def test_clear_user_cache_removes_only_target_user_entries():
+    params = _make_recommend_params()
+    user_one = "u1"
+    user_two = "u2"
+    key_one = recommend_routes._get_cache_key(user_one, params)
+    key_two = recommend_routes._get_cache_key(user_two, params)
+
+    recommend_routes._cache_set(user_one, key_one, [{"id": 1}])
+    recommend_routes._cache_set(user_two, key_two, [{"id": 2}])
+
+    recommend_routes.clear_user_cache(user_one)
+
+    assert recommend_routes._cache_get(key_one) is None
+    assert recommend_routes._cache_get(key_two) is not None
+
+
+@pytest.mark.anyio
+async def test_recommend_deduplicates_inflight_cache_miss(monkeypatch):
+    params = _make_recommend_params(user_id="u1")
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/recommend",
+            "headers": [],
+            "query_string": b"",
+        }
+    )
+
+    call_count = {"value": 0}
+
+    async def fake_compute(*args, **kwargs):
+        call_count["value"] += 1
+        await asyncio.sleep(0.01)
+        return recommend_routes.ComputeResult(
+            items=[{"id": 1, "title": "Alpha"}], debug_context={}
+        )
+
+    monkeypatch.setattr(
+        recommend_routes, "_compute_recommendations_async", fake_compute
+    )
+
+    results = await asyncio.gather(
+        recommend_routes.recommend(request, params=params, cursor=None, db=object()),
+        recommend_routes.recommend(request, params=params, cursor=None, db=object()),
+    )
+
+    assert call_count["value"] == 1
+    assert results[0]["items"] == results[1]["items"]
 
 
 def test_recommend_uses_entity_linker_and_blends_query_vector(

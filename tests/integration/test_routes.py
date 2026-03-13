@@ -11,7 +11,7 @@ from api.db.session import get_db
 from api.main import app
 from api.routes import recommend as recommend_routes
 from api.routes import user as user_routes
-from api.routes.recommend import PrefilterDecision, _RECOMMEND_CACHE
+from api.routes.recommend import PrefilterDecision
 from tests.helpers import FakeResult
 from api.core import reranker
 from api.core import business_rules
@@ -19,9 +19,9 @@ from api.core import business_rules
 
 @pytest.fixture(autouse=True)
 def _clear_recommend_cache():
-    _RECOMMEND_CACHE.clear()
+    recommend_routes._clear_recommend_cache_for_tests()
     yield
-    _RECOMMEND_CACHE.clear()
+    recommend_routes._clear_recommend_cache_for_tests()
 
 
 @pytest.fixture(autouse=True)

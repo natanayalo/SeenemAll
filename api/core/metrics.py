@@ -53,10 +53,10 @@ class Histogram:
             if value > self._max:
                 self._max = value
 
-    def snapshot(self) -> Dict[str, float]:
+    def snapshot(self) -> Dict[str, float | None]:
         with self._lock:
             if self._count == 0:
-                return {"count": 0, "sum": 0.0, "avg": 0.0, "min": 0.0, "max": 0.0}
+                return {"count": 0, "sum": 0.0, "avg": 0.0, "min": None, "max": None}
             s = float(self._sum)
             c = float(self._count)
             return {

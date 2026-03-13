@@ -38,6 +38,8 @@ class TestHistogram:
         snap = h.snapshot()
         assert snap["count"] == 0
         assert snap["avg"] == 0.0
+        assert snap["min"] is None
+        assert snap["max"] is None
 
     def test_observe_single(self):
         h = Histogram()

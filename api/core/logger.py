@@ -25,8 +25,15 @@ class StructuredLogger:
         try:
             log_str = json.dumps(record, default=str)
         except TypeError:
-            # Fallback for non-serializable values.
-            log_str = f"{msg} | {kwargs}"
+            # Preserve JSON log shape even if input contains unserializable values.
+            log_str = json.dumps(
+                {
+                    "message": msg,
+                    "request_id": request_id_ctx.get(),
+                    "error": "Failed to serialize full record",
+                    "kwargs_repr": repr(kwargs),
+                }
+            )
 
         self.logger.log(level, log_str)
 
