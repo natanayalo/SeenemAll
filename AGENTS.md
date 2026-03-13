@@ -3,7 +3,7 @@
 > Multi-agent roles that orchestrate data ingestion, embeddings, and recommendations.
 
 > [!NOTE]
-> AI Agents working on this project should follow the [Architecture Rules](file:///c:/Users/Natan/Dev/SeenemAll/.agents/rules/architecture-rules.md) and use the available [Workflows](file:///c:/Users/Natan/Dev/SeenemAll/.agents/workflows/) and [Skills](file:///c:/Users/Natan/Dev/SeenemAll/.agents/skills/).
+> AI Agents working on this project should follow the [Architecture Rules](./.agents/rules/architecture-rules.md) and use the available [Workflows](./.agents/workflows/) and [Skills](./.agents/skills/).
 
 > **Quality bar:** Maintain automated test coverage above 90% (enforced via pytest’s coverage gate).
 

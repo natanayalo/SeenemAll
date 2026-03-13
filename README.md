@@ -167,7 +167,6 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -r requirements.txt
-pip install pytest pytest-asyncio pytest-cov httpx cachetools
 ```
 
 ### 2. Running Tests

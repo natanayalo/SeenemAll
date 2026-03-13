@@ -63,7 +63,7 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             # Capture status code from common FastAPI/Starlette exceptions if available
             status_code = getattr(e, "status_code", 500)
-            raise e
+            raise
         finally:
             elapsed_ms = (time.perf_counter() - start_time) * 1000
 

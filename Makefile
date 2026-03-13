@@ -37,7 +37,7 @@ health:
 	curl -s http://localhost:8000/healthz
 
 metrics:
-	curl -s http://localhost:8000/healthz/metrics | python3 -m json.tool || curl -s http://localhost:8000/healthz/metrics
+	curl -s http://localhost:8000/healthz/metrics | { python3 -m json.tool || cat; }
 
 debug-rec:
-	curl -s "http://localhost:8000/recommend/debug?user_id=u1&limit=5" | python3 -m json.tool || curl -s "http://localhost:8000/recommend/debug?user_id=u1&limit=5"
+	curl -s "http://localhost:8000/recommend/debug?user_id=u1&limit=5" | { python3 -m json.tool || cat; }

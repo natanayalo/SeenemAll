@@ -1424,6 +1424,62 @@ def test_float_from_env_parses_values(monkeypatch):
     assert recommend_routes._float_from_env("FLOAT_ENV", 2.5) == 2.5
 
 
+def _make_recommend_params(**overrides):
+    payload = {
+        "user_id": "u1",
+        "limit": 20,
+        "query": "space opera",
+        "diversify": True,
+        "profile": None,
+        "use_llm_intent": True,
+        "ann_description_override": "high stakes",
+        "rewrite_override": "space survival",
+        "ann_weight_override": 0.6,
+        "rewrite_weight_override": 0.4,
+        "genre_override": "Drama, Sci-Fi",
+        "mixer_ann_weight": 0.7,
+        "mixer_collab_weight": 0.2,
+        "mixer_trending_weight": 0.1,
+        "mixer_popularity_weight": 0.05,
+        "mixer_vote_weight": 0.03,
+        "mixer_novelty_weight": 0.02,
+    }
+    payload.update(overrides)
+    return recommend_routes.RecommendParams(**payload)
+
+
+def test_get_cache_key_tracks_all_recommendation_overrides():
+    canonical_id = "u1"
+    baseline = _make_recommend_params()
+    baseline_key = recommend_routes._get_cache_key(canonical_id, baseline)
+
+    overrides = [
+        {"use_llm_intent": False},
+        {"ann_description_override": "grim dystopia"},
+        {"rewrite_override": "dark competition"},
+        {"ann_weight_override": 0.9},
+        {"rewrite_weight_override": 0.1},
+        {"genre_override": "Thriller"},
+        {"mixer_ann_weight": 0.4},
+        {"mixer_collab_weight": 0.35},
+        {"mixer_trending_weight": 0.25},
+        {"mixer_popularity_weight": 0.2},
+        {"mixer_vote_weight": 0.15},
+        {"mixer_novelty_weight": 0.05},
+        {"query": "mystery"},
+        {"limit": 10},
+        {"diversify": False},
+    ]
+
+    for override in overrides:
+        key = recommend_routes._get_cache_key(
+            canonical_id, _make_recommend_params(**override)
+        )
+        assert key != baseline_key
+
+    assert recommend_routes._get_cache_key("u1:kids", baseline) != baseline_key
+
+
 def test_recommend_uses_entity_linker_and_blends_query_vector(
     monkeypatch, _stub_llm_intent
 ):
