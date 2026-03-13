@@ -1,18 +1,23 @@
 from __future__ import annotations
 
+import asyncio
 import base64
+import hashlib
 import json
-import os
 import logging
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Sequence, Set
+import os
+import time
+from dataclasses import asdict, dataclass
+from threading import Lock
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
+from cachetools import TTLCache
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_, cast
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from api.db.session import get_db
 from api.db.models import Item, ItemEmbedding, Availability, UserHistory
@@ -33,9 +38,76 @@ from api.core.embeddings import encode_texts
 from api.core.user_profile import NEGATIVE_EVENT_TYPES, _event_weight
 from api.core.maturity import rating_level
 from api.core.rewrite import Rewrite
+from api.core.metrics import METRICS, timer
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
 logger = logging.getLogger(__name__)
+
+# --- Caching ---
+_RECOMMEND_CACHE_TTL_SECONDS = int(os.getenv("RECOMMEND_CACHE_TTL_SECONDS", "300"))
+_RECOMMEND_CACHE_MAXSIZE = int(os.getenv("RECOMMEND_CACHE_MAXSIZE", "512"))
+_RECOMMEND_CACHE: TTLCache[str, Dict[str, Any]] = TTLCache(
+    maxsize=_RECOMMEND_CACHE_MAXSIZE, ttl=_RECOMMEND_CACHE_TTL_SECONDS
+)
+_RECOMMEND_CACHE_LOCK = Lock()
+_RECOMMEND_CACHE_USER_KEYS: Dict[str, Set[str]] = {}
+_INFLIGHT_RECOMMEND_TASKS: Dict[Tuple[int, str], asyncio.Task[ComputeResult]] = {}
+_INFLIGHT_TASKS_LOCK = Lock()
+
+
+def _cache_get(cache_key: str) -> Dict[str, Any] | None:
+    with _RECOMMEND_CACHE_LOCK:
+        return _RECOMMEND_CACHE.get(cache_key)
+
+
+def _cache_set(canonical_id: str, cache_key: str, items: List[Dict[str, Any]]) -> None:
+    with _RECOMMEND_CACHE_LOCK:
+        _RECOMMEND_CACHE[cache_key] = {"items": items}
+        user_keys = _RECOMMEND_CACHE_USER_KEYS.setdefault(canonical_id, set())
+        user_keys.add(cache_key)
+
+
+def _cache_remove_user(canonical_id: str) -> int:
+    with _RECOMMEND_CACHE_LOCK:
+        keys_to_remove = _RECOMMEND_CACHE_USER_KEYS.pop(canonical_id, set())
+        removed = 0
+        for cache_key in keys_to_remove:
+            if _RECOMMEND_CACHE.pop(cache_key, None) is not None:
+                removed += 1
+        return removed
+
+
+def _clear_recommend_cache_for_tests() -> None:
+    """Reset cache internals for test isolation."""
+    with _RECOMMEND_CACHE_LOCK:
+        _RECOMMEND_CACHE.clear()
+        _RECOMMEND_CACHE_USER_KEYS.clear()
+    with _INFLIGHT_TASKS_LOCK:
+        _INFLIGHT_RECOMMEND_TASKS.clear()
+
+
+def clear_user_cache(canonical_id: str) -> None:
+    """Clear all cached recommendations for a specific user profile."""
+    removed = _cache_remove_user(canonical_id)
+    logger.debug(
+        "Cleared recommendation cache for %s (removed %d entries)",
+        canonical_id,
+        removed,
+    )
+
+
+def _get_cache_key(
+    canonical_id: str,
+    params: RecommendParams,
+) -> str:
+    # Serialize params canonically so future fields are automatically reflected in the key.
+    params_dict = asdict(params)
+    params_dict.pop("user_id", None)
+    params_dict.pop("profile", None)
+    hash_payload = json.dumps(params_dict, sort_keys=True, default=str)
+    hashed = hashlib.sha256(hash_payload.encode("utf-8")).hexdigest()
+    return f"{canonical_id}:{hashed}"
+
 
 _STREAMING_PROVIDER_ALIASES: Dict[str, Set[str]] = {
     "netflix": {"netflix", "nfx"},
@@ -371,92 +443,96 @@ def _apply_serendipity_slot(
     return deduped
 
 
-@router.get("")
-async def recommend(
-    request: Request,
-    user_id: str = Query(..., description="Seen'emAll user_id (e.g., 'u1')"),
-    limit: int = Query(20, ge=1, le=100),
+@dataclass
+class ComputeResult:
+    items: List[Dict[str, Any]]
+    debug_context: Dict[str, Any]
+
+
+@dataclass
+class RecommendParams:
+    user_id: str = Query(..., description="Seen'emAll user_id (e.g., 'u1')")
+    limit: int = Query(20, ge=1, le=100)
     query: str | None = Query(
-        None,
-        description="Optional natural-language intent (e.g. 'light sci-fi < 2h')",
-    ),
-    cursor: str | None = Query(
-        None,
-        description="Opaque cursor returned by a previous request for pagination.",
-    ),
-    diversify: bool = Query(True, description="Whether to diversify recommendations."),
-    profile: str | None = Query(None, description="Optional profile identifier"),
+        None, description="Optional natural-language intent (e.g. 'light sci-fi < 2h')"
+    )
+    diversify: bool = Query(True, description="Whether to diversify recommendations.")
+    profile: str | None = Query(None, description="Optional profile identifier")
     use_llm_intent: bool = Query(
         True,
         description="Enable the LLM intent parser (set to false for manual overrides).",
-    ),
+    )
     ann_description_override: str | None = Query(
         None,
         description="Manual ANN description override to blend into the rewrite vector.",
-    ),
+    )
     rewrite_override: str | None = Query(
         None,
         description="Manual rewrite text override (skips rewrite_query when provided).",
-    ),
+    )
     ann_weight_override: float | None = Query(
-        None,
-        ge=0.0,
-        description="Override weight for the ANN description component.",
-    ),
+        None, ge=0.0, description="Override weight for the ANN description component."
+    )
     rewrite_weight_override: float | None = Query(
-        None,
-        ge=0.0,
-        description="Override weight for the rewrite text component.",
-    ),
+        None, ge=0.0, description="Override weight for the rewrite text component."
+    )
     genre_override: str | None = Query(
         None,
         description="Comma-separated manual genres to enforce (e.g., 'Drama, Sci-Fi').",
-    ),
+    )
     mixer_ann_weight: float | None = Query(
         None,
         ge=0.0,
         description="Override hybrid ANN weight (default from HYBRID_ANN_WEIGHT).",
-    ),
+    )
     mixer_collab_weight: float | None = Query(
         None,
         ge=0.0,
         description="Override collaborative weight (default MIXER_COLLAB_WEIGHT).",
-    ),
+    )
     mixer_trending_weight: float | None = Query(
         None,
         ge=0.0,
         description="Override trending weight (default HYBRID_TRENDING_WEIGHT).",
-    ),
+    )
     mixer_popularity_weight: float | None = Query(
         None,
         ge=0.0,
         description="Override popularity weight (default HYBRID_POPULARITY_WEIGHT).",
-    ),
+    )
     mixer_vote_weight: float | None = Query(
         None,
         ge=0.0,
         description="Override vote-count weight (default HYBRID_VOTE_WEIGHT).",
-    ),
+    )
     mixer_novelty_weight: float | None = Query(
         None,
         ge=0.0,
         description="Override novelty weight (default MIXER_NOVELTY_WEIGHT).",
-    ),
-    db: Session = Depends(get_db),
-):
-    canonical_id = canonical_profile_id(user_id, profile)
+    )
+
+
+async def _compute_recommendations_async(
+    request: Request,
+    params: RecommendParams,
+    db: Session,
+) -> ComputeResult:
+    _pipeline_start = time.perf_counter()
+    canonical_id = canonical_profile_id(params.user_id, params.profile)
     long_v, short_v, exclude, profile_meta = load_user_state(db, canonical_id)
     cold_start = short_v is None
+    if cold_start:
+        METRICS.counter("recommend.cold_start").inc()
 
     linked_entities = None
-    if query:
+    if params.query:
         entity_linker = getattr(request.app.state, "entity_linker", None)
         if entity_linker:
-            linked_entities = await entity_linker.link_entities(query)
+            linked_entities = await entity_linker.link_entities(params.query)
 
-    llm_user_context = {"user_id": canonical_id, "profile_id": profile}
-    if use_llm_intent:
-        llm_intent = _parse_llm_intent(query, llm_user_context, linked_entities)
+    llm_user_context = {"user_id": canonical_id, "profile_id": params.profile}
+    if params.use_llm_intent:
+        llm_intent = _parse_llm_intent(params.query, llm_user_context, linked_entities)
     else:
         llm_intent = Intent()
         if logger.isEnabledFor(logging.DEBUG):
@@ -464,6 +540,8 @@ async def recommend(
                 "LLM intent parser disabled for user %s; using manual/default intent.",
                 canonical_id,
             )
+
+    intent_snapshot = {}
     if logger.isEnabledFor(logging.DEBUG):
         intent_snapshot = {
             key: value
@@ -477,18 +555,23 @@ async def recommend(
                 for key, value in linked_entities.items()
             }
             logger.debug("Linked entity counts: %s", entity_counts)
-    intent = _intent_filters_from_llm(query, llm_intent)
-    if genre_override:
-        custom_genres = [g.strip() for g in genre_override.split(",") if g.strip()]
+
+    intent = _intent_filters_from_llm(params.query, llm_intent)
+    if params.genre_override:
+        custom_genres = [
+            g.strip() for g in params.genre_override.split(",") if g.strip()
+        ]
         if custom_genres:
             intent.genres = custom_genres
             llm_intent.include_genres = custom_genres
+
     preferred_services = _normalize_streaming_services(llm_intent.streaming_providers)
     llm_media_types = list(intent.media_types or [])
-    legacy_filters = legacy_parse_intent(query) if query else None
+    legacy_filters = legacy_parse_intent(params.query) if params.query else None
     if legacy_filters:
         intent = _merge_with_legacy_filters(intent, legacy_filters)
     entity_media_types = linked_media_types(linked_entities)
+
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
             "Media type signals for user %s | llm=%s legacy=%s linked=%s -> merged=%s",
@@ -504,47 +587,51 @@ async def recommend(
                 canonical_id,
                 sorted(preferred_services),
             )
-    if ann_description_override:
-        llm_intent.ann_description = ann_description_override.strip()
-    candidate_limit = min(500, max(limit, limit * 3))
+
+    if params.ann_description_override:
+        llm_intent.ann_description = params.ann_description_override.strip()
+    candidate_limit = min(500, max(params.limit, params.limit * 3))
     if intent.has_filters():
-        candidate_limit = min(500, max(candidate_limit, limit * 5))
+        candidate_limit = min(500, max(candidate_limit, params.limit * 5))
 
     prefilter = _prefilter_allowed_ids(
         db, intent, candidate_limit, preferred_services=preferred_services
     )
     allowlist = prefilter.allowed_ids
     boost_ids = prefilter.boost_ids or []
-    # Carry the stricter genre requirement forward so downstream filtering
-    # (ann_candidates + item_matches_intent) stays aligned with the prefilter.
     enforce_genres = prefilter.enforce_genres
     rewrite_result = None
     rewrite_vec: np.ndarray | None = None
-    manual_rewrite_text = (rewrite_override or "").strip() if rewrite_override else ""
+    manual_rewrite_text = (
+        (params.rewrite_override or "").strip() if params.rewrite_override else ""
+    )
     if manual_rewrite_text:
         manual_rewrite_text = " ".join(manual_rewrite_text.split()[:8])
         rewrite_result = Rewrite(rewritten_text=manual_rewrite_text)
-    elif query:
-        rewrite_result = rewrite_query(query or "", llm_intent)
+    elif params.query:
+        rewrite_result = rewrite_query(params.query or "", llm_intent)
+
     rewrite_vec = _build_rewrite_vector(
         getattr(rewrite_result, "rewritten_text", None),
         getattr(llm_intent, "ann_description", None),
-        ann_weight_override,
-        rewrite_weight_override,
+        params.ann_weight_override,
+        params.rewrite_weight_override,
     )
 
+    ids = []
     if cold_start:
         rewrite_used = False
         if rewrite_vec is not None:
             vec_norm = float(np.linalg.norm(rewrite_vec))
             if vec_norm > 0 and np.isfinite(vec_norm):
-                ann_ids = ann_candidates(
-                    db,
-                    rewrite_vec,
-                    exclude,
-                    limit=candidate_limit,
-                    allowed_ids=allowlist,
-                )
+                with timer("recommend.ann_latency_ms"):
+                    ann_ids = ann_candidates(
+                        db,
+                        rewrite_vec,
+                        exclude,
+                        limit=candidate_limit,
+                        allowed_ids=allowlist,
+                    )
                 if ann_ids:
                     logger.info(
                         "Using rewrite ANN candidates for cold-start user %s",
@@ -571,16 +658,17 @@ async def recommend(
         logger.info("Using ANN candidates for user %s", canonical_id)
         assert short_v is not None
         if rewrite_vec is not None:
-            alpha = _REWRITE_BLEND_ALPHA_QUERY if query else _REWRITE_BLEND_ALPHA
+            alpha = _REWRITE_BLEND_ALPHA_QUERY if params.query else _REWRITE_BLEND_ALPHA
             alpha = max(0.0, min(1.0, alpha))
             q_vec = (alpha * short_v) + ((1 - alpha) * rewrite_vec)
             q_vec = q_vec / np.linalg.norm(q_vec)
         else:
             q_vec = short_v
 
-        ids = ann_candidates(
-            db, q_vec, exclude, limit=candidate_limit, allowed_ids=allowlist
-        )
+        with timer("recommend.ann_latency_ms"):
+            ids = ann_candidates(
+                db, q_vec, exclude, limit=candidate_limit, allowed_ids=allowlist
+            )
         rewrite_applied = bool(rewrite_vec is not None)
         logger.debug(
             "ANN retrieval | candidate_count=%d allowlist_size=%s enforce_genres=%s rewrite=%s",
@@ -618,7 +706,7 @@ async def recommend(
             merged_scores.setdefault(iid, {})["collab"] = score / max_collab
 
     trending_results: List[Tuple[int, float]] = []
-    if not query:
+    if not params.query:
         if cold_start or ann_scores or collab_scores or boost_ids:
             trending_results = _trending_prior_candidates(
                 db,
@@ -698,7 +786,7 @@ async def recommend(
     if negative_items:
         ids = [i for i in ids if i not in negative_items]
     if not ids:
-        return _empty_response()
+        return ComputeResult(items=[], debug_context={})
 
     # fetch metadata and streaming links, preserve ANN order
     items_with_data = {
@@ -728,7 +816,7 @@ async def recommend(
     }
     ordered: List[Dict[str, Any]] = []
     fallback_candidates: List[Dict[str, Any]] = []
-    max_candidates = min(candidate_limit, max(limit * 2, 25))
+    max_candidates = min(candidate_limit, max(params.limit * 2, 25))
     skipped_intent = 0
     rank_counter = 0
     for iid in ids:
@@ -808,12 +896,13 @@ async def recommend(
         if provider_allowed and len(ordered) >= max_candidates:
             break
 
-    if preferred_services and len(ordered) < limit and fallback_candidates:
-        deficit = limit - len(ordered)
+    if preferred_services and len(ordered) < params.limit and fallback_candidates:
+        deficit = params.limit - len(ordered)
         ordered.extend(fallback_candidates[:deficit])
 
     if not ordered:
-        return _empty_response()
+        return ComputeResult(items=[], debug_context={})
+
     if skipped_intent and logger.isEnabledFor(logging.DEBUG):
         logger.debug(
             "Post-filter dropped %d candidates due to intent match (enforce_genres=%s)",
@@ -821,16 +910,17 @@ async def recommend(
             enforce_genres,
         )
 
-    if diversify:
+    if params.diversify:
         ordered = _apply_franchise_cap(ordered)
-    ann_weight_override = mixer_ann_weight
-    collab_weight_override = mixer_collab_weight
-    trending_weight_override = mixer_trending_weight
-    popularity_weight_override = mixer_popularity_weight
-    vote_weight_override = mixer_vote_weight
-    novelty_weight_override = mixer_novelty_weight
 
-    if query:
+    ann_weight_override = params.mixer_ann_weight
+    collab_weight_override = params.mixer_collab_weight
+    trending_weight_override = params.mixer_trending_weight
+    popularity_weight_override = params.mixer_popularity_weight
+    vote_weight_override = params.mixer_vote_weight
+    novelty_weight_override = params.mixer_novelty_weight
+
+    if params.query:
         if trending_weight_override is None:
             trending_weight_override = 0.0
         if popularity_weight_override is None:
@@ -851,34 +941,102 @@ async def recommend(
     )
     ordered = apply_business_rules(ordered, intent=intent)
     if not ordered:
-        return _empty_response()
+        return ComputeResult(items=[], debug_context={})
 
     serendipity_context = list(ordered)
 
-    if diversify:
-        ordered = diversify_with_mmr(ordered, limit=limit)
+    if params.diversify:
+        with timer("recommend.mmr_latency_ms"):
+            ordered = diversify_with_mmr(ordered, limit=params.limit)
 
-    ordered = _apply_serendipity_slot(ordered, serendipity_context, limit)
+    ordered = _apply_serendipity_slot(ordered, serendipity_context, params.limit)
 
-    reranked = rerank_with_explanations(
-        ordered,
-        intent=intent,
-        query=query,
-        user={
-            "user_id": canonical_id,
-            "base_user_id": user_id,
-            "profile": profile,
-            "genre_prefs": profile_meta.get("genre_prefs"),
-            "neighbors": profile_meta.get("neighbors"),
-            "negative_items": profile_meta.get("negative_items"),
+    with timer("recommend.rerank_latency_ms"):
+        reranked = rerank_with_explanations(
+            ordered,
+            intent=intent,
+            query=params.query,
+            user={
+                "user_id": canonical_id,
+                "base_user_id": params.user_id,
+                "profile": params.profile,
+                "genre_prefs": profile_meta.get("genre_prefs"),
+                "neighbors": profile_meta.get("neighbors"),
+                "negative_items": profile_meta.get("negative_items"),
+            },
+        )
+    METRICS.counter("recommend.reranker_used").inc()
+
+    pipeline_ms = (time.perf_counter() - _pipeline_start) * 1000
+    METRICS.histogram("recommend.total_latency_ms").observe(pipeline_ms)
+
+    debug_ctx = {
+        "intent_snapshot": intent_snapshot,
+        "rewrite_text": (
+            getattr(rewrite_result, "rewritten_text", None) if rewrite_result else None
+        ),
+        "metrics": {
+            "initial_candidates": len(ids),
+            "post_filter_candidates": len(ordered),
+            "neighbors_found": len(profile_meta.get("neighbors") or []),
+            "cold_start": cold_start,
+            "pipeline_latency_ms": round(pipeline_ms, 2),
         },
-    )
+    }
+    return ComputeResult(items=reranked, debug_context=debug_ctx)
+
+
+@router.get("")
+async def recommend(
+    request: Request,
+    params: RecommendParams = Depends(),
+    cursor: str | None = Query(
+        None,
+        description="Opaque cursor returned by a previous request for pagination.",
+    ),
+    db: Session = Depends(get_db),
+):
+    canonical_id = canonical_profile_id(params.user_id, params.profile)
+    cache_key = _get_cache_key(canonical_id, params)
+
+    cached_result = _cache_get(cache_key)
+
+    if cached_result:
+        METRICS.counter("recommend.cache_hit").inc()
+        reranked = cached_result["items"]
+        logger.debug("Served recommendation from cache (key=%s)", cache_key)
+    else:
+        loop_scoped_key = (id(asyncio.get_running_loop()), cache_key)
+        created_task = False
+        with _INFLIGHT_TASKS_LOCK:
+            task = _INFLIGHT_RECOMMEND_TASKS.get(loop_scoped_key)
+            if task is None:
+                METRICS.counter("recommend.cache_miss").inc()
+                task = asyncio.create_task(
+                    _compute_recommendations_async(request, params, db)
+                )
+                _INFLIGHT_RECOMMEND_TASKS[loop_scoped_key] = task
+                created_task = True
+            else:
+                METRICS.counter("recommend.cache_wait").inc()
+
+        try:
+            result = await task
+        finally:
+            if created_task:
+                with _INFLIGHT_TASKS_LOCK:
+                    if _INFLIGHT_RECOMMEND_TASKS.get(loop_scoped_key) is task:
+                        _INFLIGHT_RECOMMEND_TASKS.pop(loop_scoped_key, None)
+
+        reranked = result.items
+        if created_task and reranked:
+            _cache_set(canonical_id, cache_key, reranked)
 
     start_index = _decode_cursor(cursor)
     if start_index < 0:
         raise HTTPException(status_code=400, detail="Invalid cursor")
 
-    page = reranked[start_index : start_index + limit]
+    page = reranked[start_index : start_index + params.limit]
     response: List[Dict[str, Any]] = []
     for entry in page:
         cleaned = dict(entry)
@@ -890,12 +1048,30 @@ async def recommend(
         response.append(cleaned)
 
     next_cursor = None
-    if start_index + limit < len(reranked):
-        next_cursor = _encode_cursor(start_index + limit)
+    if start_index + params.limit < len(reranked):
+        next_cursor = _encode_cursor(start_index + params.limit)
 
     payload: Dict[str, Any] = {"items": response}
     if next_cursor:
         payload["next_cursor"] = next_cursor
+    return payload
+
+
+@router.get("/debug")
+async def debug_recommend(
+    request: Request,
+    params: RecommendParams = Depends(),
+    db: Session = Depends(get_db),
+):
+    result = await _compute_recommendations_async(request, params, db)
+
+    response: List[Dict[str, Any]] = []
+    for entry in result.items[: params.limit]:
+        cleaned = dict(entry)
+        cleaned.pop("vector", None)  # just hide vector representation to save space
+        response.append(cleaned)
+
+    payload: Dict[str, Any] = {"items": response, "debug": result.debug_context}
     return payload
 
 

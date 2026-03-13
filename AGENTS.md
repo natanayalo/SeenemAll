@@ -1,88 +1,48 @@
-# Seen’emAll Agents Overview
+﻿# SeenemAll Codex Instructions
 
-> Multi-agent roles that orchestrate data ingestion, embeddings, and recommendations.
+Use this file as the project instruction root for Codex.
 
-> **Quality bar:** Maintain automated test coverage above 90% (enforced via pytest’s coverage gate).
+## Core References
+- Architecture rules: [./.agents/rules/architecture-rules.md](./.agents/rules/architecture-rules.md)
+- Reusable workflows: [./.agents/workflows/](./.agents/workflows/)
+- Skills: [./.agents/skills/](./.agents/skills/)
 
----
+## Repo Snapshot
+- API service: `api/` (FastAPI routes + core recommendation logic)
+- ETL pipelines: `etl/` (TMDB, embeddings, JustWatch)
+- Frontend: `frontend/`
+- Tests: `tests/`
 
-### 🧩 1. ETL Agent
-**Goal:** Populate the catalog from TMDB
-**Implements:** `etl/tmdb_sync.py`
+## Quick Commands
+- Start stack: `make up`
+- Migrate DB: `make migrate`
+- Sync TMDB: `make etl-tmdb`
+- Compute embeddings: `make embed`
+- Sync streaming offers: `make etl-justwatch`
+- Health check: `make health`
+- Metrics endpoint: `make metrics`
+- Recommendation debug endpoint: `make debug-rec`
 
-- Fetches movies and TV shows (popular / top rated / trending)
-- Upserts metadata into `items` table
-- Runs on demand (`make etl-tmdb`)
+## Engineering Guardrails
+- Keep business logic in `api/core/`; keep routes in `api/routes/` orchestration-only.
+- Keep recommendation changes test-backed, especially cache, mixer, MMR, and reranker behavior.
+- Avoid silent behavior changes in ranking paths; document intent in tests.
+- Prefer additive, reversible changes over broad refactors when fixing bugs.
 
----
+## Domain-Specific Guidance
+- API work:
+  - Keep route handlers thin and push core behavior into `api/core/`.
+  - Keep request/response schemas explicit and stable.
+  - If recommendation behavior changes, run `pytest tests/unit/test_recommend_route.py tests/unit/test_metrics.py`.
+  - If route contracts change, run integration route tests.
+- ETL work:
+  - Keep sync jobs idempotent when rerun.
+  - Normalize upstream payloads before persisting.
+  - Preserve stable identifiers and avoid duplicate writes.
+  - Log failures with enough context for replay/debugging.
+  - Run ETL unit tests for touched modules and verify API compatibility.
 
-### 🔢 2. Embedding Agent
-**Goal:** Convert items into semantic vectors
-**Implements:** `etl/compute_embeddings.py`
-
-- Uses `sentence-transformers` MiniLM-L6-v2 (384-dim)
-- Stores normalized vectors in `item_embeddings`
-- Run with `make embed`
-
----
-
-### 👤 3. User Profile Agent
-**Goal:** Build and maintain user preference vectors
-**Implements:** `api/core/user_profile.py`
-
-- Averages recent watch history (time-decayed)
-- Updates `users.long_vec` and `users.short_vec`
-- Triggered automatically via `/user/history`
-
----
-
-### 🧭 4. Candidate Agent
-**Goal:** Retrieve similar items by cosine similarity
-**Implements:** `api/core/candidate_gen.py`
-
-- Uses pgvector `<->` distance
-- Excludes items the user has already watched
-- Respects intent-driven allowlists before ANN scoring
-- Returns ANN-ranked IDs for recommendation
-
----
-
-### 🧠 5. Reranker Agent
-**Goal:** Reorder candidates with natural-language explanations
-**Implements:** `api/core/reranker.py`
-
-- Calls OpenAI- or Gemini-compatible APIs when configured
-- Generates concise reasons tied to the user’s query/filters
-- Falls back gracefully to ANN order when disabled or failing
-
----
-
-### 🎬 6. Streaming Agent
-**Goal:** Resolve watch links from JustWatch
-**Implements:** `etl/justwatch_sync.py`
-
-- Looks up TMDB ids via the unofficial JustWatch endpoints
-- Normalises offers into `availability` (country/service/deeplink)
-- Command: `make etl-justwatch`
-
----
-
-### 💬 7. Recommendation Agent
-**Goal:** Serve recommendations via API
-**Implements:** `api/routes/recommend.py`
-
-- Combines user vector, collaborative neighbors, and LLM rewrite for ANN search
-- Integrates entity linking and trending priors before scoring
-- Applies business-rule boosts/filters + optional MMR diversity
-- Invokes the reranker for final ordering + explanations
-- Serves cursor-based pagination with cached responses
-- Endpoint: `GET /recommend?user_id=u1&limit=10`
-
----
-
----
-
-### (Coming Soon)
-| Agent | Description |
-|-------|--------------|
-| ❤️ **Feedback Agent** | Collect feedback signals and retrain user vector |
+## Quality Gate
+- Run `pre-commit run --all-files` before committing.
+- Run `pytest` before opening or updating a PR.
+- Keep coverage above the configured threshold (target: 90%+, enforced threshold in CI/pytest config).

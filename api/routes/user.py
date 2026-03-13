@@ -7,6 +7,7 @@ from api.db.session import get_db
 from api.db.models import UserHistory
 from api.core.user_profile import upsert_user_vectors
 from api.core.user_utils import canonical_profile_id
+from api.routes.recommend import clear_user_cache
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -34,4 +35,8 @@ def post_history(payload: HistoryIn, db: Session = Depends(get_db)):
     db.commit()
     upsert_user_vectors(db, canonical_id)
     db.commit()
+
+    # Invalidate recommendation cache for this profile
+    clear_user_cache(canonical_id)
+
     return {"ok": True, "user_id": payload.user_id, "profile": payload.profile}

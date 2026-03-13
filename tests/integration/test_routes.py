@@ -18,6 +18,13 @@ from api.core import business_rules
 
 
 @pytest.fixture(autouse=True)
+def _clear_recommend_cache():
+    recommend_routes._clear_recommend_cache_for_tests()
+    yield
+    recommend_routes._clear_recommend_cache_for_tests()
+
+
+@pytest.fixture(autouse=True)
 def _disable_db_startup(monkeypatch):
     monkeypatch.setattr("api.main.init_engine", lambda: None)
     monkeypatch.setattr("api.main.get_sessionmaker", lambda: None)
