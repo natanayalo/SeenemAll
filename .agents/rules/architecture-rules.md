@@ -1,23 +1,33 @@
-# Architecture & Coding Standards
+# Architecture and Coding Rules
 
-This rule ensures that all AI agents maintain the "Seen’emAll" architectural integrity and coding quality.
+Use these rules for all implementation tasks in SeenemAll.
 
-## 🏗️ Architectural Philosophy
-- **Agent-Oriented**: Partition logic into functional "agents" (ETL, Embedding, Candidate, Reranker, etc.).
-- **Domain Layer**: Core logic must reside in `api/core/`. Routes in `api/routes/` should only orchestrate.
-- **Persistence**: Use `pgvector` for similarity search. Avoid in-memory state that isn't backed by the DB or a dedicated cache.
+## Architecture
+- Keep domain logic in `api/core/`.
+- Keep `api/routes/` thin: request validation, orchestration, and response shaping only.
+- Treat recommendation ranking behavior as high-sensitivity logic. Any ranking-path change requires tests.
+- Persist similarity-search state in PostgreSQL/pgvector, not ad-hoc in-memory stores.
 
-## 🔄 Workflow & CI
-- **Pre-commit**: You MUST run `pre-commit run --all-files` before every commit. This ensures linting, formatting (Black/Ruff), and type checking (Mypy) are valid before pushing.
-- **Git State**: Maintain a clean working tree. If a pre-commit hook modifies files (like trailing-whitespace), stage those changes and re-run.
+## Coding Standards
+- Prefer explicit type hints for all new functions.
+- Keep I/O paths async where applicable (DB, network, provider calls).
+- Prefer `pathlib` for filesystem path manipulation.
+- Avoid silent behavior changes and dead flags.
 
-## 🐍 Coding Standards
-- **PEP 8**: Follow standard Python formatting.
-- **Async First**: Use `async/await` for all I/O bound operations (DB, LLM calls).
-- **Type Hints**: All new functions must include type annotations (Pydantic models preferred for API data).
-- **Path Handling**: Prefer `pathlib` for filesystem path manipulation to ensure cross-platform compatibility.
+## Testing Requirements
+- Add or update tests for every behavior change.
+- During implementation, run targeted tests for touched modules.
+- Before final handoff or PR update, run the full test suite (`pytest`).
+- For recommendation pipeline tests, isolate cache/stateful globals.
+- Mock external LLM/network dependencies in unit tests.
+- Maintain coverage at or above the project threshold.
 
-## 🧪 Testing Requirements
-- **90% Coverage**: New code must include unit tests. Check coverage with `pytest --cov=api tests/`.
-- **Isolation**: Use the `_clear_recommend_cache` fixture for any test involving the recommendation pipeline.
-- **Mocking**: Mock external LLM providers (OpenAI/Gemini) in unit tests using the stubs in `conftest.py`.
+## Workflow and CI
+- Run `pre-commit run --all-files` before every commit.
+- If pre-commit modifies files, re-stage and re-run pre-commit.
+- Keep a clean working tree before finalizing.
+
+## Approval and Git Operations
+- Do not create a commit without explicit user approval.
+- Do not push commits without explicit user approval.
+- If a task is blocked by policy or permissions, report the blocker and ask for direction.
