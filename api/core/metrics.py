@@ -57,12 +57,14 @@ class Histogram:
         with self._lock:
             if self._count == 0:
                 return {"count": 0, "sum": 0.0, "avg": 0.0, "min": 0.0, "max": 0.0}
+            s = float(self._sum)
+            c = float(self._count)
             return {
-                "count": self._count,
-                "sum": round(self._sum, 3),
-                "avg": round(self._sum / self._count, 3),
-                "min": round(self._min, 3),
-                "max": round(self._max, 3),
+                "count": float(self._count),
+                "sum": round(s, 3),
+                "avg": round(s / c, 3),
+                "min": round(float(self._min), 3),
+                "max": round(float(self._max), 3),
             }
 
 
@@ -71,15 +73,21 @@ class MetricsRegistry:
 
     _instance: MetricsRegistry | None = None
     _init_lock = threading.Lock()
+    _counters: Dict[str, Counter]
+    _histograms: Dict[str, Histogram]
 
     def __new__(cls) -> MetricsRegistry:
         if cls._instance is None:
             with cls._init_lock:
                 if cls._instance is None:
+                    # We cast to avoid mypy errors during initialization of the singleton
+                    from typing import cast
                     inst = super().__new__(cls)
-                    inst._counters: Dict[str, Counter] = {}
-                    inst._histograms: Dict[str, Histogram] = {}
-                    cls._instance = inst
+                    # Initialize attributes that mypy expects to exist
+                    object.__setattr__(inst, "_counters", {})
+                    object.__setattr__(inst, "_histograms", {})
+                    cls._instance = cast(MetricsRegistry, inst)
+        assert cls._instance is not None
         return cls._instance
 
     # -- Counters --
