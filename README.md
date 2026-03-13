@@ -120,7 +120,14 @@ curl -X POST http://localhost:8000/user/history \
 # 10. Get recommendations (profile-aware)
 curl "http://localhost:8000/recommend?user_id=u1&profile=main&limit=10"
 
-# 11. Continue with cursor pagination (optional)
+# 11. Deep Diagnostics (detailed intent rewrite + pipeline latencies)
+curl "http://localhost:8000/recommend/debug?user_id=u1&profile=main&limit=5"
+
+# 12. Health & Metrics (latency histograms + cache hit rates)
+curl "http://localhost:8000/healthz"
+curl "http://localhost:8000/healthz/metrics"
+
+# 13. Continue with cursor pagination (optional)
 # Response payload includes {"items": [...], "next_cursor": "..."}
 curl "http://localhost:8000/recommend?user_id=u1&profile=main&limit=10&cursor=eyJyYW5rIjoxMH0"
 ````
@@ -208,6 +215,19 @@ reranker (when enabled), producing the final explanations and ordering.
   is invalidated after `/user/history` updates so profile changes take effect immediately.
 - `GET /recommend` now returns `{"items": [...], "next_cursor": "..."}`; pass the returned
   cursor back in `cursor=` to fetch the next page without recomputing the ranking pipeline.
+
+---
+
+## 📊 Diagnostics & Monitoring
+
+- **Structured Logging**: All API requests are instrumented with a unique `request_id` (injected via middleware) and include standard fields like `method`, `path`, `status_code`, and `latency_ms`.
+- **Latency Histograms**: `GET /healthz/metrics` exposes thread-safe statistics for critical pipeline stages:
+  - `recommend.ann_latency_ms`
+  - `recommend.mmr_latency_ms`
+  - `recommend.rerank_latency_ms`
+  - `recommend.total_latency_ms`
+- **Cache Telemetry**: Track `recommend.cache_hit` vs `recommend.cache_miss` and `recommend.cold_start` counters via the metrics endpoint.
+- **Deep Debug**: Use `GET /recommend/debug` to inspect the LLM intent parser output, the rewritten query vector components, candidate retrieval counts, and per-stage latency numbers for a single request.
 
 ---
 

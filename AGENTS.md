@@ -76,6 +76,8 @@
 - Applies business-rule boosts/filters + optional MMR diversity
 - Invokes the reranker for final ordering + explanations
 - Serves cursor-based pagination with cached responses
+- **Emits telemetry**: Tracks latency (ANN, MMR, Rerank) and cache hit rates
+- **Diagnostic API**: Exposes deep pipeline state via `/recommend/debug`
 - Endpoint: `GET /recommend?user_id=u1&limit=10`
 
 ---

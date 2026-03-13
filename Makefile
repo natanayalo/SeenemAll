@@ -1,4 +1,4 @@
-.PHONY: up down logs sh migrate rev head alembic-init etl-tmdb embed etl-justwatch eval
+.PHONY: up down logs sh migrate rev head alembic-init etl-tmdb embed etl-justwatch eval health metrics debug-rec
 
 up:
 	docker compose up -d --build
@@ -32,3 +32,12 @@ etl-justwatch:
 
 eval:
 	docker compose exec api python evaluation/evaluate.py
+
+health:
+	curl -s http://localhost:8000/healthz
+
+metrics:
+	curl -s http://localhost:8000/healthz/metrics | python3 -m json.tool || curl -s http://localhost:8000/healthz/metrics
+
+debug-rec:
+	curl -s "http://localhost:8000/recommend/debug?user_id=u1&limit=5" | python3 -m json.tool || curl -s "http://localhost:8000/recommend/debug?user_id=u1&limit=5"
