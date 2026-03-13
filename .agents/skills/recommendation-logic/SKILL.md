@@ -20,7 +20,7 @@ This skill provides the deep context needed to modify or debug the core recommen
 ## 🛠️ Performance & Caching
 - **Caching**: Per-request caching with TTL (300s default).
 - **Invalidation**: Invalidate cache via `clear_cache_for_user()` when the user watch history changes.
-- **Latency Targets**: 
+- **Latency Targets**:
     - ANN < 100ms
     - MMR < 50ms
     - Reranker (small) < 500ms

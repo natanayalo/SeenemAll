@@ -35,8 +35,8 @@ def post_history(payload: HistoryIn, db: Session = Depends(get_db)):
     db.commit()
     upsert_user_vectors(db, canonical_id)
     db.commit()
-    
+
     # Invalidate recommendation cache for this profile
     clear_user_cache(canonical_id)
-    
+
     return {"ok": True, "user_id": payload.user_id, "profile": payload.profile}

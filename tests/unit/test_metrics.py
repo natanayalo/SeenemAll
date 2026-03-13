@@ -6,7 +6,7 @@ import threading
 
 import pytest
 
-from api.core.metrics import Counter, Histogram, MetricsRegistry, timer, METRICS
+from api.core.metrics import Counter, Histogram, timer, METRICS
 
 
 class TestCounter:

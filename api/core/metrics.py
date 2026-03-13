@@ -82,6 +82,7 @@ class MetricsRegistry:
                 if cls._instance is None:
                     # We cast to avoid mypy errors during initialization of the singleton
                     from typing import cast
+
                     inst = super().__new__(cls)
                     # Initialize attributes that mypy expects to exist
                     object.__setattr__(inst, "_counters", {})
