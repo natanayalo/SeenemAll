@@ -155,6 +155,57 @@ curl "http://localhost:8000/recommend?user_id=u1&profile=main&limit=10&cursor=ey
 
 ---
 
+## 🛠️ Local Development
+
+### 1. Virtual Environment
+For local linting and running tests outside of Docker:
+```bash
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# Unix/macOS:
+source .venv/bin/activate
+
+pip install -r requirements.txt
+pip install pytest pytest-asyncio pytest-cov httpx cachetools
+```
+
+### 2. Running Tests
+```bash
+# Run all tests
+pytest tests/
+
+# Run with coverage
+pytest --cov=api tests/
+```
+
+---
+
+## ❓ Troubleshooting
+
+### 1. Frontend Connectivity (Port 504/404)
+If the frontend cannot reach the API, ensure `REACT_APP_API_URL` is set in your `.env` and that the containers were built with it:
+```bash
+# In .env:
+REACT_APP_API_URL=http://localhost:8000
+
+# Rebuild to bake the URL into the frontend assets:
+docker compose up -d --build
+```
+
+### 2. Database Migration Mismatch
+If you see `FAILED: Can't locate revision identified by '...'`, your database volume is likely ahead of your codebase (or vice versa). To reset:
+```bash
+# CAUTION: This deletes all local data
+docker compose down -v
+docker compose up -d
+```
+alternatively, use `alembic stamp` to force a specific version if you know the schema matches.
+
+---
+
+---
+
 ## 🧠 Recommendation Pipeline Details
 
 The `/recommend` route orchestrates several retrieval streams before reranking:
