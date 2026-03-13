@@ -2,6 +2,9 @@
 
 > Multi-agent roles that orchestrate data ingestion, embeddings, and recommendations.
 
+> [!NOTE]
+> AI Agents working on this project should refer to the [Gemini Guidelines](file:///c:/Users/Natan/Dev/SeenemAll/.agents/GEMINI.md) for project-specific best practices and pitfalls.
+
 > **Quality bar:** Maintain automated test coverage above 90% (enforced via pytest’s coverage gate).
 
 ---
