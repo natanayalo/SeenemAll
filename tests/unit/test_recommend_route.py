@@ -14,7 +14,7 @@ from tests.helpers import FakeResult
 from api.main import app
 from api.db.session import get_db
 from api.routes import recommend as recommend_routes
-from api.routes.recommend import PrefilterDecision
+from api.routes.recommend import PrefilterDecision, _RECOMMEND_CACHE
 from api.core import business_rules
 from api.core.legacy_intent_parser import IntentFilters
 from api.core.entity_linker import ENTITY_LINKER_CACHE
@@ -22,6 +22,13 @@ from api.core.intent_parser import Intent
 from api.core.rewrite import Rewrite
 
 ORIGINAL_PREFILTER = recommend_routes._prefilter_allowed_ids
+
+
+@pytest.fixture(autouse=True)
+def _clear_recommend_cache():
+    _RECOMMEND_CACHE.clear()
+    yield
+    _RECOMMEND_CACHE.clear()
 
 
 @pytest.fixture(autouse=True)
