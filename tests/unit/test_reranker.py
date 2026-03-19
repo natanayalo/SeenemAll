@@ -19,9 +19,9 @@ def _reset_settings() -> None:
     reranker._get_settings.cache_clear()
     reranker._reset_small_rerank_cache_for_tests()
     for key in [
-        "RERANK_API_KEY",
+        "LLM_PROVIDER",
+        "GEMINI_API_KEY",
         "OPENAI_API_KEY",
-        "RERANK_PROVIDER",
         "RERANK_ENDPOINT",
         "RERANK_MODEL",
         "RERANK_ENABLED",
@@ -31,8 +31,8 @@ def _reset_settings() -> None:
 
 def test_rerank_with_explanations_without_api_key(monkeypatch):
     _reset_settings()
-    monkeypatch.delenv("RERANK_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
     items = [
         {
@@ -64,7 +64,7 @@ def test_rerank_with_explanations_no_items():
 
 def test_rerank_returns_base_when_llm_decisions_empty(monkeypatch):
     _reset_settings()
-    monkeypatch.setenv("RERANK_API_KEY", "fake")
+    monkeypatch.setenv("OPENAI_API_KEY", "fake")
     original = [
         {"id": 1, "title": "Alpha"},
         {"id": 2, "title": "Beta"},
@@ -80,7 +80,7 @@ def test_rerank_returns_base_when_llm_decisions_empty(monkeypatch):
 
 def test_rerank_with_explanations_handles_exception(monkeypatch):
     _reset_settings()
-    monkeypatch.setenv("RERANK_API_KEY", "fake")
+    monkeypatch.setenv("OPENAI_API_KEY", "fake")
 
     def boom(*args, **kwargs):
         raise RuntimeError("llm failed")
@@ -94,7 +94,7 @@ def test_rerank_with_explanations_handles_exception(monkeypatch):
 
 def test_get_settings_invalid_timeout_warns(monkeypatch, capfd):
     _reset_settings()
-    monkeypatch.setenv("RERANK_API_KEY", "fake")
+    monkeypatch.setenv("OPENAI_API_KEY", "fake")
     monkeypatch.setenv("RERANK_TIMEOUT", "not-a-number")
 
     settings = reranker._get_settings()
@@ -105,17 +105,27 @@ def test_get_settings_invalid_timeout_warns(monkeypatch, capfd):
 
 def test_get_settings_fallback_provider(monkeypatch):
     _reset_settings()
-    monkeypatch.setenv("RERANK_API_KEY", "fake")
-    monkeypatch.setenv("RERANK_PROVIDER", "unsupported")
+    monkeypatch.setenv("OPENAI_API_KEY", "fake")
+    monkeypatch.setenv("LLM_PROVIDER", "unsupported")
     settings = reranker._get_settings()
     assert settings.provider == "openai"
+    _reset_settings()
+
+
+def test_get_settings_uses_global_provider_and_gemini_key(monkeypatch):
+    _reset_settings()
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "gem-key")
+    settings = reranker._get_settings()
+    assert settings.provider == "gemini"
+    assert settings.api_key == "gem-key"
     _reset_settings()
 
 
 def test_call_openai_reranker_parses_payload(monkeypatch):
     _reset_settings()
     monkeypatch.setenv("OPENAI_PROJECT", "proj-test")
-    monkeypatch.setenv("RERANK_API_KEY", "fake")
+    monkeypatch.setenv("OPENAI_API_KEY", "fake")
     settings = reranker._get_settings()
 
     captured_request = {}
@@ -184,8 +194,8 @@ def test_call_reranker_raises_on_unknown_provider():
 
 def test_rerank_with_explanations_uses_gemini(monkeypatch):
     _reset_settings()
-    monkeypatch.setenv("RERANK_API_KEY", "gem-key")
-    monkeypatch.setenv("RERANK_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "gem-key")
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
 
     items = [
         {"id": 1, "title": "Alpha"},
@@ -209,7 +219,7 @@ def test_rerank_with_explanations_uses_gemini(monkeypatch):
 
 def test_small_reranker_orders_items(monkeypatch):
     _reset_settings()
-    monkeypatch.setenv("RERANK_PROVIDER", "small")
+    monkeypatch.setenv("LLM_PROVIDER", "small")
     filters = IntentFilters(
         raw_query="space opera", genres=["Sci-Fi"], moods=[], media_types=["movie"]
     )
@@ -265,7 +275,7 @@ def test_small_reranker_orders_items(monkeypatch):
 
 def test_small_reranker_uses_cache(monkeypatch):
     _reset_settings()
-    monkeypatch.setenv("RERANK_PROVIDER", "small")
+    monkeypatch.setenv("LLM_PROVIDER", "small")
 
     items = [
         {
@@ -308,7 +318,7 @@ def test_small_reranker_uses_cache(monkeypatch):
 
 def test_small_reranker_handles_timeout(monkeypatch):
     _reset_settings()
-    monkeypatch.setenv("RERANK_PROVIDER", "small")
+    monkeypatch.setenv("LLM_PROVIDER", "small")
 
     items = [
         {"id": 1, "title": "Alpha", "overview": "Heroic quest."},
@@ -505,7 +515,7 @@ def test_call_openai_reranker_requires_api_key():
 
 def test_call_openai_reranker_handles_unexpected_response(monkeypatch):
     _reset_settings()
-    monkeypatch.setenv("RERANK_API_KEY", "fake")
+    monkeypatch.setenv("OPENAI_API_KEY", "fake")
     settings = reranker._get_settings()
 
     class DummyResponse:
@@ -537,8 +547,8 @@ def test_call_openai_reranker_handles_unexpected_response(monkeypatch):
 
 def test_call_gemini_reranker_parses_payload(monkeypatch):
     _reset_settings()
-    monkeypatch.setenv("RERANK_API_KEY", "gem-key")
-    monkeypatch.setenv("RERANK_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "gem-key")
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
     monkeypatch.delenv("RERANK_ENDPOINT", raising=False)
     settings = reranker._get_settings()
 
@@ -604,8 +614,8 @@ def test_call_gemini_reranker_parses_payload(monkeypatch):
 
 def test_call_gemini_reranker_sanitizes_error(monkeypatch, capfd):
     _reset_settings()
-    monkeypatch.setenv("RERANK_API_KEY", "gem-key")
-    monkeypatch.setenv("RERANK_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "gem-key")
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
     monkeypatch.delenv("RERANK_ENDPOINT", raising=False)
     settings = reranker._get_settings()
 
@@ -657,8 +667,8 @@ def test_call_gemini_reranker_requires_api_key():
 
 def test_call_gemini_reranker_returns_empty_when_no_text(monkeypatch):
     _reset_settings()
-    monkeypatch.setenv("RERANK_API_KEY", "gem")
-    monkeypatch.setenv("RERANK_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "gem")
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
     settings = reranker._get_settings()
 
     class DummyResponse:
@@ -916,7 +926,7 @@ def test_default_explanation_covers_runtime_branch():
 
 def test_heuristic_ranker_highlights_trending(monkeypatch):
     _reset_settings()
-    monkeypatch.delenv("RERANK_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("RERANK_ENABLED", "0")
     reranker._get_settings.cache_clear()
 
@@ -948,7 +958,7 @@ def test_heuristic_ranker_highlights_trending(monkeypatch):
 
 def test_explanation_templates_override(monkeypatch):
     _reset_settings()
-    monkeypatch.delenv("RERANK_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("RERANK_ENABLED", "0")
     reranker._get_settings.cache_clear()
 
@@ -1002,8 +1012,8 @@ def test_explanation_templates_override(monkeypatch):
 
 def test_rerank_with_explanations_uses_llm_decisions(monkeypatch):
     _reset_settings()
-    monkeypatch.setenv("RERANK_API_KEY", "fake-key")
-    monkeypatch.setenv("RERANK_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-key")
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
 
     items = [
         {"id": 1, "title": "Alpha", "overview": "First film.", "genres": ["Drama"]},
@@ -1161,7 +1171,7 @@ def test_reranker_prompt_evaluation_logs(monkeypatch, caplog):
 
 def test_rerank_with_explanations_handles_reranker_error(monkeypatch):
     _reset_settings()
-    monkeypatch.setenv("RERANK_API_KEY", "key")
+    monkeypatch.setenv("OPENAI_API_KEY", "key")
     settings = reranker.RerankerSettings(
         provider="openai",
         api_key="key",

@@ -9,10 +9,16 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 .pre-commit-cache/
+.tmp/
+tmp/
+pytest-temp*/
+pytest-temp-*/
+pytest-temp/
 
 # Coverage and test artifacts
 .coverage
 htmlcov/
+evaluation/artifacts/
 
 # Local env/config secrets (compose passes env_file at runtime)
 .env

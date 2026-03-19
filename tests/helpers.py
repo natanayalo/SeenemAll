@@ -105,6 +105,27 @@ class _ItemQuery:
         ]
 
 
+class _ItemMediaTypeQuery:
+    def __init__(self, rows: Dict[int, str]):
+        self._rows = rows
+        self._filter_ids: List[int] | None = None
+
+    def filter(self, criterion, *args: Any, **kwargs: Any) -> "_ItemMediaTypeQuery":
+        ids = getattr(getattr(criterion, "right", None), "value", None)
+        if ids is not None:
+            self._filter_ids = list(ids)
+        return self
+
+    def all(self) -> List[tuple[int, str]]:
+        if self._filter_ids is None:
+            return list(self._rows.items())
+        return [
+            (item_id, self._rows[item_id])
+            for item_id in self._filter_ids
+            if item_id in self._rows
+        ]
+
+
 class _UserQuery:
     def __init__(self, session: "FakeSession"):
         self._session = session
@@ -151,6 +172,7 @@ class FakeSession:
             Iterable[Iterable[float]] | Iterable[tuple[int, Iterable[float]]] | None
         ) = None,
         item_rows: Iterable[tuple[int, list[dict]]] | None = None,
+        item_media_types: Dict[int, str] | None = None,
         user: User | None = None,
         other_users: Sequence[User] | None = None,
         history_ids: Sequence[int] | None = None,
@@ -206,6 +228,10 @@ class FakeSession:
         self.item_rows = {
             item_id: list(genres or []) for item_id, genres in item_rows or []
         }
+        self.item_media_types = {
+            int(item_id): str(media_type)
+            for item_id, media_type in (item_media_types or {}).items()
+        }
         for item_id, _ in self.embeddings:
             self.item_rows.setdefault(item_id, [])
 
@@ -237,6 +263,8 @@ class FakeSession:
             return _EmbeddingVectorQuery(self.embeddings)
         if len(entities) == 2 and entities[0] is Item.id and entities[1] is Item.genres:
             return _ItemQuery(self.item_rows)
+        if len(entities) == 2 and entities[0] is Item.id and entities[1] is Item.media_type:
+            return _ItemMediaTypeQuery(self.item_media_types)
         if len(entities) == 1 and entities[0] is UserHistory.item_id:
             return _HistoryIdsQuery(self.history_ids)
         if len(entities) == 1 and entities[0] is User:

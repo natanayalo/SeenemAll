@@ -19,12 +19,17 @@ from api.core.rewrite import Rewrite
 
 @pytest.fixture(autouse=True)
 def _reset_llm_state(monkeypatch):
+    for key in (
+        "LLM_PROVIDER",
+        "OPENAI_API_KEY",
+        "GEMINI_API_KEY",
+        "INTENT_ENABLED",
+    ):
+        monkeypatch.delenv(key, raising=False)
     llm_parser.INTENT_CACHE.clear()
     llm_parser.REWRITE_CACHE.clear()
     for key in llm_parser.CACHE_METRICS:
         llm_parser.CACHE_METRICS[key] = 0
-    monkeypatch.delenv("INTENT_API_KEY", raising=False)
-    monkeypatch.delenv("INTENT_ENABLED", raising=False)
     original_get_settings = llm_parser._get_settings
     if hasattr(original_get_settings, "cache_clear"):
         original_get_settings.cache_clear()
@@ -88,27 +93,170 @@ def test_rewrite_query():
     """
     test_cases = [
         (
+            "some query",
             Intent(include_genres=["sci-fi"], runtime_minutes_max=120),
             Rewrite(rewritten_text="sci-fi movies some query"),
         ),
         (
+            "some query",
             Intent(include_genres=["Science Fiction"]),
             Rewrite(rewritten_text="sci-fi movies some query"),
         ),
         (
+            "some query",
             Intent(exclude_genres=["horror"]),
             Rewrite(rewritten_text="some query"),
         ),
         (
+            "some query",
             Intent(ann_description="desperate players risk their lives for fortune"),
             Rewrite(
                 rewritten_text="desperate players risk their lives for fortune some"
             ),
         ),
+        (
+            "quick caper crime series",
+            Intent(ann_description="quick caper crime series"),
+            Rewrite(rewritten_text="crime caper heist con artist tv series"),
+        ),
+        (
+            "short grifter crime shows",
+            Intent(ann_description="short grifter crime shows"),
+            Rewrite(rewritten_text="crime caper heist con artist tv series"),
+        ),
+        (
+            "robbery caper show",
+            Intent(ann_description="robbery caper show"),
+            Rewrite(rewritten_text="crime caper heist con artist tv series"),
+        ),
+        (
+            "paradox mystery thrillers",
+            Intent(ann_description="paradox mystery thrillers"),
+            Rewrite(rewritten_text="temporal paradox time loop thriller movies"),
+        ),
+        (
+            "mind-bending temporal thrillers",
+            Intent(ann_description="mind-bending temporal thrillers"),
+            Rewrite(
+                rewritten_text="cerebral science fiction temporal paradox mystery thriller movies"
+            ),
+        ),
+        (
+            "brainy time-bending thrillers",
+            Intent(ann_description="brainy time-bending thrillers"),
+            Rewrite(
+                rewritten_text="cerebral science fiction temporal paradox mystery thriller movies"
+            ),
+        ),
+        (
+            "short high-concept thriller movies",
+            Intent(ann_description="short high-concept thriller movies"),
+            Rewrite(rewritten_text="short temporal twisty thriller movies"),
+        ),
+        (
+            "optimistic sci-fi TV",
+            Intent(ann_description="optimistic sci-fi TV"),
+            Rewrite(rewritten_text="optimistic space crew adventure sci fi tv"),
+        ),
+        (
+            "hopeful space adventure series",
+            Intent(ann_description="hopeful space adventure series"),
+            Rewrite(rewritten_text="optimistic space crew adventure sci fi tv"),
+        ),
+        (
+            "quick bingeable science fiction series",
+            Intent(ann_description="quick bingeable science fiction series"),
+            Rewrite(rewritten_text="short bingeable space adventure sci fi tv"),
+        ),
+        (
+            "fantasy epics like classic monster sagas",
+            Intent(ann_description="fantasy epics like classic monster sagas"),
+            Rewrite(rewritten_text="fantasy epic kingdom prophecy monster quest tv"),
+        ),
+        (
+            "epic fantasy quest series",
+            Intent(ann_description="epic fantasy quest series"),
+            Rewrite(rewritten_text="fantasy epic kingdom prophecy monster quest tv"),
+        ),
+        (
+            "fantasy kingdoms across films and series",
+            Intent(ann_description="fantasy kingdoms across films and series"),
+            Rewrite(rewritten_text="fantasy magic adventure kingdoms movies tv"),
+        ),
+        (
+            "international crime picks across movies and TV",
+            Intent(ann_description="international crime picks across movies and TV"),
+            Rewrite(
+                rewritten_text="international european crime heist thriller movies tv series"
+            ),
+        ),
+        (
+            "european crime films and series",
+            Intent(ann_description="european crime films and series"),
+            Rewrite(
+                rewritten_text="international european crime heist thriller movies tv series"
+            ),
+        ),
+        (
+            "modern city noir detective films",
+            Intent(ann_description="modern city noir detective films"),
+            Rewrite(rewritten_text="urban noir mystery thriller movies modern city"),
+        ),
+        (
+            "modern-city noir mysteries",
+            Intent(ann_description="modern-city noir mysteries"),
+            Rewrite(rewritten_text="urban noir mystery thriller movies modern city"),
+        ),
+        (
+            "prestige survival drama series",
+            Intent(ann_description="prestige survival drama series"),
+            Rewrite(
+                rewritten_text="dark prestige fantasy apocalypse antihero political tv series"
+            ),
+        ),
+        (
+            "kids profile multilingual fantasy adventures across films and series",
+            Intent(
+                ann_description="kids profile multilingual fantasy adventures across films and series"
+            ),
+            Rewrite(
+                rewritten_text="family animation fantasy adventure kids movies tv multilingual"
+            ),
+        ),
+        (
+            "uplifting dramedies under 125 minutes",
+            Intent(ann_description="uplifting dramedies under 125 minutes"),
+            Rewrite(rewritten_text="heartwarming uplifting comedy drama movies"),
+        ),
+        (
+            "family adventure movies rated PG-13 or below",
+            Intent(ann_description="family adventure movies rated PG-13 or below"),
+            Rewrite(rewritten_text="family fantasy quest adventure movies pg13"),
+        ),
+        (
+            "rom-com picks for date night",
+            Intent(ann_description="rom-com picks for date night"),
+            Rewrite(rewritten_text="romantic feel good comedy relationship movies"),
+        ),
+        (
+            "grounded vigilante series",
+            Intent(ann_description="grounded vigilante series"),
+            Rewrite(rewritten_text="gritty street-level vigilante superhero series"),
+        ),
+        (
+            "anime sci-fi films",
+            Intent(ann_description="anime sci-fi films"),
+            Rewrite(rewritten_text="anime cyberpunk mecha science fiction movies"),
+        ),
+        (
+            "japanese cyberpunk movies",
+            Intent(ann_description="japanese cyberpunk movies"),
+            Rewrite(rewritten_text="anime cyberpunk mecha science fiction movies"),
+        ),
     ]
 
-    for intent, expected_rewrite in test_cases:
-        rewrite = rewrite_query("some query", intent)
+    for query, intent, expected_rewrite in test_cases:
+        rewrite = rewrite_query(query, intent)
         assert rewrite == expected_rewrite
 
 
@@ -209,8 +357,8 @@ def test_parse_intent_llm_success(monkeypatch):
 
 
 def test_get_settings_falls_back_to_openai(monkeypatch):
-    monkeypatch.setenv("INTENT_PROVIDER", "invalid")
-    monkeypatch.setenv("INTENT_API_KEY", "key")
+    monkeypatch.setenv("LLM_PROVIDER", "invalid")
+    monkeypatch.setenv("OPENAI_API_KEY", "key")
     llm_parser._get_settings.cache_clear()
     settings = llm_parser._get_settings()
     assert settings.provider == "openai"
@@ -322,6 +470,11 @@ def test_offline_intent_stub_handles_kids_query():
     assert "tv" in payload.get("media_types", [])
 
 
+def test_offline_intent_stub_detects_streaming_provider():
+    payload = llm_parser._offline_intent_stub("crime shows on netflix")
+    assert payload.get("streaming_providers") == ["netflix"]
+
+
 def test_build_prompt_scopes_genres_when_media_known(monkeypatch):
     monkeypatch.setattr(llm_parser, "_ENABLE_MEDIA_TYPE_SCOPING", True)
 
@@ -410,7 +563,7 @@ def test_load_fallback_rules_parses_entries(monkeypatch, tmp_path):
 
 
 def test_get_settings_invalid_timeout_warns(monkeypatch, caplog):
-    monkeypatch.setenv("INTENT_API_KEY", "token")
+    monkeypatch.setenv("OPENAI_API_KEY", "token")
     monkeypatch.setenv("INTENT_TIMEOUT", "oops")
     llm_parser._get_settings.cache_clear()
 
@@ -420,6 +573,16 @@ def test_get_settings_invalid_timeout_warns(monkeypatch, caplog):
     assert "Invalid INTENT_TIMEOUT" in caplog.text
 
     llm_parser._get_settings.cache_clear()
+
+
+def test_get_settings_uses_global_provider_and_gemini_key(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "gem-token")
+    llm_parser._get_settings.cache_clear()
+    settings = llm_parser._get_settings()
+    assert settings.provider == "gemini"
+    assert settings.api_key == "gem-token"
+    assert settings.enabled is True
 
 
 def test_default_rewrite_returns_new_instance():

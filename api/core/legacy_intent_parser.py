@@ -59,8 +59,22 @@ _GENRE_SYNONYMS.update(
         "sci fi": ["Science Fiction"],
         "sci-fi": ["Science Fiction"],
         "scifi": ["Science Fiction"],
+        "space opera": ["Science Fiction", "Adventure"],
+        "space adventure": ["Science Fiction", "Adventure"],
+        "post apocalyptic": ["Science Fiction", "Drama"],
+        "post-apocalyptic": ["Science Fiction", "Drama"],
+        "apocalyptic": ["Science Fiction", "Drama"],
+        "dystopian": ["Science Fiction", "Drama"],
+        "heist": ["Crime", "Thriller"],
+        "caper": ["Crime"],
+        "neo noir": ["Crime", "Mystery", "Thriller"],
+        "neo-noir": ["Crime", "Mystery", "Thriller"],
         "romcom": ["Romance", "Comedy"],
+        "romcoms": ["Romance", "Comedy"],
         "rom com": ["Romance", "Comedy"],
+        "rom coms": ["Romance", "Comedy"],
+        "rom-com": ["Romance", "Comedy"],
+        "rom-coms": ["Romance", "Comedy"],
         "feel good": ["Comedy", "Family"],
         "feel-good": ["Comedy", "Family"],
         "superhero": ["Action", "Science Fiction"],
@@ -147,6 +161,18 @@ _BETWEEN_PATTERN = re.compile(
     flags=re.IGNORECASE,
 )
 
+_SHORT_TV_RUNTIME_PATTERN = re.compile(
+    r"(\b(short|quick|bingeable)\b.*\b(tv|series|show|episode)s?\b)|"
+    r"(\b(tv|series|show|episode)s?\b.*\b(short|quick|bingeable)\b)",
+    flags=re.IGNORECASE,
+)
+_SHORT_MOVIE_RUNTIME_PATTERN = re.compile(
+    r"(\b(short|quick)\b.*\b(movie|film)s?\b)|"
+    r"(\b(movie|film)s?\b.*\b(short|quick)\b)",
+    flags=re.IGNORECASE,
+)
+_MISSING_TV_RUNTIME_MAX_MINUTES = 60
+
 
 @dataclass
 class IntentFilters:
@@ -154,6 +180,8 @@ class IntentFilters:
     genres: List[str] = field(default_factory=list)
     moods: List[str] = field(default_factory=list)
     media_types: List[str] = field(default_factory=list)
+    year_min: Optional[int] = None
+    year_max: Optional[int] = None
     min_runtime: Optional[int] = None
     max_runtime: Optional[int] = None
     maturity_rating_max: Optional[str] = None
@@ -185,6 +213,8 @@ class IntentFilters:
     def has_filters(self) -> bool:
         return bool(
             self.media_types
+            or self.year_min is not None
+            or self.year_max is not None
             or self.min_runtime is not None
             or self.max_runtime is not None
             or self.effective_genres()
@@ -253,12 +283,26 @@ def item_matches_intent(
         if media_type not in filters.media_types:
             return False
 
+    release_year = getattr(item, "release_year", None)
+    if filters.year_min is not None:
+        if release_year is None or release_year < filters.year_min:
+            return False
+    if filters.year_max is not None:
+        if release_year is None or release_year > filters.year_max:
+            return False
+
     runtime = getattr(item, "runtime", None)
     if filters.min_runtime is not None:
-        if runtime is None or runtime < filters.min_runtime:
+        if runtime is None:
+            if not _allow_missing_tv_runtime(item, filters):
+                return False
+        elif runtime < filters.min_runtime:
             return False
     if filters.max_runtime is not None:
-        if runtime is None or runtime > filters.max_runtime:
+        if runtime is None:
+            if not _allow_missing_tv_runtime(item, filters):
+                return False
+        elif runtime > filters.max_runtime:
             return False
 
     if filters.maturity_rating_max:
@@ -274,6 +318,18 @@ def item_matches_intent(
                 return False
 
     return True
+
+
+def _allow_missing_tv_runtime(item: "Item | object", filters: IntentFilters) -> bool:
+    media_type = getattr(item, "media_type", None)
+    if media_type != "tv":
+        return False
+    if filters.min_runtime is not None:
+        return False
+    return (
+        filters.max_runtime is not None
+        and filters.max_runtime <= _MISSING_TV_RUNTIME_MAX_MINUTES
+    )
 
 
 _GENRE_CACHE_TTL_SECONDS = timedelta(minutes=30).total_seconds()
@@ -416,6 +472,39 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", cleaned).strip()
 
 
+def _pluralize_token(token: str) -> str | None:
+    lowered = token.strip().lower()
+    if not lowered or lowered.endswith("s"):
+        return None
+    if lowered.endswith("y") and len(lowered) > 2:
+        return f"{lowered[:-1]}ies"
+    if lowered.endswith(("s", "x", "z", "ch", "sh")):
+        return f"{lowered}es"
+    return f"{lowered}s"
+
+
+def _phrase_variants(phrase: str) -> List[str]:
+    normalized = phrase.strip().lower()
+    if not normalized:
+        return []
+    variants = [normalized]
+    tokens = normalized.split()
+    if not tokens:
+        return variants
+    if len(tokens) == 1:
+        plural = _pluralize_token(tokens[0])
+        if plural and plural not in variants:
+            variants.append(plural)
+        return variants
+
+    plural_last = _pluralize_token(tokens[-1])
+    if plural_last:
+        plural_phrase = " ".join([*tokens[:-1], plural_last])
+        if plural_phrase not in variants:
+            variants.append(plural_phrase)
+    return variants
+
+
 def _extract_genres(normalized_text: str) -> List[str]:
     if not normalized_text:
         return []
@@ -423,12 +512,18 @@ def _extract_genres(normalized_text: str) -> List[str]:
     found: List[str] = []
     seen: set[str] = set()
     for phrase, canonicals in _GENRE_SYNONYMS.items():
-        token = f" {phrase} "
-        if token in padded:
-            for canonical in canonicals:
-                if canonical not in seen:
-                    found.append(canonical)
-                    seen.add(canonical)
+        matched = False
+        for variant in _phrase_variants(phrase):
+            token = f" {variant} "
+            if token in padded:
+                matched = True
+                break
+        if not matched:
+            continue
+        for canonical in canonicals:
+            if canonical not in seen:
+                found.append(canonical)
+                seen.add(canonical)
     return found
 
 
@@ -511,6 +606,12 @@ def _extract_runtime(text: str) -> tuple[Optional[int], Optional[int]]:
     ):
         # Swap if parsing produced inverted bounds.
         min_runtime, max_runtime = max_runtime, min_runtime
+
+    if max_runtime is None:
+        if _SHORT_TV_RUNTIME_PATTERN.search(lowered):
+            max_runtime = 50
+        elif _SHORT_MOVIE_RUNTIME_PATTERN.search(lowered):
+            max_runtime = 125
 
     return min_runtime, max_runtime
 

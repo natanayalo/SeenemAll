@@ -1,0 +1,75 @@
+{
+  "version": "v2",
+  "target_total_cases": 72,
+  "bucket_targets": {
+    "semantic_query_movie": 14,
+    "semantic_query_tv": 14,
+    "constrained_single_filter": 16,
+    "constrained_multi_filter": 10,
+    "no_query_warm_start": 6,
+    "no_query_cold_start": 6,
+    "profile_persona": 4,
+    "edge_adversarial": 2
+  },
+  "minimum_slice_counts": {
+    "movie": 30,
+    "tv": 30,
+    "mixed": 8,
+    "provider_filtered": 12,
+    "runtime_capped": 12,
+    "maturity_capped": 10,
+    "language_or_region": 8,
+    "year_or_decade": 8,
+    "cold_start": 12,
+    "no_query": 12
+  },
+  "milestones": {
+    "m1": {
+      "name": "Milestone A",
+      "target_total_cases": 30,
+      "bucket_targets": {
+        "semantic_query_movie": 6,
+        "semantic_query_tv": 6,
+        "constrained_single_filter": 6,
+        "constrained_multi_filter": 4,
+        "no_query_warm_start": 2,
+        "no_query_cold_start": 2,
+        "profile_persona": 2,
+        "edge_adversarial": 2
+      },
+      "minimum_slice_counts": {
+        "movie": 12,
+        "tv": 12,
+        "cold_start": 4,
+        "no_query": 4
+      }
+    },
+    "m2": {
+      "name": "Milestone B",
+      "target_total_cases": 50,
+      "bucket_targets": {
+        "semantic_query_movie": 10,
+        "semantic_query_tv": 10,
+        "constrained_single_filter": 10,
+        "constrained_multi_filter": 7,
+        "no_query_warm_start": 4,
+        "no_query_cold_start": 4,
+        "profile_persona": 3,
+        "edge_adversarial": 2
+      },
+      "minimum_slice_counts": {
+        "movie": 20,
+        "tv": 20,
+        "provider_filtered": 6,
+        "runtime_capped": 6,
+        "maturity_capped": 5,
+        "cold_start": 8,
+        "no_query": 8
+      }
+    },
+    "v2": {
+      "name": "Milestone C / Final",
+      "target_total_cases": 72
+    }
+  }
+}

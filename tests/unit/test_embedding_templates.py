@@ -56,6 +56,27 @@ def test_emphasized_template():
     assert "mysterious world" in text
 
 
+def test_hybrid_template():
+    text = format_with_template("hybrid", TEST_ITEM)
+    assert "Title: The Matrix" in text
+    assert "Genres: Science Fiction, Action" in text
+    assert "Era: Modern" in text
+    assert "Decade: 1990s" in text
+    assert "Overview: A computer programmer discovers a mysterious world" in text
+
+
+def test_catalog_rich_template():
+    text = format_with_template("catalog_rich", TEST_ITEM)
+    assert "Title: The Matrix" in text
+    assert "Media: movie" in text
+    assert "Genres: Science Fiction, Action" in text
+    assert "Era: Modern" in text
+    assert "Decade: 1990s" in text
+    assert "Runtime: Long" in text
+    assert "Language: unknown" in text
+    assert "Overview: A computer programmer discovers a mysterious world" in text
+
+
 def test_unknown_template():
     with pytest.raises(ValueError, match="Unknown template"):
         format_with_template("nonexistent", TEST_ITEM)

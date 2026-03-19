@@ -23,6 +23,12 @@ This file is loaded on demand by the recommendation-logic skill.
 - MMR and post-filter ordering
 - Reranker integration and fallback
 - Query override and intent override behavior
+- Query-family heuristics and rewrite normalization
+
+## Anti-Overfit Notes
+- Keep product logic independent from exact benchmark case wording.
+- Prefer semantic detectors that should match paraphrases and neighboring queries.
+- If a fix requires naming a benchmark phrase directly, treat it as temporary and refactor it before considering the work complete.
 
 ## Recommended Test Targets
 - `tests/unit/test_recommend_route.py`

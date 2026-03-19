@@ -137,15 +137,20 @@ def _load_fallback_rules() -> Tuple[IntentFallbackRule, ...]:
 
 @lru_cache(maxsize=1)
 def _get_settings() -> IntentParserSettings:
-    api_key = os.getenv("INTENT_API_KEY") or os.getenv("OPENAI_API_KEY")
-    raw_provider = os.getenv("INTENT_PROVIDER", "openai").strip().lower()
+    raw_provider = (os.getenv("LLM_PROVIDER") or "openai").strip().lower()
     if raw_provider not in {"openai", "gemini"}:
         logger.warning(
-            "Unsupported INTENT_PROVIDER '%s'; falling back to 'openai'.", raw_provider
+            "Unsupported intent provider '%s'; falling back to 'openai'.",
+            raw_provider,
         )
         provider = "openai"
     else:
         provider = raw_provider
+
+    if provider == "gemini":
+        api_key = os.getenv("GEMINI_API_KEY")
+    else:
+        api_key = os.getenv("OPENAI_API_KEY")
 
     if provider == "gemini":
         default_model = "gemini-2.0-flash-lite"
@@ -756,6 +761,11 @@ def _offline_intent_stub(query: str) -> Dict[str, Any]:
         if detected_languages:
             intent.languages = detected_languages
 
+    if intent.streaming_providers is None:
+        detected_providers = _detect_streaming_providers(stripped)
+        if detected_providers:
+            intent.streaming_providers = detected_providers
+
     payload = intent.model_dump(exclude_none=True)
     if legacy_filters.media_types:
         payload.setdefault("media_types", list(legacy_filters.media_types))
@@ -781,6 +791,15 @@ _LANGUAGE_KEYWORDS = {
     "chinese": "zh",
     "portuguese": "pt",
 }
+_STREAMING_PROVIDER_RULES: List[Tuple[str, Tuple[str, ...]]] = [
+    ("netflix", ("netflix", "nfx")),
+    ("disney_plus", ("disney plus", "disney+", "disney")),
+    ("prime_video", ("prime video", "amazon prime", "prime")),
+    ("hulu", ("hulu",)),
+    ("max", ("hbo max", "max")),
+    ("apple_tv_plus", ("apple tv plus", "apple tv+", "apple tv")),
+    ("paramount_plus", ("paramount plus", "paramount+", "paramount")),
+]
 
 
 def _infer_year_range(text: str) -> Optional[Tuple[int, int]]:
@@ -813,6 +832,23 @@ def _detect_languages(text: str) -> List[str]:
     return detected
 
 
+def _detect_streaming_providers(text: str) -> List[str]:
+    normalized = text.lower().replace("+", " plus ").replace("-", " ")
+    normalized = " ".join(normalized.split())
+    if not normalized:
+        return []
+
+    padded = f" {normalized} "
+    detected: List[str] = []
+    for provider, keywords in _STREAMING_PROVIDER_RULES:
+        for keyword in keywords:
+            if f" {keyword} " in padded:
+                if provider not in detected:
+                    detected.append(provider)
+                break
+    return detected
+
+
 def _rewrite_from_intent(intent: Intent) -> Optional[str]:
     include_genres = intent.include_genres or []
     for genre in include_genres:
@@ -826,24 +862,309 @@ def _rewrite_from_intent(intent: Intent) -> Optional[str]:
     return None
 
 
+def _normalize_query_text(query: str | None) -> str:
+    return " ".join((query or "").lower().replace("-", " ").split())
+
+
+def _has_any_keyword(text: str, keywords: tuple[str, ...]) -> bool:
+    return any(keyword in text for keyword in keywords)
+
+
+def _is_post_apocalyptic_tv_query(text: str) -> bool:
+    return _has_any_keyword(text, ("tv", "series", "show")) and _has_any_keyword(
+        text,
+        ("post apocalyptic", "post-apocalyptic", "dystopian survival", "apocalypse"),
+    )
+
+
+def _is_short_bingeable_scifi_tv_query(text: str) -> bool:
+    return _has_any_keyword(text, ("tv", "series", "show")) and _has_any_keyword(
+        text, ("sci fi", "science fiction", "space")
+    ) and _has_any_keyword(text, ("short", "bingeable", "quick"))
+
+
+def _is_feel_good_comedy_query(text: str) -> bool:
+    return _has_any_keyword(text, ("feel good", "feel-good", "uplifting", "heartwarming")) and _has_any_keyword(
+        text, ("comedy", "comedies", "funny", "dramedy", "dramedies")
+    )
+
+
+def _is_family_pg13_adventure_movie_query(text: str) -> bool:
+    return _has_any_keyword(text, ("movie", "movies", "film", "films")) and _has_any_keyword(
+        text, ("family", "teen friendly", "teen-friendly")
+    ) and _has_any_keyword(text, ("adventure", "fantasy", "quest")) and _has_any_keyword(
+        text, ("pg13", "pg 13", "pg-13", "or below", "or lower")
+    )
+
+
+def _is_date_night_comedy_query(text: str) -> bool:
+    return _has_any_keyword(text, ("date night", "date-night", "rom com", "rom-com")) and _has_any_keyword(
+        text, ("comedy", "comedies", "romantic", "relationship", "rom com", "rom-com")
+    )
+
+
+def _is_fantasy_worlds_cross_media_query(text: str) -> bool:
+    has_cross_media = _has_any_keyword(text, ("movies and tv", "tv and movies", "films and series"))
+    return has_cross_media and _has_any_keyword(
+        text, ("fantasy", "magic", "kingdoms", "worlds", "quest")
+    )
+
+
+def _is_serialized_prestige_tv_query(text: str) -> bool:
+    return _has_any_keyword(text, ("tv", "series", "show")) and _has_any_keyword(
+        text, ("serialized", "prestige", "high stakes", "high-stakes")
+    ) and _has_any_keyword(text, ("drama", "power struggle", "survival", "antihero"))
+
+
+def _is_kids_multilingual_adventure_query(text: str) -> bool:
+    return _has_any_keyword(text, ("kids profile", "kids", "children", "family")) and _has_any_keyword(
+        text, ("bilingual", "multilingual", "international")
+    ) and _has_any_keyword(
+        text, ("adventure", "fantasy", "quest", "magic")
+    ) and _has_any_keyword(text, ("movie", "movies", "film", "films", "tv", "series", "show"))
+
+
+def _is_epic_fantasy_tv_query(text: str) -> bool:
+    has_tv_signal = _has_any_keyword(text, ("tv", "series", "show"))
+    has_comparison_signal = _has_any_keyword(
+        text, ("like", "similar to", "in the vein of", "vibes")
+    )
+    return (
+        (has_tv_signal or has_comparison_signal)
+        and "fantasy" in text
+        and _has_any_keyword(text, ("epic", "epics", "quest", "kingdom", "prophecy", "monster"))
+    )
+
+
+def _is_caper_crime_tv_query(text: str) -> bool:
+    return _has_any_keyword(text, ("tv", "series", "show")) and "crime" in text and _has_any_keyword(
+        text,
+        (
+            "short episode",
+            "short episodes",
+            "heist",
+            "caper",
+            "con artist",
+            "con artists",
+            "thief",
+            "thieves",
+            "grifter",
+            "robbery",
+        ),
+    )
+
+
+def _is_heist_tv_query(text: str) -> bool:
+    return _has_any_keyword(text, ("tv", "series", "show")) and _has_any_keyword(
+        text,
+        (
+            "heist",
+            "caper",
+            "con artist",
+            "con artists",
+            "conman",
+            "grifter",
+            "thief",
+            "thieves",
+            "robbery",
+            "robber",
+        ),
+    )
+
+
+def _is_noir_movie_query(text: str) -> bool:
+    return _has_any_keyword(text, ("noir", "neo noir", "neo-noir", "film noir")) and (
+        _has_any_keyword(text, ("movie", "movies", "film", "films"))
+        or _has_any_keyword(text, ("city", "cities", "urban", "modern"))
+    ) and _has_any_keyword(
+        text,
+        ("crime", "mystery", "mysteries", "thriller", "detective", "investigation"),
+    )
+
+
+def _is_temporal_thriller_query(text: str) -> bool:
+    temporal_signal = _has_any_keyword(
+        text,
+        (
+            "time travel",
+            "time traveling",
+            "time bending",
+            "time loop",
+            "temporal",
+            "paradox",
+            "timeline",
+        ),
+    )
+    thriller_signal = _has_any_keyword(
+        text,
+        (
+            "thriller",
+            "thrillers",
+            "brainy",
+            "cerebral",
+            "mind bending",
+            "mind-bending",
+            "twisty",
+            "mystery",
+        ),
+    )
+    return temporal_signal and thriller_signal
+
+
+def _is_high_concept_thriller_query(text: str) -> bool:
+    return _has_any_keyword(
+        text, ("high concept", "brainy", "cerebral", "mind bending", "mind-bending")
+    ) and _has_any_keyword(text, ("thriller", "thrillers", "movie", "movies", "film", "films"))
+
+
 def _heuristic_rewrite(normalized_query: str) -> Optional[str]:
     """Fallback heuristics for common queries when LLM intent is unavailable."""
-    lower = normalized_query.lower()
-    normalized = " ".join(lower.replace("-", " ").split())
-    heuristics = [
-        (("post apocalyptic", "tv"), "post-apocalyptic survival resilience tv series"),
-        (("feel good",), "feel-good uplifting short comedy movies"),
-        (("anime", "sci fi"), "anime science fiction adventure films"),
-        (("space opera",), "optimistic space exploration adventure tv series"),
-        (("rom com",), "romantic comedy films from the 2000s"),
-        (("gritty", "superhero"), "gritty street-level vigilante superhero series"),
-        (("fantasy", "witcher"), "high fantasy epic quest tv series"),
-    ]
+    normalized = _normalize_query_text(normalized_query)
+    caper_crime_tv_signal = _is_caper_crime_tv_query(normalized)
+    heist_tv_signal = _is_heist_tv_query(normalized)
+    international_crime_signal = (
+        "crime" in normalized
+        and any(
+            keyword in normalized
+            for keyword in (
+                "international",
+                "europe",
+                "european",
+                "foreign",
+                "non english",
+                "global",
+                "world cinema",
+            )
+        )
+        and any(
+            keyword in normalized
+            for keyword in ("movie", "movies", "film", "films", "tv", "series", "show")
+        )
+    )
+    street_level_superhero_signal = (
+        any(keyword in normalized for keyword in ("tv", "series", "show"))
+        and any(keyword in normalized for keyword in ("superhero", "vigilante"))
+        and any(
+            keyword in normalized
+            for keyword in ("street level", "street-level", "gritty", "grounded", "urban")
+        )
+    )
+    anime_scifi_movie_signal = (
+        any(keyword in normalized for keyword in ("movie", "movies", "film", "films"))
+        and any(keyword in normalized for keyword in ("anime", "animated", "japanese"))
+        and any(
+            keyword in normalized
+            for keyword in (
+                "sci fi",
+                "science fiction",
+                "cyberpunk",
+                "mecha",
+                "future",
+                "futuristic",
+                "android",
+                "space",
+            )
+        )
+    )
+    noir_movie_signal = _is_noir_movie_query(normalized)
+    temporal_signal = _is_temporal_thriller_query(normalized)
+    high_concept_thriller_signal = _is_high_concept_thriller_query(normalized)
+    thriller_signal = _has_any_keyword(
+        normalized,
+        (
+            "thriller",
+            "thrillers",
+            "high concept",
+            "brainy",
+            "cerebral",
+            "mind bending",
+            "mind-bending",
+            "twisty",
+        ),
+    )
+    optimistic_scifi_tv_signal = (
+        any(keyword in normalized for keyword in ("tv", "series", "show"))
+        and (
+            "space opera" in normalized
+            or (
+                any(
+                    keyword in normalized
+                    for keyword in ("sci fi", "science fiction", "space")
+                )
+                and any(
+                    keyword in normalized
+                    for keyword in (
+                        "optimistic",
+                        "hopeful",
+                        "uplifting",
+                        "adventure",
+                        "crew",
+                        "starship",
+                        "exploration",
+                        "not too dark",
+                    )
+                )
+            )
+        )
+    )
+    fantasy_epic_tv_signal = _is_epic_fantasy_tv_query(normalized)
 
-    for keywords, rewrite in heuristics:
-        if all(keyword in normalized for keyword in keywords):
-            return rewrite
+    if high_concept_thriller_signal and temporal_signal:
+        return "cerebral science fiction temporal paradox mystery thriller movies"
+    if temporal_signal and thriller_signal:
+        if "short" in normalized:
+            return "short temporal twisty thriller movies"
+        return "temporal paradox time loop thriller movies"
+    if high_concept_thriller_signal and "short" in normalized:
+        return "short temporal twisty thriller movies"
+    if caper_crime_tv_signal:
+        return "crime caper heist con artist tv series"
+    if heist_tv_signal:
+        return "crime caper heist con artist tv series"
+    if international_crime_signal:
+        return "international european crime heist thriller movies tv series"
+    if street_level_superhero_signal:
+        return "gritty street-level vigilante superhero series"
+    if anime_scifi_movie_signal:
+        return "anime cyberpunk mecha science fiction movies"
+    if noir_movie_signal:
+        if any(keyword in normalized for keyword in ("city", "cities", "urban", "modern")):
+            return "urban noir mystery thriller movies modern city"
+        return "urban noir crime mystery thriller movies"
+    if optimistic_scifi_tv_signal:
+        return "optimistic space crew adventure sci fi tv"
+    if _is_kids_multilingual_adventure_query(normalized):
+        return "family animation fantasy adventure kids movies tv multilingual"
+    if _is_fantasy_worlds_cross_media_query(normalized):
+        return "fantasy magic adventure kingdoms movies tv"
+    if fantasy_epic_tv_signal:
+        return "fantasy epic kingdom prophecy monster quest tv"
+
+    if _is_post_apocalyptic_tv_query(normalized):
+        return "post-apocalyptic survival resilience tv series"
+    if _is_short_bingeable_scifi_tv_query(normalized):
+        return "short bingeable space adventure sci fi tv"
+    if _is_feel_good_comedy_query(normalized):
+        if _has_any_keyword(normalized, ("dramedy", "heartwarming", "uplifting")):
+            return "heartwarming uplifting comedy drama movies"
+        return "feel-good uplifting short comedy movies"
+    if "space opera" in normalized:
+        return "optimistic space exploration adventure tv series"
+    if _is_family_pg13_adventure_movie_query(normalized):
+        return "family fantasy quest adventure movies pg13"
+    if _is_date_night_comedy_query(normalized):
+        return "romantic feel good comedy relationship movies"
+    if _has_any_keyword(normalized, ("rom com", "rom-com")):
+        return "romantic comedy films from the 2000s"
+    if _is_epic_fantasy_tv_query(normalized):
+        return "high fantasy epic quest tv series"
+    if _is_serialized_prestige_tv_query(normalized):
+        return "dark prestige fantasy apocalypse antihero political tv series"
     return None
+
+
+def _normalize_rewrite_text(text: str) -> str:
+    return " ".join((text or "").lower().replace("-", " ").split())
 
 
 def _truncate_words(text: str, limit: int = 8) -> str:
@@ -872,21 +1193,33 @@ def rewrite_query(query: str, intent: Intent) -> Rewrite:
     if intent_hint is not None:
         intent_hint = intent_hint.strip()
     normalized = normalized_query.strip()
+    heuristic = _heuristic_rewrite(normalized)
+    used_heuristic = False
 
     base_text = ""
     if description:
-        base_text = description
+        normalized_description = _normalize_rewrite_text(description)
+        normalized_query_text = _normalize_rewrite_text(normalized)
+        if heuristic and normalized_description == normalized_query_text:
+            base_text = heuristic
+            used_heuristic = True
+        else:
+            base_text = description
     elif intent_hint:
         base_text = intent_hint
     else:
-        heuristic = _heuristic_rewrite(normalized)
         if heuristic:
             base_text = heuristic
+            used_heuristic = True
     if not base_text:
         base_text = normalized
 
     combined = base_text or normalized
-    if normalized and normalized.lower() not in (combined or "").lower():
+    if (
+        normalized
+        and not used_heuristic
+        and normalized.lower() not in (combined or "").lower()
+    ):
         combined = f"{combined} {normalized}".strip()
 
     rewritten_text = _truncate_words(combined)

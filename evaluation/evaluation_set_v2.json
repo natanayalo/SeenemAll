@@ -1,0 +1,1609 @@
+[
+  {
+    "query": "mind-bending sci-fi movies like Inception",
+    "golden_set": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "media_type": "movie",
+        "relevance": 3.0
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "media_type": "movie",
+        "relevance": 3.0
+      },
+      {
+        "id": 1124,
+        "title": "The Prestige",
+        "media_type": "movie",
+        "relevance": 2.0
+      },
+      {
+        "id": 329865,
+        "title": "Arrival",
+        "media_type": "movie",
+        "relevance": 2.0
+      },
+      {
+        "id": 577922,
+        "title": "Tenet",
+        "media_type": "movie",
+        "relevance": 2.0
+      }
+    ],
+    "negative_set": [
+      {
+        "id": 238,
+        "title": "The Godfather",
+        "media_type": "movie"
+      },
+      {
+        "id": 9655,
+        "title": "She's the Man",
+        "media_type": "movie"
+      }
+    ],
+    "genre_override": "Science Fiction",
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "query"
+    ],
+    "case_id": "v2_case_001",
+    "distribution_bucket": "semantic_query_movie"
+  },
+  {
+    "query": "time-travel thrillers",
+    "golden_set": [
+      {
+        "id": 59967,
+        "title": "Looper",
+        "media_type": "movie"
+      },
+      {
+        "id": 137113,
+        "title": "Edge of Tomorrow",
+        "media_type": "movie"
+      },
+      {
+        "id": 206487,
+        "title": "Predestination",
+        "media_type": "movie"
+      },
+      {
+        "id": 45612,
+        "title": "Source Code",
+        "media_type": "movie"
+      },
+      {
+        "id": 1954,
+        "title": "The Butterfly Effect",
+        "media_type": "movie"
+      }
+    ],
+    "genre_override": "Science Fiction",
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "query"
+    ],
+    "case_id": "v2_case_002",
+    "distribution_bucket": "semantic_query_movie"
+  },
+  {
+    "query": "psychological thrillers about money and greed",
+    "description": "Desperate people pushed to extremes by money and status.",
+      "golden_set": [
+        {
+          "id": 496243,
+          "title": "Parasite",
+          "media_type": "movie"
+      },
+      {
+        "id": 1359,
+        "title": "American Psycho",
+        "media_type": "movie"
+      },
+        {
+          "id": 303858,
+          "title": "Money Monster",
+          "media_type": "movie"
+        }
+      ],
+    "genre_override": "Thriller",
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "query"
+    ],
+    "case_id": "v2_case_003",
+    "distribution_bucket": "semantic_query_movie"
+  },
+  {
+    "query": "heist TV series",
+    "golden_set": [
+      {
+        "id": 71446,
+        "title": "Money Heist",
+        "media_type": "tv"
+      },
+      {
+        "id": 71715,
+        "title": "Good Girls",
+        "media_type": "tv"
+      },
+      {
+        "id": 96677,
+        "title": "Lupin",
+        "media_type": "tv"
+      },
+      {
+        "id": 21510,
+        "title": "White Collar",
+        "media_type": "tv"
+      },
+      {
+        "id": 7482,
+        "title": "Leverage",
+        "media_type": "tv"
+      },
+      {
+        "id": 64199,
+        "title": "Sneaky Pete",
+        "media_type": "tv"
+      }
+    ],
+    "negative_set": [
+      {
+        "id": 1399,
+        "title": "Game of Thrones",
+        "media_type": "tv"
+      },
+      {
+        "id": 673,
+        "title": "Harry Potter and the Prisoner of Azkaban",
+        "media_type": "movie"
+      }
+    ],
+    "genre_override": "Crime",
+    "slice_tags": [
+      "warm_start",
+      "tv",
+      "query"
+    ],
+    "case_id": "v2_case_004",
+    "distribution_bucket": "semantic_query_tv"
+  },
+  {
+    "query": "neo-noir crime movies",
+    "golden_set": [
+      {
+        "id": 829,
+        "title": "Chinatown",
+        "media_type": "movie"
+      },
+      {
+        "id": 2118,
+        "title": "L.A. Confidential",
+        "media_type": "movie"
+      },
+      {
+        "id": 807,
+        "title": "Se7en",
+        "media_type": "movie"
+      },
+      {
+        "id": 6977,
+        "title": "No Country for Old Men",
+        "media_type": "movie"
+      },
+      {
+        "id": 77,
+        "title": "Memento",
+        "media_type": "movie"
+      },
+      {
+        "id": 64690,
+        "title": "Drive",
+        "media_type": "movie"
+      },
+      {
+        "id": 242582,
+        "title": "Nightcrawler",
+        "media_type": "movie"
+      },
+      {
+        "id": 146233,
+        "title": "Prisoners",
+        "media_type": "movie"
+      },
+      {
+        "id": 395834,
+        "title": "Wind River",
+        "media_type": "movie"
+      }
+    ],
+    "genre_override": "Thriller",
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "query"
+    ],
+    "case_id": "v2_case_005",
+    "distribution_bucket": "semantic_query_movie"
+  },
+  {
+    "query": "space-opera TV (not too dark)",
+      "golden_set": [
+        {
+          "id": 71738,
+          "title": "The Orville",
+          "media_type": "tv"
+        },
+        {
+          "id": 1437,
+          "title": "Firefly",
+        "media_type": "tv"
+      },
+      {
+        "id": 4629,
+        "title": "Stargate SG-1",
+        "media_type": "tv"
+      },
+      {
+        "id": 30991,
+        "title": "Cowboy Bebop",
+        "media_type": "tv"
+      },
+      {
+        "id": 4271,
+        "title": "Farscape",
+        "media_type": "tv"
+      },
+      {
+        "id": 103516,
+        "title": "Star Trek: Strange New Worlds",
+        "media_type": "tv"
+      }
+    ],
+    "genre_override": "Sci-Fi & Fantasy",
+    "slice_tags": [
+      "warm_start",
+      "tv",
+      "query"
+    ],
+    "case_id": "v2_case_006",
+    "distribution_bucket": "semantic_query_tv"
+  },
+  {
+    "query": "post-apocalyptic TV shows",
+    "golden_set": [
+      {
+        "id": 48866,
+        "title": "The 100",
+        "media_type": "tv"
+      },
+      {
+        "id": 100088,
+        "title": "The Last of Us",
+        "media_type": "tv"
+      },
+      {
+        "id": 1402,
+        "title": "The Walking Dead",
+        "media_type": "tv"
+      },
+      {
+        "id": 204541,
+        "title": "Silo",
+        "media_type": "tv"
+      }
+    ],
+    "genre_override": "Drama",
+    "slice_tags": [
+      "warm_start",
+      "tv",
+      "query"
+    ],
+    "case_id": "v2_case_007",
+    "distribution_bucket": "semantic_query_tv"
+  },
+  {
+    "query": "feel-good comedies under 125 minutes",
+    "golden_set": [
+      {
+        "id": 19913,
+        "title": "(500) Days of Summer",
+        "media_type": "movie"
+      },
+      {
+        "id": 194,
+        "title": "Amélie",
+        "media_type": "movie"
+      },
+      {
+        "id": 8051,
+        "title": "Punch-Drunk Love",
+        "media_type": "movie"
+      },
+      {
+        "id": 105,
+        "title": "Back to the Future",
+        "media_type": "movie"
+      },
+      {
+        "id": 2280,
+        "title": "Big",
+        "media_type": "movie"
+      }
+    ],
+    "genre_override": "Comedy",
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "runtime_capped",
+      "query"
+    ],
+    "case_id": "v2_case_008",
+    "distribution_bucket": "constrained_single_filter"
+  },
+  {
+    "query": "anime sci-fi films",
+    "golden_set": [
+      {
+        "id": 149,
+        "title": "Akira",
+        "media_type": "movie"
+      },
+      {
+        "id": 9323,
+        "title": "Ghost in the Shell",
+        "media_type": "movie"
+      },
+      {
+        "id": 4977,
+        "title": "Paprika",
+        "media_type": "movie"
+      },
+      {
+        "id": 372058,
+        "title": "Your Name.",
+        "media_type": "movie"
+      }
+    ],
+    "genre_override": "Animation",
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "query"
+    ],
+    "case_id": "v2_case_009",
+    "distribution_bucket": "semantic_query_movie"
+  },
+  {
+    "query": "rom-coms from the 2000s",
+    "golden_set": [
+      {
+        "id": 19913,
+        "title": "(500) Days of Summer",
+        "media_type": "movie"
+      },
+      {
+        "id": 1824,
+        "title": "50 First Dates",
+        "media_type": "movie"
+      },
+      {
+        "id": 50646,
+        "title": "Crazy, Stupid, Love.",
+        "media_type": "movie"
+      },
+      {
+        "id": 508,
+        "title": "Love Actually",
+        "media_type": "movie"
+      },
+      {
+        "id": 9655,
+        "title": "She's the Man",
+        "media_type": "movie"
+      }
+    ],
+    "genre_override": "Comedy",
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "year_or_decade",
+      "query"
+    ],
+    "case_id": "v2_case_010",
+    "distribution_bucket": "constrained_single_filter"
+  },
+  {
+    "query": "gritty superhero TV (street-level)",
+    "golden_set": [
+      {
+        "id": 61889,
+        "title": "Marvel's Daredevil",
+        "media_type": "tv"
+      },
+      {
+        "id": 76479,
+        "title": "The Boys",
+        "media_type": "tv"
+      },
+      {
+        "id": 67178,
+        "title": "Marvel's The Punisher",
+        "media_type": "tv"
+      },
+        {
+          "id": 1412,
+          "title": "Arrow",
+          "media_type": "tv"
+        }
+      ],
+    "genre_override": "Action",
+    "slice_tags": [
+      "warm_start",
+      "tv",
+      "query"
+    ],
+    "case_id": "v2_case_011",
+    "distribution_bucket": "semantic_query_tv"
+  },
+  {
+    "query": "fantasy epics like The Witcher",
+    "golden_set": [
+      {
+        "id": 1399,
+        "title": "Game of Thrones",
+        "media_type": "tv"
+      },
+      {
+        "id": 94997,
+        "title": "House of the Dragon",
+        "media_type": "tv"
+      },
+      {
+        "id": 71914,
+        "title": "The Wheel of Time",
+        "media_type": "tv"
+      },
+      {
+        "id": 71912,
+        "title": "The Witcher",
+        "media_type": "tv"
+      }
+    ],
+    "genre_override": "Sci-Fi & Fantasy",
+    "slice_tags": [
+      "warm_start",
+      "tv",
+      "query"
+    ],
+    "case_id": "v2_case_012",
+    "distribution_bucket": "semantic_query_tv"
+  },
+  {
+    "query": "feel-good comedies on netflix under 125 minutes",
+    "golden_set": [
+      {
+        "id": 137,
+        "title": "Groundhog Day",
+        "media_type": "movie"
+      },
+      {
+        "id": 621,
+        "title": "Grease",
+        "media_type": "movie"
+      },
+      {
+        "id": 8916,
+        "title": "Antz",
+        "media_type": "movie"
+      }
+    ],
+    "negative_set": [
+      {
+        "id": 238,
+        "title": "The Godfather",
+        "media_type": "movie"
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "media_type": "movie"
+      }
+    ],
+    "genre_override": "Comedy",
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "provider_filtered",
+      "runtime_capped",
+      "query"
+    ],
+    "case_id": "v2_case_013",
+    "distribution_bucket": "constrained_multi_filter"
+  },
+  {
+    "query": "family adventure movies rated PG-13 or below",
+    "golden_set": [
+      {
+        "id": 411,
+        "title": "The Chronicles of Narnia: The Lion, the Witch and the Wardrobe",
+        "media_type": "movie"
+      },
+      {
+        "id": 121,
+        "title": "The Lord of the Rings: The Two Towers",
+        "media_type": "movie"
+      },
+      {
+        "id": 109445,
+        "title": "Frozen",
+        "media_type": "movie"
+      },
+      {
+        "id": 166428,
+        "title": "How to Train Your Dragon: The Hidden World",
+        "media_type": "movie"
+      },
+      {
+        "id": 502356,
+        "title": "The Super Mario Bros. Movie",
+        "media_type": "movie"
+      }
+    ],
+    "genre_override": "Adventure",
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "maturity_capped",
+      "query"
+    ],
+    "case_id": "v2_case_014",
+    "distribution_bucket": "constrained_single_filter"
+  },
+  {
+    "query": null,
+    "description": "No-query warm-start mixed home feed quality check (broad sci-fi/adventure mainstream).",
+    "golden_set": [
+      {
+        "id": 1639,
+        "title": "Heroes",
+        "media_type": "tv"
+      },
+      {
+        "id": 1098006,
+        "title": "Fountain of Youth",
+        "media_type": "movie"
+      },
+      {
+        "id": 166424,
+        "title": "Fantastic Four",
+        "media_type": "movie"
+      },
+      {
+        "id": 116711,
+        "title": "Epic",
+        "media_type": "movie"
+      },
+      {
+        "id": 75006,
+        "title": "The Umbrella Academy",
+        "media_type": "tv"
+      }
+    ],
+    "request_overrides": {
+      "user_id": "u1"
+    },
+    "slice_tags": [
+      "warm_start",
+      "mixed",
+      "no_query"
+    ],
+    "case_id": "v2_case_015",
+    "distribution_bucket": "no_query_warm_start"
+  },
+  {
+    "query": null,
+    "description": "No-query cold-start mixed home feed quality check (broad current-popular catalog mix).",
+    "golden_set": [
+      {
+        "id": 354912,
+        "title": "Coco",
+        "media_type": "movie"
+      },
+      {
+        "id": 66732,
+        "title": "Stranger Things",
+        "media_type": "tv"
+      },
+      {
+        "id": 456,
+        "title": "The Simpsons",
+        "media_type": "tv"
+      },
+      {
+        "id": 1416,
+        "title": "Grey's Anatomy",
+        "media_type": "tv"
+      },
+      {
+        "id": 4057,
+        "title": "Criminal Minds",
+        "media_type": "tv"
+      },
+      {
+        "id": 1311031,
+        "title": "Demon Slayer: Kimetsu no Yaiba Infinity Castle",
+        "media_type": "movie"
+      }
+    ],
+    "request_overrides": {
+      "user_id": "coldstart_eval"
+    },
+    "slice_tags": [
+      "cold_start",
+      "mixed",
+      "no_query"
+    ],
+    "case_id": "v2_case_016",
+    "distribution_bucket": "no_query_cold_start"
+  },
+  {
+    "query": "space adventure movies",
+    "golden_set": [
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "media_type": "movie"
+      },
+      {
+        "id": 603,
+        "title": "The Matrix",
+        "media_type": "movie"
+      },
+      {
+        "id": 11,
+        "title": "Star Wars",
+        "media_type": "movie"
+      }
+    ],
+    "request_overrides": {
+      "user_id": "coldstart_eval"
+    },
+    "genre_override": "Science Fiction",
+    "slice_tags": [
+      "cold_start",
+      "movie",
+      "query"
+    ],
+    "case_id": "v2_case_017",
+    "distribution_bucket": "semantic_query_movie"
+  },
+  {
+    "query": "optimistic sci-fi TV",
+      "golden_set": [
+        {
+          "id": 71738,
+          "title": "The Orville",
+          "media_type": "tv"
+        },
+        {
+          "id": 1437,
+          "title": "Firefly",
+        "media_type": "tv"
+      },
+        {
+          "id": 4629,
+          "title": "Stargate SG-1",
+          "media_type": "tv"
+        },
+        {
+          "id": 103516,
+          "title": "Star Trek: Strange New Worlds",
+          "media_type": "tv"
+        }
+      ],
+    "request_overrides": {
+      "user_id": "coldstart_eval_tv"
+    },
+    "genre_override": "Sci-Fi & Fantasy",
+    "slice_tags": [
+      "cold_start",
+      "tv",
+      "query"
+    ],
+    "case_id": "v2_case_018",
+    "distribution_bucket": "semantic_query_tv"
+  },
+  {
+    "case_id": "m1_case_020",
+    "distribution_bucket": "constrained_single_filter",
+    "query": "crime TV series with short episodes",
+      "golden_set": [
+        {
+          "id": 96677,
+          "title": "Lupin",
+          "media_type": "tv"
+        },
+        {
+          "id": 21510,
+          "title": "White Collar",
+        "media_type": "tv"
+      },
+      {
+        "id": 7482,
+        "title": "Leverage",
+        "media_type": "tv"
+      },
+      {
+        "id": 71715,
+        "title": "Good Girls",
+        "media_type": "tv"
+      }
+    ],
+    "negative_set": [
+      {
+        "id": 100088,
+        "title": "The Last of Us",
+        "media_type": "tv"
+      },
+      {
+        "id": 1399,
+        "title": "Game of Thrones",
+        "media_type": "tv"
+      },
+      {
+        "id": 94997,
+        "title": "House of the Dragon",
+        "media_type": "tv"
+      }
+    ],
+    "slice_tags": [
+      "warm_start",
+      "tv",
+      "runtime_capped",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m1_case_024",
+    "distribution_bucket": "constrained_multi_filter",
+    "query": "fantasy-adventure TV from the 2010s and newer (not too dark)",
+        "golden_set": [
+          {
+            "id": 62715,
+            "title": "Dragon Ball Super",
+            "media_type": "tv"
+          },
+          {
+            "id": 33880,
+            "title": "The Legend of Korra",
+            "media_type": "tv"
+          },
+          {
+            "id": 61923,
+            "title": "Star vs. the Forces of Evil",
+            "media_type": "tv"
+          },
+          {
+            "id": 15260,
+            "title": "Adventure Time",
+            "media_type": "tv"
+          },
+          {
+            "id": 38693,
+            "title": "Ninjago: Masters of Spinjitzu",
+            "media_type": "tv"
+          }
+        ],
+    "negative_set": [
+      {
+        "id": 1399,
+        "title": "Game of Thrones",
+        "media_type": "tv"
+      },
+      {
+        "id": 94997,
+        "title": "House of the Dragon",
+        "media_type": "tv"
+      },
+      {
+        "id": 1402,
+        "title": "The Walking Dead",
+        "media_type": "tv"
+      }
+    ],
+    "slice_tags": [
+      "warm_start",
+      "tv",
+      "maturity_capped",
+      "year_or_decade",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m2_case_032",
+    "distribution_bucket": "semantic_query_movie",
+    "query": "neo-noir mysteries in modern cities",
+    "golden_set": [
+      {
+        "id": 414906,
+        "title": "The Batman",
+        "media_type": "movie"
+      },
+      {
+        "id": 242582,
+        "title": "Nightcrawler",
+        "media_type": "movie"
+      },
+      {
+        "id": 1949,
+        "title": "Zodiac",
+        "media_type": "movie"
+      },
+      {
+        "id": 64690,
+        "title": "Drive",
+        "media_type": "movie"
+      },
+      {
+        "id": 279322,
+        "title": "Mobius",
+        "media_type": "tv"
+      }
+    ],
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "year_or_decade",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m2_case_038",
+    "distribution_bucket": "constrained_multi_filter",
+    "query": "not-too-dark fantasy tv from the last decade",
+        "golden_set": [
+          {
+            "id": 114478,
+            "title": "Star Wars: Visions",
+            "media_type": "tv"
+          },
+          {
+            "id": 136342,
+            "title": "Disney Twisted-Wonderland: The Animation",
+            "media_type": "tv"
+          },
+          {
+            "id": 220150,
+            "title": "Pokémon Horizons",
+            "media_type": "tv"
+          },
+          {
+            "id": 245026,
+            "title": "Wizards Beyond Waverly Place",
+            "media_type": "tv"
+          },
+          {
+            "id": 212989,
+            "title": "LEGO Ninjago: Dragons Rising",
+            "media_type": "tv"
+          }
+        ],
+    "negative_set": [
+      {
+        "id": 1399,
+        "title": "Game of Thrones",
+        "media_type": "tv"
+      },
+      {
+        "id": 1402,
+        "title": "The Walking Dead",
+        "media_type": "tv"
+      },
+      {
+        "id": 100088,
+        "title": "The Last of Us",
+        "media_type": "tv"
+      }
+    ],
+    "request_overrides": {
+      "user_id": "coldstart_eval_tv_4"
+    },
+    "slice_tags": [
+      "cold_start",
+      "tv",
+      "maturity_capped",
+      "year_or_decade",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m2_case_039",
+    "distribution_bucket": "no_query_warm_start",
+    "query": null,
+    "description": "No-query warm-start feed quality check (superhero and fantasy-leaning mainstream mix).",
+    "golden_set": [
+      {
+        "id": 1639,
+        "title": "Heroes",
+        "media_type": "tv"
+      },
+      {
+        "id": 1098006,
+        "title": "Fountain of Youth",
+        "media_type": "movie"
+      },
+      {
+        "id": 166424,
+        "title": "Fantastic Four",
+        "media_type": "movie"
+      },
+      {
+        "id": 75006,
+        "title": "The Umbrella Academy",
+        "media_type": "tv"
+      },
+      {
+        "id": 76726,
+        "title": "Chronicle",
+        "media_type": "movie"
+      }
+    ],
+    "request_overrides": {
+      "user_id": "u1",
+      "profile": "main"
+    },
+    "slice_tags": [
+      "warm_start",
+      "mixed",
+      "no_query"
+    ]
+  },
+  {
+    "case_id": "m2_case_041",
+    "distribution_bucket": "semantic_query_movie",
+    "query": "brainy time-bending thrillers",
+    "golden_set": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "media_type": "movie"
+      },
+      {
+        "id": 577922,
+        "title": "Tenet",
+        "media_type": "movie"
+      },
+      {
+        "id": 141,
+        "title": "Donnie Darko",
+        "media_type": "movie"
+      },
+      {
+        "id": 59967,
+        "title": "Looper",
+        "media_type": "movie"
+      },
+      {
+        "id": 206487,
+        "title": "Predestination",
+        "media_type": "movie"
+      }
+    ],
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m2_case_044",
+    "distribution_bucket": "semantic_query_tv",
+    "query": "high-stakes serialized drama TV",
+    "golden_set": [
+      {
+        "id": 1399,
+        "title": "Game of Thrones",
+        "media_type": "tv"
+      },
+      {
+        "id": 94997,
+        "title": "House of the Dragon",
+        "media_type": "tv"
+      },
+      {
+        "id": 1402,
+        "title": "The Walking Dead",
+        "media_type": "tv"
+      },
+      {
+        "id": 100088,
+        "title": "The Last of Us",
+        "media_type": "tv"
+      },
+      {
+        "id": 76479,
+        "title": "The Boys",
+        "media_type": "tv"
+      }
+    ],
+    "slice_tags": [
+      "warm_start",
+      "tv",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m2_case_048",
+    "distribution_bucket": "no_query_warm_start",
+    "query": null,
+    "description": "No-query warm-start feed quality check (movie-leaning mainstream drama/fantasy mix).",
+    "golden_set": [
+      {
+        "id": 322,
+        "title": "Mystic River",
+        "media_type": "movie"
+      },
+      {
+        "id": 420809,
+        "title": "Maleficent: Mistress of Evil",
+        "media_type": "movie"
+      },
+      {
+        "id": 76726,
+        "title": "Chronicle",
+        "media_type": "movie"
+      },
+      {
+        "id": 1098006,
+        "title": "Fountain of Youth",
+        "media_type": "movie"
+      },
+      {
+        "id": 116711,
+        "title": "Epic",
+        "media_type": "movie"
+      }
+    ],
+    "request_overrides": {
+      "user_id": "u1",
+      "profile": "main"
+    },
+    "slice_tags": [
+      "warm_start",
+      "mixed",
+      "no_query"
+    ]
+  },
+  {
+    "case_id": "m2_case_050",
+    "distribution_bucket": "profile_persona",
+    "query": "light comedy date-night movies",
+    "golden_set": [
+      {
+        "id": 122906,
+        "title": "About Time",
+        "media_type": "movie"
+      },
+      {
+        "id": 212778,
+        "title": "Chef",
+        "media_type": "movie"
+      },
+      {
+        "id": 369557,
+        "title": "Sing Street",
+        "media_type": "movie"
+      },
+      {
+        "id": 19913,
+        "title": "(500) Days of Summer",
+        "media_type": "movie"
+      },
+      {
+        "id": 50646,
+        "title": "Crazy, Stupid, Love.",
+        "media_type": "movie"
+      }
+    ],
+    "negative_set": [
+      {
+        "id": 238,
+        "title": "The Godfather",
+        "media_type": "movie"
+      },
+      {
+        "id": 680,
+        "title": "Pulp Fiction",
+        "media_type": "movie"
+      },
+      {
+        "id": 496243,
+        "title": "Parasite",
+        "media_type": "movie"
+      }
+    ],
+    "request_overrides": {
+      "user_id": "u1",
+      "profile": "date_night"
+    },
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "profile_persona",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m3_case_051",
+    "distribution_bucket": "semantic_query_movie",
+    "query": "sci-fi picks across movies and TV in english/french",
+      "golden_set": [
+        {
+          "id": 157336,
+          "title": "Interstellar",
+          "media_type": "movie"
+      },
+        {
+          "id": 329865,
+          "title": "Arrival",
+          "media_type": "movie"
+        },
+        {
+          "id": 18,
+          "title": "The Fifth Element",
+          "media_type": "movie"
+        },
+        {
+          "id": 240832,
+          "title": "Lucy",
+          "media_type": "movie"
+        },
+        {
+          "id": 1437,
+          "title": "Firefly",
+          "media_type": "tv"
+        }
+      ],
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "tv",
+      "language_or_region",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m3_case_052",
+    "distribution_bucket": "semantic_query_movie",
+    "query": "crime stories across films and series (europe vibe)",
+      "golden_set": [
+        {
+          "id": 107,
+          "title": "Snatch",
+          "media_type": "movie"
+        },
+        {
+          "id": 100,
+          "title": "Lock, Stock and Two Smoking Barrels",
+          "media_type": "movie"
+        },
+        {
+          "id": 96677,
+          "title": "Lupin",
+          "media_type": "tv"
+        },
+        {
+          "id": 71446,
+          "title": "Money Heist",
+          "media_type": "tv"
+        },
+          {
+            "id": 66980,
+            "title": "Babylon Berlin",
+            "media_type": "tv"
+          }
+        ],
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "tv",
+      "language_or_region",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m3_case_053",
+    "distribution_bucket": "semantic_query_tv",
+    "query": "series-first sci-fi recommendations with strong movie companions",
+      "golden_set": [
+        {
+          "id": 71738,
+          "title": "The Orville",
+          "media_type": "tv"
+        },
+        {
+          "id": 1437,
+          "title": "Firefly",
+        "media_type": "tv"
+      },
+      {
+        "id": 4629,
+        "title": "Stargate SG-1",
+        "media_type": "tv"
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "media_type": "movie"
+      },
+      {
+        "id": 329865,
+        "title": "Arrival",
+        "media_type": "movie"
+      }
+    ],
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "tv",
+      "language_or_region",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m3_case_054",
+    "distribution_bucket": "semantic_query_tv",
+    "query": "fantasy worlds across TV and movies",
+    "golden_set": [
+      {
+        "id": 71912,
+        "title": "The Witcher",
+        "media_type": "tv"
+      },
+      {
+        "id": 71914,
+        "title": "The Wheel of Time",
+        "media_type": "tv"
+      },
+      {
+        "id": 1399,
+        "title": "Game of Thrones",
+        "media_type": "tv"
+      },
+      {
+        "id": 120,
+        "title": "The Lord of the Rings: The Fellowship of the Ring",
+        "media_type": "movie"
+      },
+      {
+        "id": 673,
+        "title": "Harry Potter and the Prisoner of Azkaban",
+        "media_type": "movie"
+      }
+    ],
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "tv",
+      "language_or_region",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m3_case_055",
+    "distribution_bucket": "constrained_single_filter",
+    "query": "family-safe mixed movie and TV picks",
+    "golden_set": [
+      {
+        "id": 456,
+        "title": "The Simpsons",
+        "media_type": "tv"
+      },
+      {
+        "id": 31132,
+        "title": "Regular Show",
+        "media_type": "tv"
+      },
+      {
+        "id": 9806,
+        "title": "The Incredibles",
+        "media_type": "movie"
+      },
+      {
+        "id": 321612,
+        "title": "Beauty and the Beast",
+        "media_type": "movie"
+      },
+      {
+        "id": 585,
+        "title": "Monsters, Inc.",
+        "media_type": "movie"
+      }
+    ],
+    "negative_set": [
+      {
+        "id": 238,
+        "title": "The Godfather",
+        "media_type": "movie"
+      },
+      {
+        "id": 680,
+        "title": "Pulp Fiction",
+        "media_type": "movie"
+      },
+      {
+        "id": 1402,
+        "title": "The Walking Dead",
+        "media_type": "tv"
+      }
+    ],
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "tv",
+      "maturity_capped",
+      "language_or_region",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m3_case_056",
+    "distribution_bucket": "constrained_single_filter",
+    "query": "international crime picks across movies and TV",
+      "golden_set": [
+        {
+          "id": 25376,
+          "title": "The Secret in Their Eyes",
+          "media_type": "movie"
+        },
+        {
+          "id": 107,
+          "title": "Snatch",
+          "media_type": "movie"
+        },
+        {
+          "id": 71446,
+          "title": "Money Heist",
+          "media_type": "tv"
+        },
+        {
+          "id": 96677,
+          "title": "Lupin",
+          "media_type": "tv"
+        },
+        {
+          "id": 61068,
+          "title": "Gomorrah",
+          "media_type": "tv"
+        }
+      ],
+    "negative_set": [
+      {
+        "id": 71738,
+        "title": "The Orville",
+        "media_type": "tv"
+      },
+      {
+        "id": 1437,
+        "title": "Firefly",
+        "media_type": "tv"
+      },
+      {
+        "id": 603,
+        "title": "The Matrix",
+        "media_type": "movie"
+      }
+    ],
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "tv",
+      "language_or_region",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m3_case_058",
+    "distribution_bucket": "profile_persona",
+    "query": "kids profile: bilingual adventure picks across movies and TV",
+      "golden_set": [
+        {
+          "id": 129,
+          "title": "Spirited Away",
+          "media_type": "movie"
+        },
+        {
+          "id": 65334,
+          "title": "Miraculous: Tales of Ladybug & Cat Noir",
+          "media_type": "tv"
+        },
+        {
+          "id": 92685,
+          "title": "The Owl House",
+          "media_type": "tv"
+        },
+        {
+          "id": 1848,
+          "title": "Winx Club",
+          "media_type": "tv"
+        },
+        {
+          "id": 34584,
+          "title": "The NeverEnding Story",
+          "media_type": "movie"
+        }
+      ],
+    "negative_set": [
+      {
+        "id": 238,
+        "title": "The Godfather",
+        "media_type": "movie"
+      },
+      {
+        "id": 1402,
+        "title": "The Walking Dead",
+        "media_type": "tv"
+      },
+      {
+        "id": 67178,
+        "title": "Marvel's The Punisher",
+        "media_type": "tv"
+      }
+    ],
+    "request_overrides": {
+      "user_id": "u1",
+      "profile": "kids"
+    },
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "tv",
+      "profile_persona",
+      "language_or_region",
+      "maturity_capped",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m3_case_060",
+    "distribution_bucket": "semantic_query_movie",
+    "query": "short high-concept thriller movies",
+      "golden_set": [
+        {
+          "id": 45612,
+          "title": "Source Code",
+          "media_type": "movie"
+      },
+      {
+        "id": 59967,
+        "title": "Looper",
+        "media_type": "movie"
+      },
+      {
+        "id": 242582,
+        "title": "Nightcrawler",
+        "media_type": "movie"
+      },
+        {
+          "id": 64690,
+          "title": "Drive",
+          "media_type": "movie"
+        },
+        {
+          "id": 206487,
+          "title": "Predestination",
+          "media_type": "movie"
+        }
+      ],
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "runtime_capped",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m3_case_062",
+    "distribution_bucket": "semantic_query_tv",
+    "query": "short bingeable sci-fi TV",
+      "golden_set": [
+        {
+          "id": 1437,
+          "title": "Firefly",
+          "media_type": "tv"
+        },
+        {
+          "id": 4629,
+          "title": "Stargate SG-1",
+          "media_type": "tv"
+        },
+        {
+          "id": 43020,
+          "title": "Continuum",
+          "media_type": "tv"
+        },
+        {
+          "id": 75758,
+          "title": "Lost in Space",
+          "media_type": "tv"
+        },
+        {
+          "id": 71738,
+          "title": "The Orville",
+          "media_type": "tv"
+        }
+      ],
+    "slice_tags": [
+      "warm_start",
+      "tv",
+      "runtime_capped",
+      "query"
+    ]
+  },
+  {
+    "case_id": "m3_case_068",
+    "distribution_bucket": "constrained_multi_filter",
+    "query": "teen-friendly adventure picks on netflix",
+      "golden_set": [
+        {
+          "id": 10515,
+          "title": "Castle in the Sky",
+          "media_type": "movie"
+        },
+        {
+          "id": 105,
+          "title": "Back to the Future",
+          "media_type": "movie"
+        },
+        {
+          "id": 961323,
+          "title": "Nimona",
+          "media_type": "movie"
+        },
+        {
+          "id": 75758,
+          "title": "Lost in Space",
+          "media_type": "tv"
+        },
+        {
+          "id": 81046,
+          "title": "The Dragon Prince",
+          "media_type": "tv"
+        }
+      ],
+    "negative_set": [
+      {
+        "id": 238,
+        "title": "The Godfather",
+        "media_type": "movie"
+      },
+      {
+        "id": 1402,
+        "title": "The Walking Dead",
+        "media_type": "tv"
+      },
+      {
+        "id": 67178,
+        "title": "Marvel's The Punisher",
+        "media_type": "tv"
+      }
+    ],
+    "slice_tags": [
+      "warm_start",
+      "movie",
+      "tv",
+      "provider_filtered",
+      "maturity_capped",
+      "query"
+    ]
+  }
+]

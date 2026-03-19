@@ -18,6 +18,13 @@ def test_parse_llm_intent_falls_back_on_error(monkeypatch):
     assert intent == recommend_routes.llm_parser.default_intent()
 
 
+def test_intent_filters_from_llm_keeps_media_types():
+    llm_intent = Intent(include_genres=["Drama"], media_types=["tv", "movie", "bad"])
+    filters = recommend_routes._intent_filters_from_llm("query", llm_intent)
+    assert filters.genres == ["Drama"]
+    assert filters.media_types == ["tv", "movie"]
+
+
 def test_merge_with_legacy_filters_merges_and_preserves(monkeypatch):
     primary = IntentFilters(
         raw_query="",

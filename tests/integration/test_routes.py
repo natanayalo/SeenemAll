@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from api.db.models import Item, UserHistory
+from api.db.models import Feedback, Item, UserHistory
 from api.db.session import get_db
 from api.main import app
 from api.routes import recommend as recommend_routes
@@ -416,3 +416,65 @@ def test_recommend_endpoint_provides_cursors(monkeypatch):
         assert "next_cursor" not in payload2
 
     app.dependency_overrides.clear()
+
+
+def test_recommend_endpoint_records_impression_feedback(monkeypatch):
+    monkeypatch.setenv("RERANK_ENABLED", "0")
+    reranker._get_settings.cache_clear()
+    monkeypatch.setattr(recommend_routes, "_RECOMMEND_ALGO_VERSION", "exp-2026-03")
+    items = _make_items()
+    session = _RecommendSession(items)
+
+    def override_get_db() -> Iterator[_RecommendSession]:
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.array([0.1, 0.2]),
+            np.array([0.3, 0.7], dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "ann_candidates",
+        lambda db, vec, exclude, limit, allowed_ids=None: [items[1].id, items[0].id],
+    )
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend",
+            params={
+                "user_id": "u1",
+                "profile": "kids",
+                "limit": 2,
+                "diversify": "false",
+            },
+            headers={"X-Request-ID": "req-123"},
+        )
+
+    app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    impression_events = [obj for obj in session.added if isinstance(obj, Feedback)]
+    assert len(impression_events) == 2
+
+    first = impression_events[0]
+    second = impression_events[1]
+    assert first.user_id == "u1::kids"
+    assert first.item_id == 200
+    assert first.type == "impression"
+    assert first.meta == {
+        "rank": 0,
+        "profile": "kids",
+        "query_present": False,
+        "algo_version": "exp-2026-03",
+        "request_id": "req-123",
+    }
+    assert second.item_id == 100
+    assert second.meta["rank"] == 1

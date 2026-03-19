@@ -1,5 +1,16 @@
 # Seen'emAll Task Tracker
 
+## Current Freeze
+
+- Recommendation baseline frozen and validated on `2026-03-19` after API restart plus warm full eval.
+- Current accepted full-eval baseline:
+  - `default nDCG@10 0.4957`
+  - `MAP 0.3596`
+  - `Hit@10 1.0000`
+- Next planned work:
+  - embedding representation `v2` experiment
+  - specifically test whether TMDB `tagline` and filtered `keywords` improve semantic neighborhoods before any schema or ETL rollout
+
 ### 1. Core Tasks
 
 | Task | Status | Notes |
@@ -137,3 +148,22 @@
 | **11.4** ANN/Hybrid query prototype | ⏳ | Implement ES kNN (HNSW) query, optionally blended with keyword filters; benchmark recall vs. pgvector for evaluation queries |
 | **11.5** API integration | ⏳ | Add ES client config, replace `ann_candidates` with ES-based retrieval, keep collaborative/popularity blending, ensure filters (genres/year/runtime/provider) apply in ES |
 | **11.6** Evaluation & rollout | ⏳ | Re-run `make eval`, capture metrics vs. current pipeline, monitor latency; update docs/env vars for staging/production deployment
+
+### 12. Evaluation Set V2 (Priority: High)
+
+Target outcome: evolve offline gold data from 18 cases to a v2 set of 72 high-signal cases with enforced bucket and slice quotas.
+
+| Task | Status | Notes |
+|---|---|---|
+| **12.1** Freeze v2 target distribution | done | Added `evaluation/evaluation_set_v2_targets.json` with final 72-case quotas + milestone targets (`m1`, `m2`, `v2`) |
+| **12.2** Add quota checker | done | Added `evaluation/check_distribution.py`; supports milestone checks and JSON report output |
+| **12.3** Create v2 working set scaffold | done | Added `evaluation/evaluation_set_v2.json` cloned from current set as the growth baseline |
+| **12.4** Wire workflow commands | done | Added `make eval-check-dist`; docs updated in `evaluation/README.md` |
+| **12.5** Milestone A expansion (18 -> 30) | done | Completed with `evaluation_set_v2.json` at 30/30 and `distribution_m1_report.json` green |
+| **12.6** Milestone B expansion (30 -> 50) | done | Completed with `evaluation_set_v2.json` at 50/50 and `distribution_m2_report.json` green |
+| **12.7** Milestone C expansion (50 -> 72) | done | Completed at 72/72 with `distribution_v2_report.json` green |
+| **12.8** Label-quality hardening | done | Verified constrained/edge cases satisfy minimums (`golden_set >= 5`, `negative_set >= 3`) |
+| **12.9** Release-gate re-baseline on v2 | done | Regenerated `evaluation/artifacts/gate/{baseline,candidate}_*.{csv,json}` and `gate_report.json` on v2 set (gate PASS) |
+| **12.10** Normalize metadata for stable diffs | done | Added `evaluation/normalize_evaluation_set.py`; backfills stable `case_id` and explicit `distribution_bucket` for v2 |
+| **12.11** Add dataset quality audit | done | Added `evaluation/audit_evaluation_set.py` + `make eval-audit-set` to track weak labels, overlap, and negative coverage |
+| **12.12** Publish v2 quality hardening backlog | done | Added `evaluation/v2_quality_backlog.md` with concrete remediation priorities and acceptance checks |

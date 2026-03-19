@@ -18,5 +18,8 @@ Use this skill when tuning recommendation behavior.
 - Do not remove fallback behavior during experiments.
 - Keep cache key logic aligned with new tunable inputs.
 - Prefer small deltas and iterative validation.
+- Avoid benchmark-phrase tuning in production defaults. If a change starts from eval failures, rewrite it into a reusable semantic hypothesis before shipping it.
+- Keep baseline behavior reachable and comparable so suspected overfit can be reverted quickly.
+- Prefer experiments that can be validated on both benchmark cases and paraphrase/adjacent live-style queries.
 
 Use [references/checklist.md](references/checklist.md) for command sequence.

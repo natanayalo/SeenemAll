@@ -426,11 +426,11 @@ def _item_identity(item: Dict[str, Any]) -> tuple[Any, int]:
 
 @lru_cache(maxsize=1)
 def _get_settings() -> RerankerSettings:
-    raw_provider = os.getenv("RERANK_PROVIDER", "openai").strip().lower()
+    raw_provider = (os.getenv("LLM_PROVIDER") or "openai").strip().lower()
     supported = {"openai", "gemini", "small"}
     if raw_provider not in supported:
         logger.warning(
-            "Unsupported RERANK_PROVIDER '%s'; falling back to 'openai'.", raw_provider
+            "Unsupported LLM_PROVIDER '%s'; falling back to 'openai'.", raw_provider
         )
         provider = "openai"
     else:
@@ -438,7 +438,10 @@ def _get_settings() -> RerankerSettings:
 
     api_key = None
     if provider in {"openai", "gemini"}:
-        api_key = os.getenv("RERANK_API_KEY") or os.getenv("OPENAI_API_KEY")
+        if provider == "gemini":
+            api_key = os.getenv("GEMINI_API_KEY")
+        else:
+            api_key = os.getenv("OPENAI_API_KEY")
 
     if provider == "gemini":
         default_model = "gemini-2.0-flash-lite"

@@ -53,3 +53,15 @@ def test_ann_candidates_respects_allowlist():
     assert result == [42, 7]
     _, params = db.calls[0]
     assert params["allowed"] == [42, 7, 9]
+
+
+def test_ann_candidates_sql_dedupes_item_ids():
+    db = DummySession()
+    db.rows = [(42,), (42,), (7,), (7,)]
+    vec = np.array([0.2, 0.8], dtype="float32")
+
+    result = ann_candidates(db, vec, exclude_ids=[], limit=4)
+
+    statement, _ = db.calls[0]
+    assert "DISTINCT ON (e.item_id)" in str(statement)
+    assert result == [42, 7]

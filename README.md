@@ -88,7 +88,7 @@ cd SeenemAll
 # 2. Configure
 cp .env.example .env
 # edit TMDB_API_KEY=your_tmdb_key
-# optional: set RERANK_PROVIDER (openai | gemini | small) + RERANK_API_KEY when needed
+# optional: set LLM_PROVIDER (openai | gemini) + OPENAI_API_KEY / GEMINI_API_KEY
 # optional: tweak USER_PROFILE_DECAY_HALF_LIFE, EMBED_MODEL/EMBED_BATCH, EMBED_VERSION/TEMPLATE
 
 # 3. Launch stack
@@ -136,11 +136,13 @@ curl "http://localhost:8000/recommend?user_id=u1&profile=main&limit=10&cursor=ey
 
 ## 🔁 LLM Reranker
 
+- Shared switch:
+  - `LLM_PROVIDER=openai|gemini|small`
+  - `OPENAI_API_KEY=...`
+  - `GEMINI_API_KEY=...`
 - Hosted options:
-  - `RERANK_PROVIDER=openai` with `RERANK_API_KEY` (or `OPENAI_API_KEY` fallback).
-  - `RERANK_PROVIDER=gemini` with a compatible Google Generative AI key.
   - Defaults: `RERANK_MODEL=gpt-4o-mini` (OpenAI) and `gemini-2.0-flash-exp` (Gemini).
-- Lightweight option: `RERANK_PROVIDER=small` activates the new MiniLM-L6-v2 reranker
+- Lightweight option: `LLM_PROVIDER=small` activates the new MiniLM-L6-v2 reranker
   that runs locally, caps the input window at 40 items, and returns the best 12 without
   calling an external API. No API key is required; it reuses the embedding pipeline.
 - Small-model knobs (all optional, see `.env.example` for defaults):
@@ -152,6 +154,15 @@ curl "http://localhost:8000/recommend?user_id=u1&profile=main&limit=10&cursor=ey
   signal multiplier for debugging.
 - Disable any provider with `RERANK_ENABLED=0`; when disabled or misconfigured, we fall
   back to ANN ordering plus heuristic explanations automatically.
+
+---
+
+## LLM Intent Parser
+
+- Uses the shared `LLM_PROVIDER` and provider keys by default.
+- Optional knobs: `INTENT_MODEL`, `INTENT_TIMEOUT`, `INTENT_ENDPOINT`,
+  `INTENT_SCOPE_GENRES_BY_MEDIA`, `INTENT_ENABLE_ANN_DESCRIPTION`.
+- Disable hosted calls with `INTENT_ENABLED=0` (falls back to offline intent heuristics).
 
 ---
 
@@ -250,6 +261,8 @@ The `/recommend` route orchestrates several retrieval streams before reranking:
   - `MIXER_COLLAB_WEIGHT` (default `0.3`)
   - `MIXER_TRENDING_WEIGHT` (default `0.2`)
   - `MIXER_NOVELTY_WEIGHT` (default `0.1`)
+  - `QUERY_DISABLE_NON_ANN_SIGNALS` (default `0`; set to `1` to zero
+    query-time trending/popularity/vote/novelty unless request overrides are provided)
   - ANN keeps the existing `_HYBRID_ANN_WEIGHT` with a minimum floor.
 
 These sources all feed into business rules, optional MMR diversification, and the LLM

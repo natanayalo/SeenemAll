@@ -1,0 +1,85 @@
+{
+  "meta": {
+    "seed": 42,
+    "holdout_ratio": 0.2,
+    "strategy": "stratified_by_distribution_bucket",
+    "dev_split": "dev",
+    "holdout_split": "holdout",
+    "total_cases": 37
+  },
+  "summary": {
+    "overall": {
+      "dev": 29,
+      "holdout": 8
+    },
+    "by_distribution_bucket": {
+      "constrained_multi_filter": {
+        "dev": 3,
+        "holdout": 1
+      },
+      "constrained_single_filter": {
+        "dev": 5,
+        "holdout": 1
+      },
+      "no_query_cold_start": {
+        "dev": 1,
+        "holdout": 0
+      },
+      "no_query_warm_start": {
+        "dev": 2,
+        "holdout": 1
+      },
+      "profile_persona": {
+        "dev": 1,
+        "holdout": 1
+      },
+      "semantic_query_movie": {
+        "dev": 9,
+        "holdout": 2
+      },
+      "semantic_query_tv": {
+        "dev": 8,
+        "holdout": 2
+      }
+    }
+  },
+  "splits": {
+    "m2_case_038": "holdout",
+    "m3_case_068": "dev",
+    "v2_case_013": "dev",
+    "m1_case_024": "dev",
+    "v2_case_008": "holdout",
+    "m1_case_020": "dev",
+    "v2_case_010": "dev",
+    "m3_case_056": "dev",
+    "m3_case_055": "dev",
+    "v2_case_014": "dev",
+    "v2_case_016": "dev",
+    "m2_case_039": "holdout",
+    "m2_case_048": "dev",
+    "v2_case_015": "dev",
+    "m3_case_058": "holdout",
+    "m2_case_050": "dev",
+    "m2_case_041": "holdout",
+    "m3_case_052": "holdout",
+    "v2_case_005": "dev",
+    "v2_case_001": "dev",
+    "v2_case_017": "dev",
+    "m2_case_032": "dev",
+    "v2_case_009": "dev",
+    "v2_case_003": "dev",
+    "m3_case_060": "dev",
+    "m3_case_051": "dev",
+    "v2_case_002": "dev",
+    "v2_case_004": "holdout",
+    "m2_case_044": "holdout",
+    "v2_case_012": "dev",
+    "v2_case_011": "dev",
+    "v2_case_018": "dev",
+    "m3_case_054": "dev",
+    "m3_case_062": "dev",
+    "m3_case_053": "dev",
+    "v2_case_006": "dev",
+    "v2_case_007": "dev"
+  }
+}

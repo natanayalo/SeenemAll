@@ -28,3 +28,16 @@ htmlcov/
 # Logs
 *.log
 .pre-commit-cache/
+.tmp/
+tmp/
+pytest-temp*/
+
+# Evaluation artifacts
+evaluation/artifacts/
+evaluation/tmp_*.csv
+evaluation/tmp_*.json
+evaluation/*_results.csv
+evaluation/*_summary.json
+evaluation/*_per_query_diff.json
+evaluation/baseline_*.md
+evaluation/gate_report.json

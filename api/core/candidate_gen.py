@@ -36,10 +36,17 @@ def ann_candidates(
 
     q = text(
         """
-        SELECT e.item_id
-        FROM item_embeddings e
-        WHERE {where_clause}
-        ORDER BY e.vector <-> :uvec
+        WITH deduped AS (
+            SELECT DISTINCT ON (e.item_id)
+                e.item_id,
+                e.vector <-> :uvec AS distance
+            FROM item_embeddings e
+            WHERE {where_clause}
+            ORDER BY e.item_id, e.vector <-> :uvec
+        )
+        SELECT d.item_id
+        FROM deduped d
+        ORDER BY d.distance, d.item_id
         LIMIT :lim
     """.format(
             where_clause=" AND ".join(where_clauses)
@@ -53,4 +60,13 @@ def ann_candidates(
         params,
     ).fetchall()
 
-    return [r[0] for r in rows]
+    ordered: List[int] = []
+    seen: set[int] = set()
+    for row in rows:
+        item_id = int(row[0])
+        if item_id in seen:
+            continue
+        seen.add(item_id)
+        ordered.append(item_id)
+
+    return ordered

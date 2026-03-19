@@ -29,11 +29,26 @@ def _get_era(year: Optional[int]) -> Optional[str]:
     return "Vintage"  # Changed: pre-1970 is Vintage
 
 
+def _get_runtime_bucket(runtime: Optional[int]) -> Optional[str]:
+    if runtime is None:
+        return None
+    if runtime < 45:
+        return "Short"
+    if runtime <= 100:
+        return "Feature"
+    if runtime <= 150:
+        return "Long"
+    return "Epic"
+
+
 def format_basic(
     title: str,
     overview: str,
     genres: List[str],
     year: Optional[int] = None,
+    media_type: Optional[str] = None,
+    runtime: Optional[int] = None,
+    original_language: Optional[str] = None,
 ) -> str:
     """Basic format: [genres] [era] (year • decade) title :: overview"""
     genre_text = f"[{', '.join(genres)}] " if genres else ""
@@ -50,7 +65,13 @@ def format_basic(
 
 
 def format_structured(
-    title: str, overview: str, genres: List[str], year: Optional[int] = None
+    title: str,
+    overview: str,
+    genres: List[str],
+    year: Optional[int] = None,
+    media_type: Optional[str] = None,
+    runtime: Optional[int] = None,
+    original_language: Optional[str] = None,
 ) -> str:
     """Structured format with clear sections:
     Title: {title}
@@ -74,7 +95,13 @@ def format_structured(
 
 
 def format_natural(
-    title: str, overview: str, genres: List[str], year: Optional[int] = None
+    title: str,
+    overview: str,
+    genres: List[str],
+    year: Optional[int] = None,
+    media_type: Optional[str] = None,
+    runtime: Optional[int] = None,
+    original_language: Optional[str] = None,
 ) -> str:
     """Natural language format describing the movie/show with temporal context"""
     genre_desc = " and ".join(genres) if genres else "no specific genre"
@@ -84,7 +111,13 @@ def format_natural(
 
 
 def format_emphasized(
-    title: str, overview: str, genres: List[str], year: Optional[int] = None
+    title: str,
+    overview: str,
+    genres: List[str],
+    year: Optional[int] = None,
+    media_type: Optional[str] = None,
+    runtime: Optional[int] = None,
+    original_language: Optional[str] = None,
 ) -> str:
     """Format emphasizing genre keywords and temporal context"""
     genre_tags = " ".join(f"#{g}" for g in genres) if genres else ""
@@ -99,12 +132,64 @@ def format_emphasized(
     return f"{title} {genre_tags}{time_text} :: {overview}"
 
 
+def format_hybrid(
+    title: str,
+    overview: str,
+    genres: List[str],
+    year: Optional[int] = None,
+    media_type: Optional[str] = None,
+    runtime: Optional[int] = None,
+    original_language: Optional[str] = None,
+) -> str:
+    """Hybrid format balancing field structure with natural synopsis text."""
+    genre_text = ", ".join(genres) if genres else "None"
+    era = _get_era(year) or "Unknown"
+    decade = _get_decade(year) or "Unknown"
+    return (
+        f"Title: {title}\n"
+        f"Genres: {genre_text}\n"
+        f"Era: {era}\n"
+        f"Decade: {decade}\n"
+        f"Overview: {overview}"
+    )
+
+
+def format_catalog_rich(
+    title: str,
+    overview: str,
+    genres: List[str],
+    year: Optional[int] = None,
+    media_type: Optional[str] = None,
+    runtime: Optional[int] = None,
+    original_language: Optional[str] = None,
+) -> str:
+    """Catalog-rich format with explicit fields but concise natural text."""
+    genre_text = ", ".join(genres) if genres else "None"
+    era = _get_era(year) or "Unknown"
+    decade = _get_decade(year) or "Unknown"
+    media_label = (media_type or "unknown").strip() or "unknown"
+    language_label = (original_language or "unknown").strip() or "unknown"
+    runtime_bucket = _get_runtime_bucket(runtime) or "Unknown"
+    return (
+        f"Title: {title}\n"
+        f"Media: {media_label}\n"
+        f"Genres: {genre_text}\n"
+        f"Era: {era}\n"
+        f"Decade: {decade}\n"
+        f"Runtime: {runtime_bucket}\n"
+        f"Language: {language_label}\n"
+        f"Overview: {overview}"
+    )
+
+
 # Map of template names to their functions
 TEMPLATES = {
     "basic": format_basic,
     "structured": format_structured,
     "natural": format_natural,
     "emphasized": format_emphasized,
+    "hybrid": format_hybrid,
+    "catalog_rich": format_catalog_rich,
 }
 
 
@@ -121,6 +206,9 @@ def format_with_template(template: str, item: Dict[str, Any]) -> str:
         overview=item.get("overview", ""),
         genres=genres_list,
         year=year,
+        media_type=item.get("media_type"),
+        runtime=item.get("runtime"),
+        original_language=item.get("original_language"),
     )
 
 

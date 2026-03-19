@@ -16,6 +16,24 @@ def test_parse_intent_extracts_expected_filters():
     assert filters.min_runtime is None
 
 
+def test_parse_intent_extracts_heist_plural_and_short_tv_runtime():
+    filters = legacy.parse_intent("heist TV series with short episodes")
+    assert "Crime" in filters.genres
+    assert "tv" in filters.media_types
+    assert filters.max_runtime == 50
+
+
+def test_parse_intent_extracts_plural_thrillers():
+    filters = legacy.parse_intent("psychological thrillers")
+    assert "Thriller" in filters.genres
+
+
+def test_parse_intent_extracts_post_apocalyptic_signal():
+    filters = legacy.parse_intent("post-apocalyptic TV shows")
+    assert "Science Fiction" in filters.genres
+    assert "tv" in filters.media_types
+
+
 def test_parse_intent_between_runtime(monkeypatch):
     filters = legacy.parse_intent("between 1.5 hours and 2 hours")
     assert filters.min_runtime == 90
@@ -101,6 +119,46 @@ def test_item_matches_intent_blocks_maturity_overflow():
     assert legacy.item_matches_intent(allowed_item, filters) is True
     assert legacy.item_matches_intent(blocked_item, filters) is False
     assert legacy.item_matches_intent(unknown_item, filters) is False
+
+
+def test_item_matches_intent_allows_missing_runtime_for_short_tv_queries():
+    filters = legacy.IntentFilters(
+        raw_query="crime TV series with short episodes",
+        media_types=["tv"],
+        max_runtime=50,
+    )
+
+    unknown_runtime_tv = SimpleNamespace(
+        media_type="tv",
+        runtime=None,
+        genres=[{"name": "Crime"}],
+        maturity_rating="TV-14",
+    )
+    unknown_runtime_movie = SimpleNamespace(
+        media_type="movie",
+        runtime=None,
+        genres=[{"name": "Crime"}],
+        maturity_rating="PG-13",
+    )
+
+    assert legacy.item_matches_intent(unknown_runtime_tv, filters) is True
+    assert legacy.item_matches_intent(unknown_runtime_movie, filters) is False
+
+
+def test_item_matches_intent_respects_year_bounds():
+    filters = legacy.IntentFilters(
+        raw_query="rom-coms from the 2000s",
+        year_min=2000,
+        year_max=2009,
+    )
+
+    in_range = SimpleNamespace(release_year=2004)
+    too_old = SimpleNamespace(release_year=1999)
+    unknown_year = SimpleNamespace(release_year=None)
+
+    assert legacy.item_matches_intent(in_range, filters) is True
+    assert legacy.item_matches_intent(too_old, filters) is False
+    assert legacy.item_matches_intent(unknown_year, filters) is False
 
 
 def test_parse_intent_empty_query_returns_empty_filters():
