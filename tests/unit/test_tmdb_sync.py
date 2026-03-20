@@ -14,9 +14,16 @@ def test_map_item_payload_handles_movie_fields():
             "media_type": "movie",
             "title": "Example",
             "overview": "Something happens.",
+            "tagline": "Nothing is what it seems.",
             "runtime": 95,
             "original_language": "en",
             "genres": [{"id": 1, "name": "Action"}],
+            "keywords": {
+                "keywords": [
+                    {"id": 1, "name": "conspiracy"},
+                    {"id": 2, "name": "neo-noir"},
+                ]
+            },
             "poster_path": "/poster.jpg",
             "release_date": "2024-05-01",
             "popularity": 123.4,
@@ -32,7 +39,9 @@ def test_map_item_payload_handles_movie_fields():
 
     assert payload["tmdb_id"] == 123
     assert payload["media_type"] == "movie"
+    assert payload["tagline"] == "Nothing is what it seems."
     assert payload["runtime"] == 95
+    assert payload["tmdb_keywords"] == ["conspiracy", "neo-noir"]
     assert payload["poster_url"].endswith("/poster.jpg")
     assert payload["release_year"] == 2024
     assert payload["popularity"] == 123.4
@@ -50,6 +59,7 @@ def test_map_item_payload_falls_back_for_tv_runtime_and_name():
             "name": "Series Name",
             "episode_run_time": [42],
             "genres": [],
+            "keywords": {"results": [{"id": 4, "name": "space opera"}]},
             "first_air_date": "2018-01-01",
         }
     )
@@ -57,7 +67,17 @@ def test_map_item_payload_falls_back_for_tv_runtime_and_name():
     assert payload["media_type"] == "tv"
     assert payload["title"] == "Series Name"
     assert payload["runtime"] == 42
+    assert payload["tmdb_keywords"] == ["space opera"]
     assert payload["release_year"] == 2018
+
+
+def test_extract_tmdb_keywords_handles_invalid_payloads():
+    assert mod._extract_tmdb_keywords("movie", {}) == []
+    assert mod._extract_tmdb_keywords("movie", {"keywords": {"keywords": {}}}) == []
+    assert mod._extract_tmdb_keywords(
+        "tv",
+        {"keywords": {"results": [{"name": "Heist"}, {"name": "Heist"}, {"id": 7}]}},
+    ) == ["Heist"]
 
 
 def test_upsert_items_inserts_and_updates(monkeypatch):
@@ -72,13 +92,20 @@ def test_upsert_items_inserts_and_updates(monkeypatch):
         def __init__(self, session):
             self.session = session
             self.tmdb_id = None
+            self.media_type = None
 
-        def filter(self, expr):
-            self.tmdb_id = getattr(expr.right, "value", None)
+        def filter(self, *exprs):
+            for expr in exprs:
+                left_name = getattr(getattr(expr, "left", None), "name", None)
+                right_value = getattr(getattr(expr, "right", None), "value", None)
+                if left_name == "tmdb_id":
+                    self.tmdb_id = right_value
+                if left_name == "media_type":
+                    self.media_type = right_value
             return self
 
         def update(self, payload):
-            self.session.updated[self.tmdb_id] = payload
+            self.session.updated[(self.tmdb_id, self.media_type)] = payload
 
     class DummySession:
         def __init__(self):
@@ -89,7 +116,7 @@ def test_upsert_items_inserts_and_updates(monkeypatch):
         def execute(self, stmt):
             self.calls += 1
             if self.calls == 1:
-                return DummyResult([(1,)])
+                return DummyResult([(1, "movie")])
             return DummyResult([])
 
         def bulk_insert_mappings(self, model, payload):
@@ -122,7 +149,7 @@ def test_upsert_items_inserts_and_updates(monkeypatch):
     session = DummySession()
     mod._upsert_items(session, items)
 
-    assert session.updated[1]["title"] == "Existing"
+    assert session.updated[(1, "movie")]["title"] == "Existing"
     assert session.inserted[0]["tmdb_id"] == 2
 
 
@@ -132,6 +159,138 @@ def test_upsert_items_no_ids_short_circuits():
             raise AssertionError("should not be called for empty input")
 
     mod._upsert_items(DummySession(), [])
+
+
+def test_detail_backfill_update_payload_keeps_only_detail_fields():
+    payload = mod._detail_backfill_update_payload(
+        {
+            "id": 123,
+            "media_type": "movie",
+            "title": "Example",
+            "overview": "Something happens.",
+            "tagline": "Nothing is what it seems.",
+            "runtime": 95,
+            "original_language": "en",
+            "genres": [{"id": 1, "name": "Action"}],
+            "keywords": {"keywords": [{"id": 1, "name": "conspiracy"}]},
+            "poster_path": "/poster.jpg",
+            "release_date": "2024-05-01",
+            "popularity": 123.4,
+            "vote_average": 8.7,
+            "vote_count": 4567,
+            "_list_ranks": {
+                "popular_rank": 2,
+                "trending_rank": 5,
+                "top_rated_rank": 4,
+            },
+        }
+    )
+
+    assert payload["tagline"] == "Nothing is what it seems."
+    assert payload["tmdb_keywords"] == ["conspiracy"]
+    assert payload["release_year"] == 2024
+    assert "popular_rank" not in payload
+    assert "tmdb_id" not in payload
+
+
+def test_backfill_metadata_updates_only_selected_targets(monkeypatch):
+    captured = {"updates": []}
+    sessions = []
+
+    class DummyResult:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def all(self):
+            return self.rows
+
+    class FakeSession:
+        def __init__(self, rows=None):
+            self.rows = rows or []
+            self.commits = 0
+            self.closed = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            self.closed = True
+
+        def execute(self, stmt):
+            return DummyResult(self.rows)
+
+        def bulk_update_mappings(self, model, payload):
+            assert model is Item
+            captured["updates"].append(list(payload))
+
+        def commit(self):
+            self.commits += 1
+
+    selection_rows = [
+        (10, 7482, "tv"),
+        (11, 320, "movie"),
+    ]
+
+    class FakeSessionmaker:
+        def __call__(self):
+            rows = selection_rows if not sessions else []
+            sess = FakeSession(rows=rows)
+            sessions.append(sess)
+            return sess
+
+    class FakeTMDBClient:
+        def __init__(self, api_key):
+            self.closed = False
+            self.detail_calls = []
+
+        async def details(self, media, tmdb_id):
+            self.detail_calls.append((media, tmdb_id))
+            if tmdb_id == 320:
+                raise RuntimeError("boom")
+            return {
+                "id": tmdb_id,
+                "media_type": media,
+                "title": "Fetched",
+                "overview": "Updated overview",
+                "tagline": "Fetched tagline",
+                "keywords": {"results": [{"name": "heist"}]},
+            }
+
+        async def aclose(self):
+            self.closed = True
+
+    fake_client = FakeTMDBClient(mod.TMDB_API_KEY)
+    monkeypatch.setattr(mod, "TMDBClient", lambda api_key: fake_client)
+
+    updated = asyncio.run(
+        mod._backfill_metadata(FakeSessionmaker(), limit=5, ranked_only=True)
+    )
+
+    assert updated == 1
+    assert fake_client.detail_calls == [("tv", 7482), ("movie", 320)]
+    assert fake_client.closed is True
+    assert len(captured["updates"]) == 1
+    assert captured["updates"][0] == [
+        {
+            "id": 10,
+            "overview": "Updated overview",
+            "tagline": "Fetched tagline",
+            "runtime": None,
+            "original_language": None,
+            "genres": None,
+            "tmdb_keywords": ["heist"],
+            "poster_url": None,
+            "release_year": None,
+            "maturity_rating": None,
+            "collection_id": None,
+            "collection_name": None,
+            "popularity": None,
+            "vote_average": None,
+            "vote_count": None,
+        }
+    ]
+    assert sessions[1].commits == 1
+    assert sessions[1].closed is True
 
 
 def test_fetch_and_upsert_collects_lists_and_commits(monkeypatch):

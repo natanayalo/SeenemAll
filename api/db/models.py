@@ -24,19 +24,24 @@ class Base(DeclarativeBase):
 
 class Item(Base):
     __tablename__ = "items"
+    __table_args__ = (
+        UniqueConstraint("tmdb_id", "media_type", name="uq_items_tmdb_media_type"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     tmdb_id: Mapped[int] = mapped_column(
-        Integer, unique=True, index=True, nullable=False
+        Integer, index=True, nullable=False
     )
     media_type: Mapped[str] = mapped_column(
         String(10), nullable=False
     )  # 'movie' or 'tv'
     title: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
     overview: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tagline: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     runtime: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # minutes
     original_language: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     genres: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    tmdb_keywords: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
     poster_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     release_year: Mapped[Optional[int]] = mapped_column(
         Integer, nullable=True, index=True

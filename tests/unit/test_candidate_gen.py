@@ -41,6 +41,7 @@ def test_ann_candidates_executes_query_and_returns_ids():
     assert params["exclude"] == [1]
     assert params["lim"] == 5
     assert params["uvec"] == [float(x) for x in vec]
+    assert params["version"] == "v1"
     assert "allowed" not in params
 
 
@@ -64,4 +65,5 @@ def test_ann_candidates_sql_dedupes_item_ids():
 
     statement, _ = db.calls[0]
     assert "DISTINCT ON (e.item_id)" in str(statement)
+    assert "e.version = :version" in str(statement)
     assert result == [42, 7]

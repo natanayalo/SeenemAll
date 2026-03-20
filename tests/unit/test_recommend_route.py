@@ -2191,6 +2191,34 @@ def test_constraint_query_bonus_prefers_heartwarming_over_slapstick_for_feel_goo
     ) > recommend_routes._constraint_query_bonus(feel_good_intent, slapstick_item)
 
 
+def test_constraint_query_bonus_prefers_short_movies_over_tv_for_adult_feel_good_runtime_queries():
+    feel_good_intent = IntentFilters(
+        raw_query="feel-good comedies under 125 minutes",
+        genres=["Comedy"],
+        moods=[],
+        media_types=[],
+        max_runtime=125,
+    )
+    movie_item = SimpleNamespace(
+        title="Summer Kitchen",
+        overview="An uplifting romantic comedy about friendship, food, and love.",
+        genres=[{"name": "Comedy"}, {"name": "Romance"}],
+        media_type="movie",
+        runtime=105,
+    )
+    tv_item = SimpleNamespace(
+        title="Laugh Track",
+        overview="A warm comedy series about friendship and love in the city.",
+        genres=[{"name": "Comedy"}],
+        media_type="tv",
+        runtime=28,
+    )
+
+    assert recommend_routes._constraint_query_bonus(
+        feel_good_intent, movie_item
+    ) > recommend_routes._constraint_query_bonus(feel_good_intent, tv_item)
+
+
 def test_constraint_query_bonus_prefers_family_fantasy_over_spy_action_for_family_adventure_queries():
     family_intent = IntentFilters(
         raw_query="family adventure movies rated PG-13 or below",
@@ -2943,6 +2971,26 @@ def test_normalize_merged_intent_strips_family_from_adult_feel_good_comedy_queri
     )
 
     assert updated.media_types == ["movie"]
+    assert updated.genres == ["Comedy"]
+    assert updated.moods == []
+
+
+def test_normalize_merged_intent_strips_family_from_adult_feel_good_comedy_queries_without_explicit_media_type():
+    intent = IntentFilters(
+        raw_query="feel-good comedies under 125 minutes",
+        genres=["Comedy", "Family", "Animation"],
+        moods=["light"],
+        media_types=[],
+        max_runtime=125,
+        maturity_rating_max="PG",
+    )
+
+    updated = recommend_routes._normalize_merged_intent(
+        intent,
+        "feel-good comedies under 125 minutes",
+    )
+
+    assert updated.media_types == []
     assert updated.genres == ["Comedy"]
     assert updated.moods == []
 
@@ -3946,6 +3994,15 @@ def test_recommend_debug_exposes_normalized_final_intent(monkeypatch):
         tmdb_id=101,
         media_type="movie",
         title="Alpha",
+        tagline="A warm night out.",
+        tmdb_keywords=[
+            "date night",
+            "feel good",
+            "netflix",
+            "short runtime",
+            "romantic comedy",
+            "extra keyword",
+        ],
         overview="Alpha saves the world.",
         poster_url="alpha.jpg",
         runtime=100,
@@ -4029,8 +4086,24 @@ def test_recommend_debug_exposes_normalized_final_intent(monkeypatch):
     assert body["debug"]["stage_counts"]["post_filter_candidates"] == 1
     assert body["debug"]["candidates"]["primary_retrieval"][0]["id"] == 1
     assert body["debug"]["candidates"]["pre_mixer"][0]["source_scores"]["ann"] == 1.0
+    assert body["debug"]["candidates"]["pre_mixer"][0]["tagline"] == "A warm night out."
+    assert body["debug"]["candidates"]["pre_mixer"][0]["tmdb_keywords"] == [
+        "date night",
+        "feel good",
+        "netflix",
+        "short runtime",
+        "romantic comedy",
+    ]
     assert body["debug"]["candidates"]["post_mixer"][0]["retrieval_score"] is not None
     assert body["debug"]["candidates"]["final"][0]["id"] == 1
+    assert body["debug"]["candidates"]["final"][0]["tagline"] == "A warm night out."
+    assert body["debug"]["candidates"]["final"][0]["tmdb_keywords"] == [
+        "date night",
+        "feel good",
+        "netflix",
+        "short runtime",
+        "romantic comedy",
+    ]
 
 
 def test_recommend_merges_constraint_prior_candidates_when_ann_misses(monkeypatch):

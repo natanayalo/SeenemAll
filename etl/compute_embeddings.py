@@ -76,10 +76,13 @@ def _fetch_items(db: Session, ids: List[int]) -> List[Tuple[int, str]]:
             "id": item.id,
             "title": item.title,
             "overview": item.overview,
+            "tagline": item.tagline,
             "genres": item.genres,
             "release_year": item.release_year,
             "media_type": item.media_type,
             "runtime": item.runtime,
+            "original_language": item.original_language,
+            "tmdb_keywords": item.tmdb_keywords,
         }
         text = _build_text(item_dict)
         results.append((item.id, text))

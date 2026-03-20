@@ -201,7 +201,8 @@ def format_with_template(template: str, item: Dict[str, Any]) -> str:
     genres_list = _extract_genre_names(item.get("genres"))
     year = item.get("release_year")
 
-    return TEMPLATES[template](
+    template_fn = TEMPLATES[template]
+    kwargs = dict(
         title=item.get("title", ""),
         overview=item.get("overview", ""),
         genres=genres_list,
@@ -210,6 +211,7 @@ def format_with_template(template: str, item: Dict[str, Any]) -> str:
         runtime=item.get("runtime"),
         original_language=item.get("original_language"),
     )
+    return template_fn(**kwargs)
 
 
 def _extract_genre_names(raw_genres: Any) -> List[str]:

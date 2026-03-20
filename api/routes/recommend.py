@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from api.db.session import get_db
 from api.db.models import Item, ItemEmbedding, Availability, UserHistory, Feedback
-from api.config import COUNTRY_DEFAULT
+from api.config import COUNTRY_DEFAULT, EMBED_VERSION
 from api.core.user_utils import load_user_state, canonical_profile_id
 from api.core.candidate_gen import ann_candidates
 from api.core import llm_parser
@@ -132,6 +132,49 @@ def _normalize_query_text(query: str | None) -> str:
 
 def _query_has_any(text: str, keywords: Sequence[str]) -> bool:
     return any(keyword in text for keyword in keywords)
+
+
+def _is_adult_feelgood_movieish_query(query: str | None) -> bool:
+    text = _normalize_query_text(query)
+    if not text or not _ADULT_FEELGOOD_COMEDY_QUERY_PATTERN.search(query or ""):
+        return False
+    if "minute" not in text:
+        return False
+    if _AUDIENCE_SIGNAL_PATTERN.search(query or ""):
+        return False
+    return not _query_has_any(
+        text,
+        ("tv", "series", "show", "episode", "episodes", "season", "seasons"),
+    )
+
+
+def _ann_candidates_with_version(
+    db: Session,
+    user_vec: np.ndarray,
+    exclude_ids: list[int],
+    *,
+    limit: int,
+    allowed_ids: Sequence[int] | None,
+) -> list[int]:
+    try:
+        return ann_candidates(
+            db,
+            user_vec,
+            exclude_ids,
+            limit=limit,
+            allowed_ids=allowed_ids,
+            version=EMBED_VERSION,
+        )
+    except TypeError as exc:
+        if "version" not in str(exc):
+            raise
+        return ann_candidates(
+            db,
+            user_vec,
+            exclude_ids,
+            limit=limit,
+            allowed_ids=allowed_ids,
+        )
 
 
 def _is_optimistic_scifi_tv_query(query: str | None) -> bool:
@@ -975,12 +1018,7 @@ def _apply_explicit_query_overrides(
     # However, if the LLM intent specifically requested a restrictive cap (provenance check),
     # or if the query contains audience signals, we keep it.
     llm_cap_explicit = bool(llm_intent and llm_intent.maturity_rating_max is not None)
-    is_adult_feel_good_comedy_query = bool(
-        query
-        and _ADULT_FEELGOOD_COMEDY_QUERY_PATTERN.search(query)
-        and "minute" in query.lower()
-        and not _AUDIENCE_SIGNAL_PATTERN.search(query)
-    )
+    is_adult_feel_good_comedy_query = _is_adult_feelgood_movieish_query(query)
     if (
         ("movie" in (intent.media_types or []) or is_adult_feel_good_comedy_query)
         and current_level is not None
@@ -1001,6 +1039,7 @@ def _normalize_merged_intent(
         return intent
 
     media_types = {media_type for media_type in intent.media_types if media_type}
+    is_adult_feel_good_movieish_query = _is_adult_feelgood_movieish_query(query)
     is_optimistic_scifi_tv_query = _is_optimistic_scifi_tv_query(query)
     is_short_bingeable_scifi_tv_query = bool(
         _SHORT_BINGEABLE_SCIFI_TV_QUERY_PATTERN.search(query)
@@ -1029,7 +1068,11 @@ def _normalize_merged_intent(
         is_kids_profile_query=is_kids_profile_query,
         is_multilingual_family_adventure_query=is_multilingual_family_adventure_query,
     )
-    if media_types != {"movie"} and not is_kids_profile_query:
+    if (
+        media_types != {"movie"}
+        and not is_kids_profile_query
+        and not is_adult_feel_good_movieish_query
+    ):
         return intent
 
     # "Animation" is often injected by legacy mood/keyword mappings (like "light").
@@ -2168,6 +2211,9 @@ def _constraint_query_bonus(intent: IntentFilters | None, item: Item) -> float:
         if "crime" in genre_names or "horror" in genre_names:
             bonus -= 0.22
     if _ADULT_FEELGOOD_COMEDY_QUERY_PATTERN.search(raw_query):
+        runtime = getattr(item, "runtime", None)
+        media_type = str(getattr(item, "media_type", "") or "").lower()
+        is_movieish_query = _is_adult_feelgood_movieish_query(raw_query)
         if "comedy" in genre_names:
             bonus += 0.18
         if "romance" in genre_names:
@@ -2176,6 +2222,10 @@ def _constraint_query_bonus(intent: IntentFilters | None, item: Item) -> float:
             bonus += 0.14
         if "music" in genre_names:
             bonus += 0.18
+        if {"comedy", "romance"} <= genre_names:
+            bonus += 0.18
+        elif {"comedy", "drama"} <= genre_names:
+            bonus += 0.08
         for keyword in (
             "heartwarming",
             "uplifting",
@@ -2193,6 +2243,18 @@ def _constraint_query_bonus(intent: IntentFilters | None, item: Item) -> float:
         ):
             if keyword in haystack:
                 bonus += 0.14
+        if is_movieish_query:
+            if media_type == "movie":
+                bonus += 0.18
+            elif media_type == "tv":
+                bonus -= 0.26
+            if isinstance(runtime, int):
+                if runtime <= 125:
+                    bonus += 0.12
+                    if runtime <= 110:
+                        bonus += 0.04
+                elif runtime > 145:
+                    bonus -= 0.16
         if "action" in genre_names or "thriller" in genre_names or "crime" in genre_names:
             bonus -= 0.2
         if "horror" in genre_names:
@@ -2967,6 +3029,8 @@ def _debug_candidate_snapshot(
                 "tmdb_id": candidate.get("tmdb_id"),
                 "title": candidate.get("title"),
                 "media_type": candidate.get("media_type"),
+                "tagline": candidate.get("tagline"),
+                "tmdb_keywords": list(candidate.get("tmdb_keywords") or [])[:5],
                 "original_rank": candidate.get("original_rank"),
                 "ann_rank": candidate.get("ann_rank"),
                 "retrieval_score": _round_debug_float(
@@ -3190,7 +3254,7 @@ async def _compute_recommendations_async(
             vec_norm = float(np.linalg.norm(rewrite_vec))
             if vec_norm > 0 and np.isfinite(vec_norm):
                 with timer("recommend.ann_latency_ms"):
-                    ann_ids = ann_candidates(
+                    ann_ids = _ann_candidates_with_version(
                         db,
                         rewrite_vec,
                         exclude,
@@ -3242,8 +3306,12 @@ async def _compute_recommendations_async(
         constraint_rank_vec = rewrite_vec if rewrite_vec is not None else q_vec
 
         with timer("recommend.ann_latency_ms"):
-            ids = ann_candidates(
-                db, q_vec, exclude, limit=candidate_limit, allowed_ids=allowlist
+            ids = _ann_candidates_with_version(
+                db,
+                q_vec,
+                exclude,
+                limit=candidate_limit,
+                allowed_ids=allowlist,
             )
         rewrite_applied = bool(rewrite_vec is not None)
         logger.debug(
@@ -3493,6 +3561,8 @@ async def _compute_recommendations_async(
             "tmdb_id": it.tmdb_id,
             "media_type": it.media_type,
             "title": it.title,
+            "tagline": getattr(it, "tagline", None),
+            "tmdb_keywords": list(getattr(it, "tmdb_keywords", None) or []),
             "overview": it.overview,
             "poster_url": it.poster_url,
             "runtime": it.runtime,

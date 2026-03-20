@@ -3,7 +3,7 @@ import asyncio
 from typing import List, Dict, Any, Optional, cast
 import logging
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, or_, func
 from api.db.session import get_engine, get_sessionmaker
 from api.db.models import Item
 from api.config import TMDB_API_KEY, TMDB_PAGE_LIMIT
@@ -92,6 +92,30 @@ def _extract_maturity_rating(media_type: str, data: Dict[str, Any]) -> Optional[
     return None
 
 
+def _extract_tmdb_keywords(media_type: str, data: Dict[str, Any]) -> list[str]:
+    payload = data.get("keywords") or {}
+    key = "keywords" if media_type == "movie" else "results"
+    raw_keywords = payload.get(key) or []
+    if not isinstance(raw_keywords, list):
+        return []
+
+    extracted: list[str] = []
+    seen: set[str] = set()
+    for keyword in raw_keywords:
+        if not isinstance(keyword, dict):
+            continue
+        name = keyword.get("name")
+        if not isinstance(name, str):
+            continue
+        cleaned = " ".join(name.split())
+        lowered = cleaned.lower()
+        if not cleaned or lowered in seen:
+            continue
+        seen.add(lowered)
+        extracted.append(cleaned)
+    return extracted
+
+
 def map_item_payload(d: Dict[str, Any]) -> Dict[str, Any]:
     media_type = d.get("media_type") or ("tv" if "name" in d else "movie")
     title = d.get("title") or d.get("name")
@@ -146,9 +170,11 @@ def map_item_payload(d: Dict[str, Any]) -> Dict[str, Any]:
         media_type=media_type,
         title=title or "",
         overview=overview,
+        tagline=d.get("tagline"),
         runtime=runtime,
         original_language=d.get("original_language"),
         genres=genres,
+        tmdb_keywords=_extract_tmdb_keywords(media_type, d),
         poster_url=poster_url,
         release_year=_extract_release_year(d),
         maturity_rating=_extract_maturity_rating(media_type, d),
@@ -161,6 +187,29 @@ def map_item_payload(d: Dict[str, Any]) -> Dict[str, Any]:
         trending_rank=list_ranks.get("trending_rank"),
         top_rated_rank=list_ranks.get("top_rated_rank"),
     )
+
+
+_DETAIL_BACKFILL_FIELDS = (
+    "overview",
+    "tagline",
+    "runtime",
+    "original_language",
+    "genres",
+    "tmdb_keywords",
+    "poster_url",
+    "release_year",
+    "maturity_rating",
+    "collection_id",
+    "collection_name",
+    "popularity",
+    "vote_average",
+    "vote_count",
+)
+
+
+def _detail_backfill_update_payload(d: Dict[str, Any]) -> Dict[str, Any]:
+    mapped = map_item_payload(d)
+    return {field: mapped.get(field) for field in _DETAIL_BACKFILL_FIELDS}
 
 
 async def _fetch_and_upsert(sessionmaker, pages: int):
@@ -243,16 +292,101 @@ async def _fetch_and_upsert(sessionmaker, pages: int):
         await client.aclose()
 
 
+async def _backfill_metadata(
+    sessionmaker,
+    *,
+    limit: Optional[int] = None,
+    ranked_only: bool = True,
+) -> int:
+    client = TMDBClient(TMDB_API_KEY)
+    try:
+        SessionLocal = sessionmaker()
+        with SessionLocal as db:
+            stmt = select(Item.id, Item.tmdb_id, Item.media_type).where(
+                Item.tmdb_id.is_not(None),
+                Item.media_type.in_(MEDIA_TYPES),
+                or_(
+                    Item.tagline.is_(None),
+                    Item.tagline == "",
+                    Item.tmdb_keywords.is_(None),
+                    func.json_array_length(Item.tmdb_keywords) == 0,
+                ),
+            )
+            if ranked_only:
+                stmt = stmt.where(
+                    or_(
+                        Item.popular_rank.is_not(None),
+                        Item.trending_rank.is_not(None),
+                        Item.top_rated_rank.is_not(None),
+                    )
+                )
+            stmt = stmt.order_by(
+                func.coalesce(Item.popular_rank, 10**9),
+                func.coalesce(Item.trending_rank, 10**9),
+                func.coalesce(Item.top_rated_rank, 10**9),
+                Item.id.asc(),
+            )
+            if limit is not None:
+                stmt = stmt.limit(limit)
+            targets = db.execute(stmt).all()
+
+        if not targets:
+            logger.info("No TMDB metadata backfill targets found.")
+            return 0
+
+        logger.info("Starting TMDB metadata backfill for %d items.", len(targets))
+        batch_size = 20
+        updated = 0
+        for i in range(0, len(targets), batch_size):
+            batch = targets[i : i + batch_size]
+            details_list = await asyncio.gather(
+                *[client.details(media_type, tmdb_id) for _, tmdb_id, media_type in batch],
+                return_exceptions=True,
+            )
+
+            update_mappings: List[Dict[str, Any]] = []
+            for (item_id, _, media_type), details in zip(batch, details_list):
+                if isinstance(details, BaseException):
+                    continue
+                payload = cast(Dict[str, Any], details)
+                payload["media_type"] = media_type
+                update_mappings.append(
+                    {
+                        "id": item_id,
+                        **_detail_backfill_update_payload(payload),
+                    }
+                )
+
+            if not update_mappings:
+                continue
+
+            SessionLocal = sessionmaker()
+            with SessionLocal as db:
+                db.bulk_update_mappings(Item, update_mappings)
+                db.commit()
+            updated += len(update_mappings)
+            logger.info(
+                "Backfilled batch %d/%d.",
+                (i // batch_size) + 1,
+                (len(targets) + batch_size - 1) // batch_size,
+            )
+
+        logger.info("TMDB metadata backfill updated %d items.", updated)
+        return updated
+    finally:
+        await client.aclose()
+
+
 def _upsert_items(db: Session, items: List[Dict[str, Any]]):
-    # fetch existing tmdb_ids to avoid duplicate insert
-    ids = [int(x["id"]) for x in items if "id" in x]
-    if not ids:
+    # fetch existing (tmdb_id, media_type) pairs to avoid duplicate inserts
+    tmdb_ids = [int(x["id"]) for x in items if "id" in x]
+    if not tmdb_ids:
         return
-    existing = set(
+    existing_pairs = set(
         [
-            row[0]
+            (int(row[0]), str(row[1]))
             for row in db.execute(
-                select(Item.tmdb_id).where(Item.tmdb_id.in_(ids))
+                select(Item.tmdb_id, Item.media_type).where(Item.tmdb_id.in_(tmdb_ids))
             ).all()
         ]
     )
@@ -261,7 +395,8 @@ def _upsert_items(db: Session, items: List[Dict[str, Any]]):
 
     for d in items:
         mapped = map_item_payload(d)
-        if mapped["tmdb_id"] in existing:
+        key = (int(mapped["tmdb_id"]), str(mapped["media_type"]))
+        if key in existing_pairs:
             to_update.append(mapped)
         else:
             to_insert.append(mapped)
@@ -271,10 +406,14 @@ def _upsert_items(db: Session, items: List[Dict[str, Any]]):
 
     for u in to_update:
         db.execute(
-            select(Item).where(Item.tmdb_id == u["tmdb_id"])
+            select(Item).where(
+                Item.tmdb_id == u["tmdb_id"], Item.media_type == u["media_type"]
+            )
         )  # touch to ensure table exists (paranoia)
 
-        db.query(Item).filter(Item.tmdb_id == u["tmdb_id"]).update(u)
+        db.query(Item).filter(
+            Item.tmdb_id == u["tmdb_id"], Item.media_type == u["media_type"]
+        ).update(u)
 
 
 def run(pages: int = TMDB_PAGE_LIMIT):
@@ -284,6 +423,20 @@ def run(pages: int = TMDB_PAGE_LIMIT):
     with engine.connect() as _:
         pass
     asyncio.run(_fetch_and_upsert(SessionLocal, pages))
+
+
+def run_metadata_backfill(
+    *,
+    limit: Optional[int] = None,
+    ranked_only: bool = True,
+) -> int:
+    engine = get_engine()
+    SessionLocal = get_sessionmaker()
+    with engine.connect() as _:
+        pass
+    return asyncio.run(
+        _backfill_metadata(SessionLocal, limit=limit, ranked_only=ranked_only)
+    )
 
 
 if __name__ == "__main__":

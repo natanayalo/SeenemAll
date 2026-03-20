@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from pgvector.sqlalchemy import Vector
 import numpy as np
 
+from api.config import EMBED_VERSION
 
 def ann_candidates(
     db: Session,
@@ -12,6 +13,7 @@ def ann_candidates(
     exclude_ids: List[int],
     limit: int = 300,
     allowed_ids: Sequence[int] | None = None,
+    version: str = EMBED_VERSION,
 ) -> List[int]:
     """
     Returns item_ids ordered by cosine distance to user_vec.
@@ -23,11 +25,12 @@ def ann_candidates(
     if allowed_ids is not None and len(allowed_ids) == 0:
         return []
 
-    where_clauses = ["NOT (e.item_id = ANY(:exclude))"]
+    where_clauses = ["e.version = :version", "NOT (e.item_id = ANY(:exclude))"]
     params = {
         "exclude": exclude_ids or [],
         "uvec": list(map(float, user_vec)),
         "lim": limit,
+        "version": version,
     }
 
     if allowed_ids is not None:

@@ -374,6 +374,7 @@ def parse_intent(
     _log_metrics(_increment_metric("misses"), cache="intent")
 
     llm_output: Dict[str, Any] | None = None
+    used_stub = False
     if settings.enabled:
         logger.info(
             "Intent parser(%s) parsing query '%s'.", settings.provider, normalized_query
@@ -401,6 +402,7 @@ def parse_intent(
 
     if not llm_output:
         llm_output = _offline_intent_stub(normalized_query)
+        used_stub = True
         if llm_output:
             logger.debug("Offline intent stub produced intent: %s", llm_output)
         else:
@@ -430,8 +432,14 @@ def parse_intent(
         if truncated:
             intent.ann_description = truncated
     logger.debug("Returning intent: %s", intent)
-    INTENT_CACHE[cache_key] = _clone_intent(intent)
-    _log_metrics(_snapshot_metrics(), cache="intent", event="store")
+    if not used_stub:
+        INTENT_CACHE[cache_key] = _clone_intent(intent)
+        _log_metrics(_snapshot_metrics(), cache="intent", event="store")
+    else:
+        logger.debug(
+            "Skipping intent cache store for stub-derived intent on query '%s'.",
+            normalized_query,
+        )
     return intent
 
 

@@ -1,4 +1,4 @@
-.PHONY: up down logs sh migrate rev head alembic-init etl-tmdb embed etl-justwatch eval eval-docker eval-normalize-set eval-validate-set eval-check-dist eval-audit-set eval-clean eval-baseline eval-gate eval-analyze health metrics debug-rec
+.PHONY: up down logs sh migrate rev head alembic-init etl-tmdb etl-tmdb-metadata embed etl-justwatch eval eval-docker eval-normalize-set eval-validate-set eval-check-dist eval-audit-set eval-clean eval-baseline eval-gate eval-analyze health metrics debug-rec
 
 PYTHON ?= .venv/Scripts/python.exe
 EVAL_CONFIG ?= evaluation/evaluation_config.json
@@ -27,6 +27,9 @@ head:
 
 etl-tmdb:
 	docker compose exec api python scripts/run_tmdb_sync.py
+
+etl-tmdb-metadata:
+	docker compose exec api python scripts/run_tmdb_metadata_backfill.py
 
 embed:
 	docker compose exec api python -m etl.compute_embeddings

@@ -72,6 +72,7 @@ class _RecommendSession(_HistorySession):
             rows = [
                 (
                     item.id,
+                    item.media_type,
                     getattr(item, "trending_rank", None),
                     getattr(item, "popular_rank", None),
                     getattr(item, "popularity", None),
@@ -209,8 +210,9 @@ def test_recommend_endpoint_returns_ranked_items(monkeypatch):
             {"genre_prefs": {}, "neighbors": [], "negative_items": []},
         )
 
-    def fake_ann_candidates(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann_candidates(db, vec, exclude, limit, allowed_ids=None, version="v1"):
         assert np.allclose(vec, np.array([0.3, 0.7], dtype="float32"))
+        assert version == "v1"
         return [items[1].id, items[0].id]
 
     monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_user_state)
@@ -252,7 +254,9 @@ def test_recommend_endpoint_handles_cold_start(monkeypatch):
 
     monkeypatch.setattr(recommend_routes, "load_user_state", fake_load_user_state)
 
-    def fake_cold_start_candidates(db, intent, limit, allowlist):
+    def fake_cold_start_candidates(
+        db, intent, limit, allowlist, preferred_media_types=None
+    ):
         assert limit >= 2
         return [items[1].id, items[0].id]
 
@@ -290,7 +294,8 @@ def test_recommend_endpoint_diversifies_items(monkeypatch):
             {"genre_prefs": {}, "neighbors": [], "negative_items": []},
         )
 
-    def fake_ann_candidates(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann_candidates(db, vec, exclude, limit, allowed_ids=None, version="v1"):
+        assert version == "v1"
         return [items[1].id, items[0].id]
 
     called = {}
@@ -347,7 +352,7 @@ def test_recommend_endpoint_honors_profile(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [],
+        lambda db, vec, exclude, limit, allowed_ids=None, version="v1": [],
     )
 
     with TestClient(app) as client:
@@ -387,7 +392,10 @@ def test_recommend_endpoint_provides_cursors(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [items[0].id, items[1].id],
+        lambda db, vec, exclude, limit, allowed_ids=None, version="v1": [
+            items[0].id,
+            items[1].id,
+        ],
     )
 
     with TestClient(app) as client:
@@ -443,7 +451,10 @@ def test_recommend_endpoint_records_impression_feedback(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [items[1].id, items[0].id],
+        lambda db, vec, exclude, limit, allowed_ids=None, version="v1": [
+            items[1].id,
+            items[0].id,
+        ],
     )
 
     with TestClient(app) as client:

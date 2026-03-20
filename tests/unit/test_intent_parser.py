@@ -261,6 +261,21 @@ def test_rewrite_query():
 
 
 def test_parse_intent_uses_cache(monkeypatch):
+    settings = IntentParserSettings(
+        provider="openai",
+        api_key="test-key",
+        model="gpt-test",
+        endpoint="https://example.com",
+        enabled=True,
+        timeout=3.0,
+    )
+    monkeypatch.setattr(llm_parser, "_get_settings", lambda: settings)
+
+    def fake_call(settings, query, user_context, linked_entities):
+        return {"exclude_genres": ["Horror", "Thriller"]}
+
+    monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
+
     user_context = {"user_id": "u-test"}
     first = parse_intent("no gore", user_context)
     assert first.exclude_genres == ["Horror", "Thriller"]
@@ -291,6 +306,32 @@ def test_parse_intent_llm_failure_falls_back(monkeypatch):
 
     intent = parse_intent("no gore", {"user_id": "u2"})
     assert intent.exclude_genres == ["Horror", "Thriller"]
+
+
+def test_parse_intent_stub_fallback_does_not_store_in_cache(monkeypatch):
+    settings = IntentParserSettings(
+        provider="openai",
+        api_key="test-key",
+        model="gpt-test",
+        endpoint="https://example.com",
+        enabled=True,
+        timeout=3.0,
+    )
+
+    monkeypatch.setattr(llm_parser, "_get_settings", lambda: settings)
+
+    def fake_call(settings, query, user_context, linked_entities):
+        raise llm_parser.IntentParserError("boom")
+
+    monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
+
+    first = parse_intent("no gore", {"user_id": "u-stub"})
+    hits_before = llm_parser.CACHE_METRICS["hits"]
+    second = parse_intent("no gore", {"user_id": "u-stub"})
+
+    assert first.exclude_genres == ["Horror", "Thriller"]
+    assert second.exclude_genres == ["Horror", "Thriller"]
+    assert llm_parser.CACHE_METRICS["hits"] == hits_before
 
 
 def test_parse_intent_merges_list_payload(monkeypatch):

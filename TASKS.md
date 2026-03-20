@@ -2,14 +2,44 @@
 
 ## Current Freeze
 
-- Recommendation baseline frozen and validated on `2026-03-19` after API restart plus warm full eval.
+- Recommendation baseline frozen and validated on `2026-03-20` after API restart plus warm full eval.
 - Current accepted full-eval baseline:
-  - `default nDCG@10 0.4957`
-  - `MAP 0.3596`
+  - `default nDCG@10 0.5072`
+  - `MAP 0.3641`
   - `Hit@10 1.0000`
 - Next planned work:
-  - embedding representation `v2` experiment
-  - specifically test whether TMDB `tagline` and filtered `keywords` improve semantic neighborhoods before any schema or ETL rollout
+  - keep `v1/basic` as the embedding path
+  - keep TMDB `tagline` / `keywords` metadata available for future non-embedding uses
+  - use `make etl-tmdb-metadata` to backfill missing TMDB metadata on existing catalog rows before any metadata-based recommendation experiment
+  - refactor recommendation query handling toward a global query-profile model and reduce family-specific bias helpers in `api/routes/recommend.py`
+
+## Query Profile Refactor
+
+Goal: replace family-by-family query shaping in `api/routes/recommend.py` with a reusable global query-profile layer that drives normalization, recall planning, and ranking consistently.
+
+| Task | Status | Notes |
+|---|---|---|
+| **QPR.1** Freeze current recommendation baseline before refactor | Completed | Accepted baseline is now `default 0.5072 / 0.3641 / 1.0000` on `2026-03-20`; keep this as the rollback point for the refactor |
+| **QPR.2** Define `QueryProfile` schema | Pending | Introduce shared dimensions like audience, tone, structure, semantic domains, and hard constraints so normalization and ranking stop depending on per-family helpers |
+| **QPR.3** Build query-profile extraction layer | Pending | Centralize current regex/helper signals behind one profile builder instead of calling `*_query` helpers throughout the route |
+| **QPR.4** Route normalization through `QueryProfile` | Pending | Replace direct family mutations in `_normalize_merged_intent()` and explicit override paths with profile-driven transformations |
+| **QPR.5** Route `constraint_prior` bonuses through generic profile dimensions | Pending | Replace many query-family blocks in `_constraint_query_bonus()` with reusable audience/tone/structure/domain signals |
+| **QPR.6** Preserve debug observability during refactor | Pending | Expose the computed query profile in `/recommend/debug` and keep enough detail to compare old vs new behavior |
+| **QPR.7** Re-baseline after refactor | Pending | Run `pytest tests/unit/test_recommend_route.py tests/unit/test_metrics.py --no-cov` plus full eval and compare against the frozen `2026-03-20` baseline |
+
+## Embeddings V2 Experiment
+
+| Task | Status | Notes |
+|---|---|---|
+| **EV2.1** Define v2 embedding experiment scope | Completed | Scope is now explicit: stay probe-only first, test multiple semantic families, and only proceed to schema/ETL if keyword/tagline enrichment shows net-positive signal beyond a single family |
+| **EV2.2** Add repeatable keyword/tagline probe | Completed | `scripts/probe_embedding_v2_tmdb_keywords.py` now compares current text vs keyword/tagline variants on weak semantic families |
+| **EV2.3** Decide selective keyword policy | Completed | Proceed with a guarded `v2` experiment: persist `tagline` plus filtered TMDB `keywords` as additive metadata, but keep rollout offline/side-by-side because noir remains mixed while `optimistic sci-fi TV`, `heist TV`, and `street-level superhero TV` show clear gains |
+| **EV2.4** Add schema/ETL support for tagline and keywords | Completed | Added DB fields, TMDB sync support, migration chain fix (`0011` placeholder + `0012_item_tagline_kw`), and version-aware ANN retrieval so `v2` can be evaluated cleanly beside `v1` |
+| **EV2.5** Compute `item_embeddings` v2 | Completed | Bounded TMDB refresh (`pages=50`) populated metadata, then `item_embeddings.version='v2'` was computed for all `9368` items using `EMBED_TEMPLATE=tmdb_enriched` |
+| **EV2.6** Compare v1 vs v2 on eval + focused recall slices | Completed | First `v2` experiment lost badly: `default 0.4492 / 0.3128 / 0.9730` vs frozen `v1 0.4957 / 0.3596 / 1.0000`; coverage was only `1975` items with tagline and `2921` with keywords, and major regressions clustered in family/mixed queries like `m3_case_055`, so `v1` remains accepted baseline |
+| **EV2.7** Test smaller metadata-enriched variants | Completed | `tagline_only`, `kw3`, and `kw5` all underperformed current live `v1/basic`; decision: drop `v2` embedding rollout and keep metadata only |
+| **EV2.8** Clean up abandoned embedding versions | Completed | Deleted DB rows for `v2`, `v2_tagline`, `v2_kw3`, and `v2_kw5`; repo stays on `v1/basic` while retaining TMDB metadata fields |
+| **EV2.9** Re-test `v2` after TMDB metadata backfill | Completed | Even after backfilling `7371` rows and lifting ranked coverage to `5021` taglines / `7915` keywords, a fresh `tmdb_enriched` rerun still lost badly (`default 0.3759 / 0.2553 / 0.8649`), so enriched dense embeddings remain closed |
 
 ### 1. Core Tasks
 
