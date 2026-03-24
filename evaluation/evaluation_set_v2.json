@@ -95,23 +95,23 @@
   {
     "query": "psychological thrillers about money and greed",
     "description": "Desperate people pushed to extremes by money and status.",
-      "golden_set": [
-        {
-          "id": 496243,
-          "title": "Parasite",
-          "media_type": "movie"
+    "golden_set": [
+      {
+        "id": 496243,
+        "title": "Parasite",
+        "media_type": "movie"
       },
       {
         "id": 1359,
         "title": "American Psycho",
         "media_type": "movie"
       },
-        {
-          "id": 303858,
-          "title": "Money Monster",
-          "media_type": "movie"
-        }
-      ],
+      {
+        "id": 303858,
+        "title": "Money Monster",
+        "media_type": "movie"
+      }
+    ],
     "genre_override": "Thriller",
     "slice_tags": [
       "warm_start",
@@ -236,15 +236,15 @@
   },
   {
     "query": "space-opera TV (not too dark)",
-      "golden_set": [
-        {
-          "id": 71738,
-          "title": "The Orville",
-          "media_type": "tv"
-        },
-        {
-          "id": 1437,
-          "title": "Firefly",
+    "golden_set": [
+      {
+        "id": 71738,
+        "title": "The Orville",
+        "media_type": "tv"
+      },
+      {
+        "id": 1437,
+        "title": "Firefly",
         "media_type": "tv"
       },
       {
@@ -320,7 +320,7 @@
       },
       {
         "id": 194,
-        "title": "Amélie",
+        "title": "Am\u00e9lie",
         "media_type": "movie"
       },
       {
@@ -439,12 +439,12 @@
         "title": "Marvel's The Punisher",
         "media_type": "tv"
       },
-        {
-          "id": 1412,
-          "title": "Arrow",
-          "media_type": "tv"
-        }
-      ],
+      {
+        "id": 1412,
+        "title": "Arrow",
+        "media_type": "tv"
+      }
+    ],
     "genre_override": "Action",
     "slice_tags": [
       "warm_start",
@@ -688,28 +688,28 @@
   },
   {
     "query": "optimistic sci-fi TV",
-      "golden_set": [
-        {
-          "id": 71738,
-          "title": "The Orville",
-          "media_type": "tv"
-        },
-        {
-          "id": 1437,
-          "title": "Firefly",
+    "golden_set": [
+      {
+        "id": 71738,
+        "title": "The Orville",
         "media_type": "tv"
       },
-        {
-          "id": 4629,
-          "title": "Stargate SG-1",
-          "media_type": "tv"
-        },
-        {
-          "id": 103516,
-          "title": "Star Trek: Strange New Worlds",
-          "media_type": "tv"
-        }
-      ],
+      {
+        "id": 1437,
+        "title": "Firefly",
+        "media_type": "tv"
+      },
+      {
+        "id": 4629,
+        "title": "Stargate SG-1",
+        "media_type": "tv"
+      },
+      {
+        "id": 103516,
+        "title": "Star Trek: Strange New Worlds",
+        "media_type": "tv"
+      }
+    ],
     "request_overrides": {
       "user_id": "coldstart_eval_tv"
     },
@@ -726,15 +726,15 @@
     "case_id": "m1_case_020",
     "distribution_bucket": "constrained_single_filter",
     "query": "crime TV series with short episodes",
-      "golden_set": [
-        {
-          "id": 96677,
-          "title": "Lupin",
-          "media_type": "tv"
-        },
-        {
-          "id": 21510,
-          "title": "White Collar",
+    "golden_set": [
+      {
+        "id": 96677,
+        "title": "Lupin",
+        "media_type": "tv"
+      },
+      {
+        "id": 21510,
+        "title": "White Collar",
         "media_type": "tv"
       },
       {
@@ -776,33 +776,33 @@
     "case_id": "m1_case_024",
     "distribution_bucket": "constrained_multi_filter",
     "query": "fantasy-adventure TV from the 2010s and newer (not too dark)",
-        "golden_set": [
-          {
-            "id": 62715,
-            "title": "Dragon Ball Super",
-            "media_type": "tv"
-          },
-          {
-            "id": 33880,
-            "title": "The Legend of Korra",
-            "media_type": "tv"
-          },
-          {
-            "id": 61923,
-            "title": "Star vs. the Forces of Evil",
-            "media_type": "tv"
-          },
-          {
-            "id": 15260,
-            "title": "Adventure Time",
-            "media_type": "tv"
-          },
-          {
-            "id": 38693,
-            "title": "Ninjago: Masters of Spinjitzu",
-            "media_type": "tv"
-          }
-        ],
+    "golden_set": [
+      {
+        "id": 62715,
+        "title": "Dragon Ball Super",
+        "media_type": "tv"
+      },
+      {
+        "id": 33880,
+        "title": "The Legend of Korra",
+        "media_type": "tv"
+      },
+      {
+        "id": 61923,
+        "title": "Star vs. the Forces of Evil",
+        "media_type": "tv"
+      },
+      {
+        "id": 15260,
+        "title": "Adventure Time",
+        "media_type": "tv"
+      },
+      {
+        "id": 38693,
+        "title": "Ninjago: Masters of Spinjitzu",
+        "media_type": "tv"
+      }
+    ],
     "negative_set": [
       {
         "id": 1399,
@@ -870,33 +870,33 @@
     "case_id": "m2_case_038",
     "distribution_bucket": "constrained_multi_filter",
     "query": "not-too-dark fantasy tv from the last decade",
-        "golden_set": [
-          {
-            "id": 114478,
-            "title": "Star Wars: Visions",
-            "media_type": "tv"
-          },
-          {
-            "id": 136342,
-            "title": "Disney Twisted-Wonderland: The Animation",
-            "media_type": "tv"
-          },
-          {
-            "id": 220150,
-            "title": "Pokémon Horizons",
-            "media_type": "tv"
-          },
-          {
-            "id": 245026,
-            "title": "Wizards Beyond Waverly Place",
-            "media_type": "tv"
-          },
-          {
-            "id": 212989,
-            "title": "LEGO Ninjago: Dragons Rising",
-            "media_type": "tv"
-          }
-        ],
+    "golden_set": [
+      {
+        "id": 114478,
+        "title": "Star Wars: Visions",
+        "media_type": "tv"
+      },
+      {
+        "id": 136342,
+        "title": "Disney Twisted-Wonderland: The Animation",
+        "media_type": "tv"
+      },
+      {
+        "id": 220150,
+        "title": "Pok\u00e9mon Horizons",
+        "media_type": "tv"
+      },
+      {
+        "id": 245026,
+        "title": "Wizards Beyond Waverly Place",
+        "media_type": "tv"
+      },
+      {
+        "id": 212989,
+        "title": "LEGO Ninjago: Dragons Rising",
+        "media_type": "tv"
+      }
+    ],
     "negative_set": [
       {
         "id": 1399,
@@ -1146,33 +1146,33 @@
     "case_id": "m3_case_051",
     "distribution_bucket": "semantic_query_movie",
     "query": "sci-fi picks across movies and TV in english/french",
-      "golden_set": [
-        {
-          "id": 157336,
-          "title": "Interstellar",
-          "media_type": "movie"
+    "golden_set": [
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "media_type": "movie"
       },
-        {
-          "id": 329865,
-          "title": "Arrival",
-          "media_type": "movie"
-        },
-        {
-          "id": 18,
-          "title": "The Fifth Element",
-          "media_type": "movie"
-        },
-        {
-          "id": 240832,
-          "title": "Lucy",
-          "media_type": "movie"
-        },
-        {
-          "id": 1437,
-          "title": "Firefly",
-          "media_type": "tv"
-        }
-      ],
+      {
+        "id": 329865,
+        "title": "Arrival",
+        "media_type": "movie"
+      },
+      {
+        "id": 18,
+        "title": "The Fifth Element",
+        "media_type": "movie"
+      },
+      {
+        "id": 240832,
+        "title": "Lucy",
+        "media_type": "movie"
+      },
+      {
+        "id": 1437,
+        "title": "Firefly",
+        "media_type": "tv"
+      }
+    ],
     "slice_tags": [
       "warm_start",
       "movie",
@@ -1185,33 +1185,33 @@
     "case_id": "m3_case_052",
     "distribution_bucket": "semantic_query_movie",
     "query": "crime stories across films and series (europe vibe)",
-      "golden_set": [
-        {
-          "id": 107,
-          "title": "Snatch",
-          "media_type": "movie"
-        },
-        {
-          "id": 100,
-          "title": "Lock, Stock and Two Smoking Barrels",
-          "media_type": "movie"
-        },
-        {
-          "id": 96677,
-          "title": "Lupin",
-          "media_type": "tv"
-        },
-        {
-          "id": 71446,
-          "title": "Money Heist",
-          "media_type": "tv"
-        },
-          {
-            "id": 66980,
-            "title": "Babylon Berlin",
-            "media_type": "tv"
-          }
-        ],
+    "golden_set": [
+      {
+        "id": 107,
+        "title": "Snatch",
+        "media_type": "movie"
+      },
+      {
+        "id": 100,
+        "title": "Lock, Stock and Two Smoking Barrels",
+        "media_type": "movie"
+      },
+      {
+        "id": 96677,
+        "title": "Lupin",
+        "media_type": "tv"
+      },
+      {
+        "id": 71446,
+        "title": "Money Heist",
+        "media_type": "tv"
+      },
+      {
+        "id": 66980,
+        "title": "Babylon Berlin",
+        "media_type": "tv"
+      }
+    ],
     "slice_tags": [
       "warm_start",
       "movie",
@@ -1224,15 +1224,15 @@
     "case_id": "m3_case_053",
     "distribution_bucket": "semantic_query_tv",
     "query": "series-first sci-fi recommendations with strong movie companions",
-      "golden_set": [
-        {
-          "id": 71738,
-          "title": "The Orville",
-          "media_type": "tv"
-        },
-        {
-          "id": 1437,
-          "title": "Firefly",
+    "golden_set": [
+      {
+        "id": 71738,
+        "title": "The Orville",
+        "media_type": "tv"
+      },
+      {
+        "id": 1437,
+        "title": "Firefly",
         "media_type": "tv"
       },
       {
@@ -1359,33 +1359,33 @@
     "case_id": "m3_case_056",
     "distribution_bucket": "constrained_single_filter",
     "query": "international crime picks across movies and TV",
-      "golden_set": [
-        {
-          "id": 25376,
-          "title": "The Secret in Their Eyes",
-          "media_type": "movie"
-        },
-        {
-          "id": 107,
-          "title": "Snatch",
-          "media_type": "movie"
-        },
-        {
-          "id": 71446,
-          "title": "Money Heist",
-          "media_type": "tv"
-        },
-        {
-          "id": 96677,
-          "title": "Lupin",
-          "media_type": "tv"
-        },
-        {
-          "id": 61068,
-          "title": "Gomorrah",
-          "media_type": "tv"
-        }
-      ],
+    "golden_set": [
+      {
+        "id": 25376,
+        "title": "The Secret in Their Eyes",
+        "media_type": "movie"
+      },
+      {
+        "id": 107,
+        "title": "Snatch",
+        "media_type": "movie"
+      },
+      {
+        "id": 71446,
+        "title": "Money Heist",
+        "media_type": "tv"
+      },
+      {
+        "id": 96677,
+        "title": "Lupin",
+        "media_type": "tv"
+      },
+      {
+        "id": 61068,
+        "title": "Gomorrah",
+        "media_type": "tv"
+      }
+    ],
     "negative_set": [
       {
         "id": 71738,
@@ -1415,33 +1415,33 @@
     "case_id": "m3_case_058",
     "distribution_bucket": "profile_persona",
     "query": "kids profile: bilingual adventure picks across movies and TV",
-      "golden_set": [
-        {
-          "id": 129,
-          "title": "Spirited Away",
-          "media_type": "movie"
-        },
-        {
-          "id": 65334,
-          "title": "Miraculous: Tales of Ladybug & Cat Noir",
-          "media_type": "tv"
-        },
-        {
-          "id": 92685,
-          "title": "The Owl House",
-          "media_type": "tv"
-        },
-        {
-          "id": 1848,
-          "title": "Winx Club",
-          "media_type": "tv"
-        },
-        {
-          "id": 34584,
-          "title": "The NeverEnding Story",
-          "media_type": "movie"
-        }
-      ],
+    "golden_set": [
+      {
+        "id": 129,
+        "title": "Spirited Away",
+        "media_type": "movie"
+      },
+      {
+        "id": 65334,
+        "title": "Miraculous: Tales of Ladybug & Cat Noir",
+        "media_type": "tv"
+      },
+      {
+        "id": 92685,
+        "title": "The Owl House",
+        "media_type": "tv"
+      },
+      {
+        "id": 1848,
+        "title": "Winx Club",
+        "media_type": "tv"
+      },
+      {
+        "id": 34584,
+        "title": "The NeverEnding Story",
+        "media_type": "movie"
+      }
+    ],
     "negative_set": [
       {
         "id": 238,
@@ -1477,11 +1477,11 @@
     "case_id": "m3_case_060",
     "distribution_bucket": "semantic_query_movie",
     "query": "short high-concept thriller movies",
-      "golden_set": [
-        {
-          "id": 45612,
-          "title": "Source Code",
-          "media_type": "movie"
+    "golden_set": [
+      {
+        "id": 45612,
+        "title": "Source Code",
+        "media_type": "movie"
       },
       {
         "id": 59967,
@@ -1493,17 +1493,17 @@
         "title": "Nightcrawler",
         "media_type": "movie"
       },
-        {
-          "id": 64690,
-          "title": "Drive",
-          "media_type": "movie"
-        },
-        {
-          "id": 206487,
-          "title": "Predestination",
-          "media_type": "movie"
-        }
-      ],
+      {
+        "id": 64690,
+        "title": "Drive",
+        "media_type": "movie"
+      },
+      {
+        "id": 206487,
+        "title": "Predestination",
+        "media_type": "movie"
+      }
+    ],
     "slice_tags": [
       "warm_start",
       "movie",
@@ -1515,33 +1515,33 @@
     "case_id": "m3_case_062",
     "distribution_bucket": "semantic_query_tv",
     "query": "short bingeable sci-fi TV",
-      "golden_set": [
-        {
-          "id": 1437,
-          "title": "Firefly",
-          "media_type": "tv"
-        },
-        {
-          "id": 4629,
-          "title": "Stargate SG-1",
-          "media_type": "tv"
-        },
-        {
-          "id": 43020,
-          "title": "Continuum",
-          "media_type": "tv"
-        },
-        {
-          "id": 75758,
-          "title": "Lost in Space",
-          "media_type": "tv"
-        },
-        {
-          "id": 71738,
-          "title": "The Orville",
-          "media_type": "tv"
-        }
-      ],
+    "golden_set": [
+      {
+        "id": 1437,
+        "title": "Firefly",
+        "media_type": "tv"
+      },
+      {
+        "id": 4629,
+        "title": "Stargate SG-1",
+        "media_type": "tv"
+      },
+      {
+        "id": 43020,
+        "title": "Continuum",
+        "media_type": "tv"
+      },
+      {
+        "id": 75758,
+        "title": "Lost in Space",
+        "media_type": "tv"
+      },
+      {
+        "id": 71738,
+        "title": "The Orville",
+        "media_type": "tv"
+      }
+    ],
     "slice_tags": [
       "warm_start",
       "tv",
@@ -1553,33 +1553,33 @@
     "case_id": "m3_case_068",
     "distribution_bucket": "constrained_multi_filter",
     "query": "teen-friendly adventure picks on netflix",
-      "golden_set": [
-        {
-          "id": 10515,
-          "title": "Castle in the Sky",
-          "media_type": "movie"
-        },
-        {
-          "id": 105,
-          "title": "Back to the Future",
-          "media_type": "movie"
-        },
-        {
-          "id": 961323,
-          "title": "Nimona",
-          "media_type": "movie"
-        },
-        {
-          "id": 75758,
-          "title": "Lost in Space",
-          "media_type": "tv"
-        },
-        {
-          "id": 81046,
-          "title": "The Dragon Prince",
-          "media_type": "tv"
-        }
-      ],
+    "golden_set": [
+      {
+        "id": 10515,
+        "title": "Castle in the Sky",
+        "media_type": "movie"
+      },
+      {
+        "id": 105,
+        "title": "Back to the Future",
+        "media_type": "movie"
+      },
+      {
+        "id": 961323,
+        "title": "Nimona",
+        "media_type": "movie"
+      },
+      {
+        "id": 75758,
+        "title": "Lost in Space",
+        "media_type": "tv"
+      },
+      {
+        "id": 81046,
+        "title": "The Dragon Prince",
+        "media_type": "tv"
+      }
+    ],
     "negative_set": [
       {
         "id": 238,

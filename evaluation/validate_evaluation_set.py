@@ -100,7 +100,9 @@ def _validate_structure(
                 try:
                     relevance = float(item["relevance"])
                 except (TypeError, ValueError):
-                    errors.append(f"{item_loc}: invalid relevance '{item['relevance']}'.")
+                    errors.append(
+                        f"{item_loc}: invalid relevance '{item['relevance']}'."
+                    )
                 else:
                     if relevance < 0.0 or relevance > 3.0:
                         errors.append(
@@ -125,7 +127,9 @@ def _validate_structure(
                         continue
                     media_raw = item.get("media_type")
                     media_type = (
-                        str(media_raw).strip().lower() if isinstance(media_raw, str) else ""
+                        str(media_raw).strip().lower()
+                        if isinstance(media_raw, str)
+                        else ""
                     )
                     if media_type not in VALID_MEDIA_TYPES:
                         errors.append(
@@ -135,7 +139,9 @@ def _validate_structure(
                         continue
                     key = (neg_id, media_type)
                     if key in seen_negative:
-                        errors.append(f"{neg_loc}: duplicate negative tuple {key} in case.")
+                        errors.append(
+                            f"{neg_loc}: duplicate negative tuple {key} in case."
+                        )
                     seen_negative.add(key)
                     id_to_media[neg_id].add(media_type)
                     if key in positive_keys:

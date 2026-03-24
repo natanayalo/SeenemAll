@@ -10,7 +10,6 @@ import os
 import re
 import time
 from dataclasses import asdict, dataclass
-from datetime import date
 from threading import Lock
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
@@ -26,7 +25,7 @@ from api.db.session import get_db
 from api.db.models import Item, ItemEmbedding, Availability, UserHistory, Feedback
 from api.config import COUNTRY_DEFAULT, EMBED_VERSION
 from api.core.user_utils import load_user_state, canonical_profile_id
-from api.core.candidate_gen import ann_candidates
+from api.core.candidate_gen import ann_candidates, lexical_candidates
 from api.core import llm_parser
 from api.core.intent_parser import Intent
 from api.core.legacy_intent_parser import (
@@ -36,13 +35,21 @@ from api.core.legacy_intent_parser import (
 )
 from api.core.reranker import rerank_with_explanations, diversify_with_mmr
 from api.core.business_rules import apply_business_rules
-from api.core.llm_parser import rewrite_query, linked_media_types
+from api.core.llm_parser import (
+    rewrite_query,
+    linked_media_types,
+    extract_intent_signals,
+)
 from api.core.embeddings import encode_texts
 from api.core.user_profile import NEGATIVE_EVENT_TYPES, _event_weight
 from api.core.maturity import rating_level
-from api.core.rewrite import Rewrite
 from api.core.metrics import METRICS, timer
 from api.core.logger import request_id_ctx
+from api.core.query_profile import (
+    IntentSignals,
+    _normalize_query_text,
+    build_query_profile,
+)
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
 logger = logging.getLogger(__name__)
@@ -58,94 +65,6 @@ _EXPLICIT_MATURITY_PATTERNS: Tuple[Tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\br\b", flags=re.IGNORECASE), "R"),
     (re.compile(r"\bg\b", flags=re.IGNORECASE), "G"),
 )
-_TEEN_QUERY_PATTERN = re.compile(
-    r"\bteen(?:s|agers?)?\b|\bteen[\s-]?(?:safe|friendly)\b",
-    flags=re.IGNORECASE,
-)
-_FAMILY_FRIENDLY_QUERY_PATTERN = re.compile(
-    r"\bfamily([\s-]?(?:friendly|safe|movies?|filters?))?\b",
-    flags=re.IGNORECASE,
-)
-_KIDS_PROFILE_QUERY_PATTERN = re.compile(
-    r"\bkids?\s+profile\b",
-    flags=re.IGNORECASE,
-)
-_KIDS_PROFILE_ADVENTURE_QUERY_PATTERN = re.compile(
-    r"(?:\bkids?\s+profile\b.*\badventure\b)|(?:\badventure\b.*\bkids?\s+profile\b)",
-    flags=re.IGNORECASE,
-)
-_NOT_TOO_DARK_QUERY_PATTERN = re.compile(
-    r"\bnot[\s-]?too[\s-]?dark\b",
-    flags=re.IGNORECASE,
-)
-_LAST_DECADE_QUERY_PATTERN = re.compile(
-    r"\blast\s+decade\b",
-    flags=re.IGNORECASE,
-)
-_FANTASY_TV_QUERY_PATTERN = re.compile(
-    r"(?=.*\bfantasy\b)(?=.*\btv\b)",
-    flags=re.IGNORECASE,
-)
-_SHORT_BINGEABLE_SCIFI_TV_QUERY_PATTERN = re.compile(
-    r"(?=.*\bshort\b)(?=.*\bbingeable\b)(?=.*\bsci[\s-]?fi\b|\bscience[\s-]?fiction\b)(?=.*\btv\b)",
-    flags=re.IGNORECASE,
-)
-_COMPARISON_SIGNAL_PATTERN = re.compile(
-    r"\b(?:like|similar to|in the vein of|vibes?)\b",
-    flags=re.IGNORECASE,
-)
-_FANTASY_WORLDS_CROSS_MEDIA_QUERY_PATTERN = re.compile(
-    r"(?=.*\bfantasy\b)(?=.*\bworlds?\b)(?=.*\btv\b)(?=.*\bmovies?\b)",
-    flags=re.IGNORECASE,
-)
-_ADULT_FEELGOOD_COMEDY_QUERY_PATTERN = re.compile(
-    r"(?=.*\bfeel[\s-]?good\b)(?=.*\bcomed(?:y|ies)\b)",
-    flags=re.IGNORECASE,
-)
-_TEEN_FRIENDLY_ADVENTURE_PROVIDER_QUERY_PATTERN = re.compile(
-    r"(?=.*\bteen[\s-]?(?:safe|friendly)|\bteens?\b)(?=.*\badventure\b)(?=.*\bnetflix\b)",
-    flags=re.IGNORECASE,
-)
-_DATE_NIGHT_QUERY_PATTERN = re.compile(
-    r"\bdate[\s-]?night\b",
-    flags=re.IGNORECASE,
-)
-_FAMILY_ADVENTURE_MOVIE_QUERY_PATTERN = re.compile(
-    r"(?=.*\bfamily\b)(?=.*\badventure\b)(?=.*\bmovies?\b)",
-    flags=re.IGNORECASE,
-)
-_MODERN_QUERY_PATTERN = re.compile(
-    r"\bmodern\b|\bcontemporary\b|\bpresent[\s-]?day\b",
-    flags=re.IGNORECASE,
-)
-_ANIMATION_AUDIENCE_PATTERN = re.compile(
-    r"\b(animation|animated|anime|cartoon|cartoons|pixar|disney)\b",
-    flags=re.IGNORECASE,
-)
-_AUDIENCE_SIGNAL_PATTERN = re.compile(
-    r"\b(teen(?:s|agers?)?|teen[\s-]?(?:safe|friendly)|family|kids?|children|animation|animated|anime|cartoon|cartoons|pixar|disney)\b",
-    flags=re.IGNORECASE,
-)
-def _normalize_query_text(query: str | None) -> str:
-    return " ".join((query or "").lower().replace("-", " ").split())
-
-
-def _query_has_any(text: str, keywords: Sequence[str]) -> bool:
-    return any(keyword in text for keyword in keywords)
-
-
-def _is_adult_feelgood_movieish_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    if not text or not _ADULT_FEELGOOD_COMEDY_QUERY_PATTERN.search(query or ""):
-        return False
-    if "minute" not in text:
-        return False
-    if _AUDIENCE_SIGNAL_PATTERN.search(query or ""):
-        return False
-    return not _query_has_any(
-        text,
-        ("tv", "series", "show", "episode", "episodes", "season", "seasons"),
-    )
 
 
 def _ann_candidates_with_version(
@@ -177,387 +96,27 @@ def _ann_candidates_with_version(
         )
 
 
-def _is_optimistic_scifi_tv_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    if not _query_has_any(text, ("tv", "series", "show")):
-        return False
-    has_space_adventure_signal = _query_has_any(
-        text,
-        ("space opera", "space adventure", "space exploration", "starship", "crew", "exploration"),
-    )
-    if has_space_adventure_signal and _query_has_any(text, ("space", "starship", "crew", "exploration")):
-        return True
-    return _query_has_any(text, ("sci fi", "science fiction", "space")) and _query_has_any(
-        text,
-        (
-            "optimistic",
-            "hopeful",
-            "uplifting",
-            "adventure",
-            "crew",
-            "starship",
-            "exploration",
-            "not too dark",
-        ),
-    )
-
-
-def _is_serialized_prestige_tv_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    if not _query_has_any(text, ("tv", "series", "show")):
-        return False
-    prestige_signal = _query_has_any(
-        text,
-        (
-            "serialized",
-            "prestige",
-            "high stakes",
-            "high-stakes",
-            "power struggle",
-            "survival",
-            "antihero",
-            "political",
-            "dynasty",
-            "dystopian",
-            "apocalypse",
-        ),
-    )
-    drama_signal = _query_has_any(
-        text,
-        ("drama", "survival", "political", "war", "fantasy", "antihero"),
-    )
-    return prestige_signal and drama_signal
-
-
-def _is_fantasy_epic_tv_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    has_tv_signal = _query_has_any(text, ("tv", "series", "show"))
-    has_comparison_signal = bool(_COMPARISON_SIGNAL_PATTERN.search(text))
-    return (
-        (has_tv_signal or has_comparison_signal)
-        and "fantasy" in text
-        and _query_has_any(text, ("epic", "epics", "quest", "kingdom", "prophecy", "monster"))
-    )
-
-
-def _is_temporal_thriller_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    temporal_signal = _query_has_any(
-        text, ("time travel", "time bending", "time loop", "temporal", "paradox")
-    )
-    thriller_signal = _query_has_any(
-        text, ("thriller", "thrillers", "brainy", "cerebral", "mind bending")
-    )
-    return temporal_signal and thriller_signal
-
-
-def _is_high_concept_thriller_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    return _query_has_any(text, ("high concept", "brainy", "cerebral")) and _query_has_any(
-        text, ("thriller", "thrillers", "movie", "movies")
-    )
-
-
-def _is_cerebral_temporal_thriller_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    return _is_temporal_thriller_query(text) and _query_has_any(
-        text, ("brainy", "cerebral", "mind bending", "mind-bending", "high concept")
-    )
-
-
-def _is_caper_crime_tv_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    return (
-        _query_has_any(text, ("tv", "series", "show"))
-        and "crime" in text
-        and _query_has_any(
-            text,
-            (
-                "short episode",
-                "short episodes",
-                "heist",
-                "caper",
-                "con artist",
-                "con artists",
-                "thief",
-                "thieves",
-                "grifter",
-            ),
-        )
-    )
-
-
-def _is_cross_media_international_crime_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    return (
-        "crime" in text
-        and _query_has_any(
-            text,
-            (
-                "international",
-                "europe",
-                "european",
-                "foreign",
-                "non english",
-                "global",
-                "world cinema",
-            ),
-        )
-        and _query_has_any(text, ("movie", "movies", "film", "films", "tv", "series", "show"))
-    )
-
-
-def _is_heist_tv_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    return (
-        _query_has_any(text, ("tv", "series", "show"))
-        and _query_has_any(
-            text,
-            (
-                "heist",
-                "caper",
-                "con artist",
-                "con artists",
-                "conman",
-                "grifter",
-                "thief",
-                "thieves",
-                "robbery",
-                "robber",
-            ),
-        )
-    )
-
-
-def _is_multilingual_family_adventure_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    has_audience_signal = _query_has_any(
-        text, ("kids profile", "kid", "kids", "children", "family")
-    )
-    has_language_signal = _query_has_any(
-        text,
-        (
-            "bilingual",
-            "multilingual",
-            "non english",
-            "foreign language",
-            "international",
-        ),
-    )
-    has_adventure_signal = _query_has_any(
-        text, ("adventure", "fantasy", "quest", "magic")
-    )
-    has_media_signal = _query_has_any(
-        text, ("movie", "movies", "film", "films", "tv", "series", "show")
-    )
-    return (
-        has_audience_signal
-        and has_language_signal
-        and has_adventure_signal
-        and has_media_signal
-    )
-
-
-def _is_street_level_superhero_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    return (
-        _query_has_any(text, ("tv", "series", "show"))
-        and _query_has_any(text, ("superhero", "vigilante"))
-        and _query_has_any(text, ("street level", "gritty", "grounded", "urban"))
-    )
-
-
-def _is_anime_scifi_movie_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    return (
-        _query_has_any(text, ("movie", "movies", "film", "films"))
-        and _query_has_any(text, ("anime", "animated", "japanese"))
-        and _query_has_any(
-            text,
-            (
-                "sci fi",
-                "science fiction",
-                "cyberpunk",
-                "mecha",
-                "future",
-                "futuristic",
-                "android",
-                "space",
-            ),
-        )
-    )
-
-
-def _is_noir_movie_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    return (
-        _query_has_any(text, ("noir", "neo noir", "film noir"))
-        and (
-            _query_has_any(text, ("movie", "movies", "film", "films"))
-            or _query_has_any(text, ("city", "cities", "urban", "modern"))
-        )
-        and _query_has_any(
-            text, ("crime", "mystery", "mysteries", "thriller", "detective", "investigation")
-        )
-    )
-
-
-def _is_money_psychology_thriller_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    if not _query_has_any(
-        text,
-        (
-            "thriller",
-            "thrillers",
-            "psychological",
-            "mind game",
-            "mind games",
-            "obsession",
-        ),
-    ):
-        return False
-    return _query_has_any(
-        text,
-        (
-            "money",
-            "greed",
-            "wealth",
-            "wealthy",
-            "rich",
-            "status",
-            "power",
-            "ambition",
-            "billionaire",
-            "finance",
-            "financial",
-            "banking",
-            "broker",
-            "wall street",
-        ),
-    )
-
-
-def _is_rom_com_query(query: str | None) -> bool:
-    text = _normalize_query_text(query)
-    if _query_has_any(
-        text,
-        (
-            "rom com",
-            "rom-com",
-            "romcom",
-            "romantic comedy",
-            "romantic comedies",
-        ),
-    ):
-        return True
-    return _query_has_any(text, ("romance", "romantic")) and _query_has_any(
-        text,
-        ("comedy", "comedies", "date night", "meet cute"),
-    )
-
-
 def _remove_values(values: Sequence[str], blocked: Set[str]) -> List[str]:
     return [value for value in values if value not in blocked]
 
 
-def _append_unique(values: List[str], additions: Sequence[str]) -> None:
-    for value in additions:
-        if value not in values:
-            values.append(value)
+def _rrf_merge(ann_ids: List[int], lexical_ids: List[int], k: int = 60) -> List[int]:
+    """
+    Combines two ranked lists using Reciprocal Rank Fusion.
+    Score = sum(1 / (rank + k))
+    """
+    scores: Dict[int, float] = {}
 
+    for rank, item_id in enumerate(ann_ids):
+        scores[item_id] = scores.get(item_id, 0.0) + 1 / (rank + k)
 
-def _apply_query_family_intent_biases(
-    intent: IntentFilters,
-    query: str,
-    *,
-    is_optimistic_scifi_tv_query: bool,
-    is_short_bingeable_scifi_tv_query: bool,
-    is_epic_fantasy_tv_query: bool,
-    is_mixed_fantasy_worlds_query: bool,
-    is_kids_profile_query: bool,
-    is_multilingual_family_adventure_query: bool,
-) -> None:
-    normalized_query = _normalize_query_text(query)
+    for rank, item_id in enumerate(lexical_ids):
+        scores[item_id] = scores.get(item_id, 0.0) + 1 / (rank + k)
 
-    if _NOT_TOO_DARK_QUERY_PATTERN.search(query) and _FANTASY_TV_QUERY_PATTERN.search(query):
-        intent.moods = [mood for mood in intent.moods if mood.lower() != "dark"]
-        intent.genres = _remove_values(intent.genres, {"Mystery", "Thriller", "Crime"})
-        for genre in ("Fantasy", "Adventure"):
-            if genre.lower() in query.lower() and genre not in intent.genres:
-                intent.genres.append(genre)
-    if is_optimistic_scifi_tv_query:
-        intent.moods = [mood for mood in intent.moods if mood.lower() != "dark"]
-        intent.genres = _remove_values(
-            intent.genres, {"Crime", "Thriller", "Horror", "Mystery"}
-        )
-        _append_unique(
-            intent.genres,
-            ("Science Fiction", "Sci-Fi & Fantasy", "Action & Adventure"),
-        )
-    if is_short_bingeable_scifi_tv_query:
-        intent.genres = _remove_values(
-            intent.genres, {"Crime", "Thriller", "Horror", "Mystery", "Comedy"}
-        )
-        _append_unique(intent.genres, ("Science Fiction", "Sci-Fi & Fantasy"))
-        if intent.max_runtime is None:
-            intent.max_runtime = 50
-    if is_epic_fantasy_tv_query:
-        intent.genres = _remove_values(intent.genres, {"Crime", "Thriller", "Horror"})
-        _append_unique(
-            intent.genres,
-            ("Fantasy", "Sci-Fi & Fantasy", "Action & Adventure"),
-        )
-    if is_mixed_fantasy_worlds_query:
-        intent.genres = _remove_values(intent.genres, {"Crime", "Thriller", "Horror"})
-        _append_unique(
-            intent.genres,
-            ("Fantasy", "Sci-Fi & Fantasy", "Adventure", "Action & Adventure"),
-        )
-    if _is_temporal_thriller_query(query):
-        intent.genres = _remove_values(intent.genres, {"Horror", "Crime"})
-        _append_unique(intent.genres, ("Thriller", "Science Fiction", "Mystery"))
-    elif _is_high_concept_thriller_query(query):
-        intent.genres = _remove_values(intent.genres, {"Horror"})
-        _append_unique(intent.genres, ("Thriller", "Mystery", "Science Fiction"))
-        if "short" in query.lower() and intent.max_runtime is None:
-            intent.max_runtime = 125
-    if _is_street_level_superhero_query(query):
-        intent.genres = _remove_values(
-            intent.genres,
-            {
-                "Family",
-                "Comedy",
-                "Fantasy",
-                "Science Fiction",
-                "Sci-Fi & Fantasy",
-                "Animation",
-            },
-        )
-        _append_unique(intent.genres, ("Action & Adventure", "Crime", "Drama"))
-    if _is_anime_scifi_movie_query(query):
-        intent.genres = _remove_values(intent.genres, {"Family", "Comedy"})
-        _append_unique(intent.genres, ("Animation", "Science Fiction"))
-    if _is_caper_crime_tv_query(query) or _is_heist_tv_query(query):
-        _append_unique(intent.genres, ("Crime",))
-    if _is_heist_tv_query(query):
-        _append_unique(intent.genres, ("Drama",))
-    if _is_cross_media_international_crime_query(query):
-        _append_unique(intent.genres, ("Crime", "Thriller", "Drama"))
-    if _TEEN_FRIENDLY_ADVENTURE_PROVIDER_QUERY_PATTERN.search(query):
-        intent.genres = _remove_values(intent.genres, {"Drama", "Crime", "Thriller"})
-        _append_unique(intent.genres, ("Adventure", "Fantasy"))
-    if (
-        (is_kids_profile_query and _KIDS_PROFILE_ADVENTURE_QUERY_PATTERN.search(query))
-        or is_multilingual_family_adventure_query
-    ):
-        intent.genres = _remove_values(intent.genres, {"Crime", "Thriller", "Horror"})
-        expanded_family_adventure_genres = ["Family", "Animation", "Adventure"]
-        if is_multilingual_family_adventure_query or _query_has_any(
-            normalized_query,
-            ("fantasy", "magic", "quest", "sci fi", "science fiction"),
-        ):
-            expanded_family_adventure_genres.extend(["Fantasy", "Sci-Fi & Fantasy"])
-        _append_unique(intent.genres, expanded_family_adventure_genres)
+    # Sort by score descending
+    sorted_items = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    return [item_id for item_id, score in sorted_items]
+
 
 # --- Caching ---
 _RECOMMEND_CACHE_TTL_SECONDS = int(os.getenv("RECOMMEND_CACHE_TTL_SECONDS", "300"))
@@ -989,26 +548,21 @@ def _apply_explicit_query_overrides(
     if not query:
         return intent
 
+    query_profile = build_query_profile(query)
+    signals = query_profile.signals
     current_level = rating_level(intent.maturity_rating_max)
-    if _KIDS_PROFILE_QUERY_PATTERN.search(query):
+    if signals.kids_profile:
         if current_level is None or current_level != _PG13_LEVEL:
             intent.maturity_rating_max = "PG-13"
         return intent
 
-    # Check for audience signals first
-    is_kids_query = bool(_TEEN_QUERY_PATTERN.search(query) or _FAMILY_FRIENDLY_QUERY_PATTERN.search(query))
-    
-    if is_kids_query:
+    if signals.teen_or_family_safe:
         # Family-safe queries work better with a consistent PG-13 ceiling across movie and TV catalogs.
         if current_level is None or current_level != _PG13_LEVEL:
             intent.maturity_rating_max = "PG-13"
         return intent
 
-    if (
-        query
-        and _NOT_TOO_DARK_QUERY_PATTERN.search(query)
-        and _FANTASY_TV_QUERY_PATTERN.search(query)
-    ):
+    if signals.not_too_dark_fantasy_tv:
         if current_level is None or current_level > _PG13_LEVEL:
             intent.maturity_rating_max = "PG-13"
         return intent
@@ -1018,12 +572,12 @@ def _apply_explicit_query_overrides(
     # However, if the LLM intent specifically requested a restrictive cap (provenance check),
     # or if the query contains audience signals, we keep it.
     llm_cap_explicit = bool(llm_intent and llm_intent.maturity_rating_max is not None)
-    is_adult_feel_good_comedy_query = _is_adult_feelgood_movieish_query(query)
+    is_adult_feel_good_comedy_query = signals.adult_feelgood_movieish
     if (
         ("movie" in (intent.media_types or []) or is_adult_feel_good_comedy_query)
         and current_level is not None
         and current_level < _PG13_LEVEL
-        and not _AUDIENCE_SIGNAL_PATTERN.search(query)
+        and not signals.audience_signal
         and (is_adult_feel_good_comedy_query or not llm_cap_explicit)
     ):
         intent.maturity_rating_max = None
@@ -1038,40 +592,52 @@ def _normalize_merged_intent(
     if not query:
         return intent
 
+    query_profile = build_query_profile(query)
+    signals = query_profile.signals
     media_types = {media_type for media_type in intent.media_types if media_type}
-    is_adult_feel_good_movieish_query = _is_adult_feelgood_movieish_query(query)
-    is_optimistic_scifi_tv_query = _is_optimistic_scifi_tv_query(query)
-    is_short_bingeable_scifi_tv_query = bool(
-        _SHORT_BINGEABLE_SCIFI_TV_QUERY_PATTERN.search(query)
-    )
-    is_epic_fantasy_tv_query = _is_fantasy_epic_tv_query(query)
-    is_mixed_fantasy_worlds_query = bool(
-        _FANTASY_WORLDS_CROSS_MEDIA_QUERY_PATTERN.search(query)
-    )
-    if intent.year_min is None and _is_noir_movie_query(query) and _MODERN_QUERY_PATTERN.search(query):
-        intent.year_min = 1990
-    if intent.year_min is None and _is_temporal_thriller_query(query):
-        intent.year_min = 2000
-    if intent.year_min is None and _LAST_DECADE_QUERY_PATTERN.search(query):
-        intent.year_min = date.today().year - 10
-    is_kids_profile_query = bool(_KIDS_PROFILE_QUERY_PATTERN.search(query))
-    is_multilingual_family_adventure_query = _is_multilingual_family_adventure_query(
-        query
-    )
-    _apply_query_family_intent_biases(
-        intent,
-        query,
-        is_optimistic_scifi_tv_query=is_optimistic_scifi_tv_query,
-        is_short_bingeable_scifi_tv_query=is_short_bingeable_scifi_tv_query,
-        is_epic_fantasy_tv_query=is_epic_fantasy_tv_query,
-        is_mixed_fantasy_worlds_query=is_mixed_fantasy_worlds_query,
-        is_kids_profile_query=is_kids_profile_query,
-        is_multilingual_family_adventure_query=is_multilingual_family_adventure_query,
-    )
+    if intent.year_min is None and query_profile.hard_constraints.year_min is not None:
+        intent.year_min = query_profile.hard_constraints.year_min
+    if intent.year_max is None and query_profile.hard_constraints.year_max is not None:
+        intent.year_max = query_profile.hard_constraints.year_max
+    if (
+        intent.min_runtime is None
+        and query_profile.hard_constraints.min_runtime is not None
+    ):
+        intent.min_runtime = query_profile.hard_constraints.min_runtime
+    if (
+        intent.max_runtime is None
+        and query_profile.hard_constraints.max_runtime is not None
+    ):
+        intent.max_runtime = query_profile.hard_constraints.max_runtime
+    if (
+        intent.maturity_rating_max is None
+        and query_profile.hard_constraints.maturity_rating_max is not None
+    ):
+        intent.maturity_rating_max = query_profile.hard_constraints.maturity_rating_max
+
     if (
         media_types != {"movie"}
-        and not is_kids_profile_query
-        and not is_adult_feel_good_movieish_query
+        and not signals.kids_profile
+        and not signals.teen_or_family_safe
+        and not signals.adult_feelgood_movieish
+        and not signals.not_too_dark_fantasy_tv
+        and not signals.teen_friendly_adventure_provider
+        and not signals.multilingual_family_adventure
+        and not signals.crime_query_signal
+        and not signals.scifi_query_signal
+        and not signals.fantasy_query_signal
+        and not signals.high_concept_thriller
+        and not signals.cerebral_temporal_thriller
+        and not signals.temporal_thriller
+        and not signals.caper_crime_tv
+        and not signals.heist_tv
+        and not signals.international_crime
+        and not signals.anime_scifi_movie
+        and not signals.street_level_superhero
+        and not signals.rom_com
+        and not signals.money_psychology_thriller
+        and not signals.optimistic_scifi_tv
+        and not signals.fantasy_epic_tv
     ):
         return intent
 
@@ -1081,23 +647,144 @@ def _normalize_merged_intent(
     # PROVENANCE FIX: If the LLM specifically picked Animation, we trust it.
     llm_genres = llm_intent.include_genres or [] if llm_intent else []
     animation_requested = "Animation" in llm_genres
-    explicit_animation_query = bool(_ANIMATION_AUDIENCE_PATTERN.search(query))
+    explicit_animation_query = signals.animation_signal
     if "Animation" in intent.genres:
-        if not is_kids_profile_query and not animation_requested and not explicit_animation_query:
+        if (
+            not signals.kids_profile
+            and not animation_requested
+            and not explicit_animation_query
+        ):
             intent.genres = [genre for genre in intent.genres if genre != "Animation"]
 
+    if signals.crime_query_signal:
+        if "Crime" not in intent.genres:
+            intent.genres.append("Crime")
+
+    # scifi_query_signal: don't double-inject when anime_scifi_movie handles it specifically
+    if signals.scifi_query_signal and not signals.anime_scifi_movie:
+        for g in ("Science Fiction", "Sci-Fi & Fantasy"):
+            if g not in intent.genres:
+                intent.genres.append(g)
+
+    if signals.fantasy_query_signal:
+        for g in ("Fantasy", "Sci-Fi & Fantasy"):
+            if g not in intent.genres:
+                intent.genres.append(g)
+
+    # fantasy_epic_tv: inject Action & Adventure on top of fantasy genres
+    if signals.fantasy_epic_tv:
+        for g in ("Sci-Fi & Fantasy", "Action & Adventure"):
+            if g not in intent.genres:
+                intent.genres.append(g)
+
+    # temporal_thriller: replace genres with the thriller-scifi-mystery set
+    if signals.temporal_thriller:
+        intent.genres = [
+            g for g in intent.genres if g in ("Thriller", "Science Fiction", "Mystery")
+        ]
+        for g in ("Thriller", "Science Fiction", "Mystery"):
+            if g not in intent.genres:
+                intent.genres.append(g)
+
     if (
-        is_kids_profile_query
-        and _KIDS_PROFILE_ADVENTURE_QUERY_PATTERN.search(query)
+        signals.high_concept_thriller
+        or signals.cerebral_temporal_thriller
+        or signals.money_psychology_thriller
     ):
-        for genre in ("Family", "Animation", "Adventure"):
+        for g in ("Mystery", "Science Fiction"):
+            if g not in intent.genres:
+                intent.genres.append(g)
+
+    # caper/heist: inject Crime + Drama only (no Thriller — too broad)
+    if signals.caper_crime_tv or signals.heist_tv:
+        for g in ("Crime", "Drama"):
+            if g not in intent.genres:
+                intent.genres.append(g)
+
+    # international_crime: inject Crime + Thriller + Drama
+    if signals.international_crime:
+        for g in ("Crime", "Thriller", "Drama"):
+            if g not in intent.genres:
+                intent.genres.append(g)
+
+    # anime_scifi_movie: override to Animation + Science Fiction only
+    if signals.anime_scifi_movie:
+        for g in ("Animation", "Science Fiction"):
+            if g not in intent.genres:
+                intent.genres.append(g)
+
+    # street_level_superhero: replace genres with action/crime set
+    if signals.street_level_superhero:
+        intent.genres = ["Action & Adventure", "Crime", "Drama"]
+
+    if signals.rom_com:
+        for g in ("Romance", "Comedy"):
+            if g not in intent.genres:
+                intent.genres.append(g)
+
+    # not_too_dark_fantasy_tv: hard-reset to Fantasy only (strips dark/thriller spillover and Sci-Fi expansion)
+    if signals.not_too_dark_fantasy_tv:
+        intent.genres = ["Fantasy"]
+        intent.moods = [m for m in intent.moods if m != "dark"]
+
+    # optimistic_scifi_tv: replace unrelated genres with sci-fi set, strip dark mood
+    if signals.optimistic_scifi_tv:
+        intent.genres = [
+            g
+            for g in intent.genres
+            if g not in ("Crime", "Thriller", "Mystery", "Horror")
+        ]
+        for g in ("Science Fiction", "Sci-Fi & Fantasy", "Action & Adventure"):
+            if g not in intent.genres:
+                intent.genres.append(g)
+        intent.moods = [m for m in intent.moods if m != "dark"]
+
+    # teen_friendly_adventure_provider: targeted injection — do NOT cascade into full kids block
+    if signals.teen_friendly_adventure_provider:
+        # Drama is often mis-assigned by the LLM for teen adventure/fantasy mashups
+        intent.genres = [
+            g for g in intent.genres if g not in ("Drama", "Family", "Animation")
+        ]
+        for genre in ("Adventure", "Fantasy"):
             if genre not in intent.genres:
                 intent.genres.append(genre)
 
-    if (
-        _ADULT_FEELGOOD_COMEDY_QUERY_PATTERN.search(query)
-        and not _AUDIENCE_SIGNAL_PATTERN.search(query)
-    ):
+    # kids/family block: only inject if NOT already a specific teen_friendly signal
+    elif signals.multilingual_family_adventure:
+        # Multilingual/bilingual adventure always gets the full family+fantasy set
+        for genre in (
+            "Family",
+            "Animation",
+            "Adventure",
+            "Fantasy",
+            "Sci-Fi & Fantasy",
+        ):
+            if genre not in intent.genres:
+                intent.genres.append(genre)
+
+    elif signals.kids_profile:
+        # Standard kids profile: respect LLM genre choices — only inject what LLM suggested
+        desired = (
+            set(llm_genres)
+            if llm_genres
+            else {"Family", "Animation", "Adventure", "Fantasy", "Sci-Fi & Fantasy"}
+        )
+        for genre in (
+            "Family",
+            "Animation",
+            "Adventure",
+            "Fantasy",
+            "Sci-Fi & Fantasy",
+        ):
+            if genre not in intent.genres and genre in desired:
+                intent.genres.append(genre)
+
+    elif signals.teen_or_family_safe and signals.family_friendly:
+        # "short family movies" and similar — only add Family if not already enriched
+        if "Family" not in intent.genres:
+            intent.genres.append("Family")
+
+    if signals.feel_good_comedy and not signals.audience_signal:
         intent.genres = [
             genre for genre in intent.genres if genre not in {"Family", "Animation"}
         ]
@@ -1112,12 +799,12 @@ def _normalize_merged_intent(
         intent.moods = [mood for mood in intent.moods if mood != "light"]
         # Only inject Comedy/Family if the query feels like it needs it (audience signal or kid-friendly)
         # to avoid mangling "light drama" or "light sci-fi".
-        if _AUDIENCE_SIGNAL_PATTERN.search(query) or _FAMILY_FRIENDLY_QUERY_PATTERN.search(query):
+        if signals.audience_signal or signals.family_friendly:
             for genre in ("Comedy", "Family"):
                 if genre not in intent.genres:
                     intent.genres.append(genre)
         elif not intent.genres:  # Fallback if no genres at all
-             intent.genres.append("Comedy")
+            intent.genres.append("Comedy")
 
     return intent
 
@@ -1131,13 +818,11 @@ def _should_soften_provider_preference(
     media_types = {media_type for media_type in intent.media_types if media_type}
     if media_types != {"movie"}:
         return False
-    if _AUDIENCE_SIGNAL_PATTERN.search(query):
+    if build_query_profile(query).signals.audience_signal:
         return False
     if _explicit_query_maturity_cap(query):
         return False
     return True
-
-
 
 
 def _safe_constraint_similarity(
@@ -1156,11 +841,19 @@ def _safe_constraint_similarity(
     return float(np.dot(rank_vector, candidate) / (rank_norm * candidate_norm))
 
 
-def _constraint_query_bonus(intent: IntentFilters | None, item: Item) -> float:
-    raw_query = (intent.raw_query or "").lower() if intent else ""
-    if not raw_query:
-        return 0.0
+@dataclass(frozen=True)
+class ConstraintBonusContext:
+    haystack: str
+    genre_names: set[str]
+    original_language: str
+    media_type: str
+    runtime: Any
+    release_year: Any
+    maturity_rating: str
+    vote_count: float
 
+
+def _build_constraint_bonus_context(item: Item) -> ConstraintBonusContext:
     text_parts = [
         str(getattr(item, "title", "") or "").lower(),
         str(getattr(item, "overview", "") or "").lower(),
@@ -1178,636 +871,65 @@ def _constraint_query_bonus(intent: IntentFilters | None, item: Item) -> float:
             text_parts.append(name)
             if name:
                 genre_names.add(name)
-    haystack = " ".join(part for part in text_parts if part)
-    original_language = str(getattr(item, "original_language", "") or "").lower()
 
+    return ConstraintBonusContext(
+        haystack=" ".join(part for part in text_parts if part),
+        genre_names=genre_names,
+        original_language=str(getattr(item, "original_language", "") or "").lower(),
+        media_type=str(getattr(item, "media_type", "") or "").lower(),
+        runtime=getattr(item, "runtime", None),
+        release_year=getattr(item, "release_year", None),
+        maturity_rating=str(getattr(item, "maturity_rating", "") or "").upper(),
+        vote_count=float(getattr(item, "vote_count", None) or 0.0),
+    )
+
+
+def _constraint_bonus_for_contextual_signals(
+    signals: Any,
+    ctx: ConstraintBonusContext,
+) -> float:
     bonus = 0.0
-    if _is_caper_crime_tv_query(raw_query):
-        if "crime" in genre_names:
-            bonus += 0.2
-        if "drama" in genre_names:
-            bonus += 0.06
-        if "action & adventure" in genre_names:
-            bonus += 0.08
-        for keyword in (
-            "heist",
-            "robbery",
-            "robber",
-            "con artist",
-            "con-artist",
-            "conman",
-            "grifter",
-            "thief",
-            "thieves",
-            "burglar",
-            "hustler",
-            "scam",
-            "crew",
-        ):
-            if keyword in haystack:
-                bonus += 0.22
-        if "horror" in genre_names or "mystery" in genre_names:
-            bonus -= 0.2
-        for keyword in (
-            "fbi",
-            "ncis",
-            "csi",
-            "detective",
-            "homicide",
-            "special agent",
-            "forensic",
-            "police procedural",
-            "crime scene",
-            "cop",
-            "squad",
-            "unit",
-            "lawyer",
-            "law firm",
-            "courtroom",
-            "serial killer",
-            "supernatural",
-            "monster",
-            "haunting",
-            "demon",
-        ):
-            if keyword in haystack:
-                bonus -= 0.24
-    if _is_heist_tv_query(raw_query):
-        if getattr(item, "media_type", None) == "tv":
-            bonus += 0.12
-        if "crime" in genre_names:
-            bonus += 0.18
-        if "drama" in genre_names:
-            bonus += 0.08
-        if "action & adventure" in genre_names:
-            bonus += 0.1
-        for keyword in (
-            "heist",
-            "robbery",
-            "robber",
-            "con artist",
-            "con-artist",
-            "conman",
-            "grifter",
-            "thief",
-            "thieves",
-            "hustler",
-            "crew",
-            "gang",
-            "gentleman thief",
-            "mastermind",
-            "inside job",
-            "score",
-            "scheme",
-        ):
-            if keyword in haystack:
-                bonus += 0.18
-        if "mystery" in genre_names and "crime" not in genre_names:
-            bonus -= 0.12
-        for keyword in (
-            "fbi",
-            "ncis",
-            "csi",
-            "detective",
-            "homicide",
-            "special agent",
-            "forensic",
-            "police procedural",
-            "crime scene",
-            "cop",
-            "squad",
-            "unit",
-            "lawyer",
-            "law firm",
-            "courtroom",
-            "serial killer",
-            "navy",
-            "marine corps",
-            "consultant",
-        ):
-            if keyword in haystack:
-                bonus -= 0.22
-    if _is_noir_movie_query(raw_query):
-        for keyword in ("noir", "mystery", "crime", "detective", "thriller"):
-            if keyword in haystack:
-                bonus += 0.22
-        for keyword in (
-            "investigate",
-            "investigation",
-            "investigates",
-            "homicide",
-            "serial killer",
-            "murder",
-            "case",
-            "missing",
-        ):
-            if keyword in haystack:
-                bonus += 0.18
-        if {"crime", "mystery"} <= genre_names:
-            bonus += 0.2
-        if "thriller" in genre_names and "crime" in genre_names:
-            bonus += 0.12
-        if "science fiction" in genre_names or "family" in genre_names or "adventure" in genre_names:
-            bonus -= 0.4
-        if "action" in genre_names and "mystery" not in genre_names:
-            bonus -= 0.22
-        if "horror" in genre_names and not ({"crime", "mystery"} & genre_names):
-            bonus -= 0.2
-        if "comedy" in genre_names:
-            bonus -= 0.14
-        for keyword in (
-            "monster",
-            "alien",
-            "ghost",
-            "supernatural",
-            "creature",
-            "farm",
-            "beach",
-            "concert",
-            "buddy cop",
-            "wedding",
-            "vacation",
-        ):
-            if keyword in haystack:
-                bonus -= 0.22
-    if _is_money_psychology_thriller_query(raw_query):
-        if getattr(item, "media_type", None) == "movie":
-            bonus += 0.12
-        if "thriller" in genre_names:
-            bonus += 0.16
-        if "drama" in genre_names:
-            bonus += 0.08
-        if "crime" in genre_names:
-            bonus += 0.08
-        for keyword in (
-            "money",
-            "wealth",
-            "wealthy",
-            "rich",
-            "greed",
-            "greedy",
-            "status",
-            "elite",
-            "luxury",
-            "class",
-            "ambition",
-            "power",
-            "billionaire",
-            "millionaire",
-            "finance",
-            "financial",
-            "bank",
-            "banker",
-            "banking",
-            "broker",
-            "wall street",
-            "investment",
-            "investor",
-            "corporate",
-            "executive",
-        ):
-            if keyword in haystack:
-                bonus += 0.16
-        for keyword in (
-            "psychological",
-            "obsession",
-            "desperate",
-            "parasite",
-            "social climbing",
-            "class divide",
-        ):
-            if keyword in haystack:
-                bonus += 0.12
-        if "action" in genre_names and "crime" not in genre_names:
-            bonus -= 0.12
-        if "science fiction" in genre_names or "horror" in genre_names:
-            bonus -= 0.16
-        for keyword in (
-            "monster",
-            "alien",
-            "ghost",
-            "demon",
-            "creature",
-            "apocalypse",
-            "supernatural",
-        ):
-            if keyword in haystack:
-                bonus -= 0.2
-    if _is_rom_com_query(raw_query):
-        release_year = getattr(item, "release_year", None)
-        if getattr(item, "media_type", None) == "movie":
-            bonus += 0.12
-        if "romance" in genre_names:
-            bonus += 0.22
-        if "comedy" in genre_names:
-            bonus += 0.22
-        if {"romance", "comedy"} <= genre_names:
-            bonus += 0.18
-        for keyword in (
-            "rom com",
-            "rom-com",
-            "romantic comedy",
-            "romantic",
-            "fall in love",
-            "falls in love",
-            "love story",
-            "meet cute",
-            "dating",
-            "date",
-            "wedding",
-            "breakup",
-            "relationship",
-            "boyfriend",
-            "girlfriend",
-            "marriage",
-            "proposal",
-        ):
-            if keyword in haystack:
-                bonus += 0.14
-        if isinstance(release_year, int):
-            if 2000 <= release_year <= 2009:
-                bonus += 0.18
-            elif release_year > 2010:
-                bonus -= 0.08
-            elif release_year < 1995:
-                bonus -= 0.12
-        if "action" in genre_names and "romance" not in genre_names:
-            bonus -= 0.2
-        if "thriller" in genre_names:
-            bonus -= 0.14
-        if "animation" in genre_names or "family" in genre_names:
-            bonus -= 0.18
-        if "adventure" in genre_names and "romance" not in genre_names:
-            bonus -= 0.12
-        for keyword in (
-            "assassin",
-            "spy",
-            "killer",
-            "warrior",
-            "dragon",
-            "zoo",
-            "animal",
-            "monster",
-            "superhero",
-            "mission",
-            "crime fighters",
-        ):
-            if keyword in haystack:
-                bonus -= 0.18
-    if _is_temporal_thriller_query(raw_query):
-        release_year = getattr(item, "release_year", None)
-        if getattr(item, "media_type", None) == "movie":
-            bonus += 0.12
-        if "science fiction" in genre_names or "sci-fi & fantasy" in genre_names:
-            bonus += 0.28
-        if "thriller" in genre_names:
-            bonus += 0.18
-        if "mystery" in genre_names:
-            bonus += 0.12
-        for keyword in (
-            "time travel",
-            "time-travel",
-            "temporal",
-            "timeline",
-            "timelines",
-            "time loop",
-            "loop",
-            "paradox",
-            "future",
-            "past",
-            "alternate reality",
-            "parallel",
-            "memory",
-            "dream",
-            "mind",
-            "identity",
-        ):
-            if keyword in haystack:
-                bonus += 0.18
-        if _is_cerebral_temporal_thriller_query(raw_query):
-            for keyword in (
-                "dream",
-                "illusion",
-                "memory",
-                "consciousness",
-                "simulation",
-                "inversion",
-                "architect",
-                "magician",
-                "prestige",
-                "experiment",
-                "source code",
-                "quantum",
-                "rival",
-                "obsession",
-            ):
-                if keyword in haystack:
-                    bonus += 0.16
-            if "family" in genre_names:
-                bonus -= 0.24
-            if "action & adventure" in genre_names:
-                bonus -= 0.18 if "mystery" in genre_names else 0.28
-            if "war" in genre_names or "war & politics" in genre_names:
-                bonus -= 0.18
-            if "crime" in genre_names and "mystery" not in genre_names:
-                bonus -= 0.18
-            for keyword in (
-                "agent",
-                "spy",
-                "operative",
-                "assassin",
-                "mission",
-                "ultimatum",
-                "rebellion",
-                "dystopian",
-                "faction",
-                "insurgent",
-                "soldier",
-                "bunker",
-                "survival game",
-            ):
-                if keyword in haystack:
-                    bonus -= 0.2
-        if isinstance(release_year, int) and release_year >= 2000:
-            bonus += 0.12
-        if "horror" in genre_names:
-            bonus -= 0.24
-        if "crime" in genre_names and "science fiction" not in genre_names:
-            bonus -= 0.14
-        for keyword in (
-            "monster",
-            "alien invasion",
-            "predator",
-            "shark",
-            "creature",
-            "zombie",
-            "gangster",
-            "cartel",
-            "slasher",
-            "maze",
-            "faction",
-            "theme park",
-            "rebels",
-        ):
-            if keyword in haystack:
-                bonus -= 0.22
-    if _is_high_concept_thriller_query(raw_query):
-        runtime = getattr(item, "runtime", None)
-        if getattr(item, "media_type", None) == "movie":
-            bonus += 0.12
-        if "thriller" in genre_names:
-            bonus += 0.2
-        if "mystery" in genre_names:
-            bonus += 0.12
-        if "science fiction" in genre_names or "sci-fi & fantasy" in genre_names:
-            bonus += 0.12
-        if isinstance(runtime, int):
-            if runtime <= 125:
-                bonus += 0.16
-            elif runtime > 140:
-                bonus -= 0.16
-        for keyword in (
-            "twist",
-            "puzzle",
-            "mind",
-            "identity",
-            "double life",
-            "driver",
-            "night",
-            "journalist",
-            "obsession",
-            "loop",
-            "paradox",
-            "temporal",
-            "dream",
-            "simulation",
-            "memory",
-            "surveillance",
-            "mysterious",
-        ):
-            if keyword in haystack:
-                bonus += 0.14
-        if "horror" in genre_names:
-            bonus -= 0.2
-        for keyword in (
-            "monster",
-            "alien invasion",
-            "predator",
-            "shark",
-            "zombie",
-            "creature",
-            "gang war",
-            "mafia",
-            "cartel",
-            "theme park",
-            "faction",
-            "rebels",
-            "apocalypse",
-        ):
-            if keyword in haystack:
-                bonus -= 0.2
-    if _is_serialized_prestige_tv_query(raw_query):
-        release_year = getattr(item, "release_year", None)
-        vote_count = float(getattr(item, "vote_count", None) or 0.0)
-        for keyword in (
-            "war",
-            "politics",
-            "political",
-            "kingdom",
-            "throne",
-            "dynastic",
-            "power",
-            "dynasty",
-            "empire",
-            "survival",
-            "apocalypse",
-            "post-apocalyptic",
-            "post apocalyptic",
-            "dystopian",
-            "dystopia",
-            "rebellion",
-            "corrupt",
-            "corruption",
-            "antihero",
-            "dragon",
-            "infected",
-            "undead",
-            "zombie",
-            "fantasy",
-            "superhero",
-            "vigilante",
-            "prestige",
-            "serialized",
-            "epic",
-        ):
-            if keyword in haystack:
+    if (
+        signals.modern_setting
+        and isinstance(ctx.release_year, int)
+        and ctx.release_year >= 1990
+    ):
+        bonus += 0.18
+    if signals.city_setting:
+        for keyword in ("city", "urban", "los angeles", "new york", "miami", "chicago"):
+            if keyword in ctx.haystack:
                 bonus += 0.2
-        if "war & politics" in genre_names:
-            bonus += 0.22
-        if "sci-fi & fantasy" in genre_names:
-            bonus += 0.24
-        if {"drama", "sci-fi & fantasy"} <= genre_names:
-            bonus += 0.12
-        if {"drama", "action & adventure"} <= genre_names:
-            bonus += 0.08
-        if "soap" in genre_names:
-            bonus -= 0.28
-        if "family" in genre_names or "comedy" in genre_names:
-            bonus -= 0.22
-        if "crime" in genre_names and not (
-            {"war & politics", "sci-fi & fantasy", "action & adventure"} & genre_names
-        ):
-            bonus -= 0.08
-        if "procedural" in haystack or "case" in haystack or "fbi" in haystack:
-            bonus -= 0.24
-        if isinstance(release_year, int):
-            if release_year >= 2010:
-                bonus += 0.16
-            elif release_year < 2005:
-                bonus -= 0.18
-        if vote_count >= 5000:
-            bonus += 0.18
-        elif 0 < vote_count < 200:
-            bonus -= 0.1
-        for keyword in (
-            "hospital",
-            "school",
-            "sitcom",
-            "teen",
-            "campus",
-            "family life",
-            "daily lives",
-            "hedge fund",
-            "wall street",
-            "billionaire",
-            "boardroom",
-            "law firm",
-            "courtroom",
-            "attorney",
-            "lawyer",
-            "judge",
-            "navy seal",
-            "special forces",
-            "task force",
-        ):
-            if keyword in haystack:
-                bonus -= 0.22
-    if _KIDS_PROFILE_ADVENTURE_QUERY_PATTERN.search(raw_query):
-        original_language = str(getattr(item, "original_language", "") or "").lower()
-        maturity_rating = str(getattr(item, "maturity_rating", "") or "").upper()
-        if "adventure" in genre_names or "action & adventure" in genre_names:
-            bonus += 0.24
-        if "fantasy" in genre_names or "sci-fi & fantasy" in genre_names:
-            bonus += 0.24
-        if "science fiction" in genre_names:
-            bonus += 0.18
-        if "family" in genre_names:
-            bonus += 0.26
-        if "animation" in genre_names:
-            bonus += 0.3
-        if getattr(item, "media_type", None) == "tv":
-            bonus += 0.22
-        if maturity_rating in {"TV-Y7", "TV-PG", "PG", "G", "PG-13"}:
-            bonus += 0.12
-        if "bilingual" in raw_query and original_language and original_language != "en":
-            bonus += 0.12
-        for keyword in (
-            "quest",
-            "magic",
-            "magical",
-            "wizard",
-            "galaxy",
-            "space",
-            "starship",
-            "alien",
-            "dragon",
-            "kingdom",
-            "heroic",
-        ):
-            if keyword in haystack:
-                bonus += 0.18
-        if "horror" in genre_names or "thriller" in genre_names or "crime" in genre_names:
-            bonus -= 0.24
-        for keyword in (
-            "murder",
-            "serial killer",
-            "terror",
-            "gangster",
-            "drug cartel",
-            "courtroom",
-            "boardroom",
-        ):
-            if keyword in haystack:
-                bonus -= 0.2
-    if _is_multilingual_family_adventure_query(raw_query):
-        original_language = str(getattr(item, "original_language", "") or "").lower()
-        maturity_rating = str(getattr(item, "maturity_rating", "") or "").upper()
-        media_type = str(getattr(item, "media_type", "") or "").lower()
-        if "family" in genre_names:
-            bonus += 0.22
-        if "animation" in genre_names:
-            bonus += 0.24
-        if "kids" in genre_names:
-            bonus += 0.28
-        if "adventure" in genre_names or "action & adventure" in genre_names:
-            bonus += 0.24
-        if "fantasy" in genre_names or "sci-fi & fantasy" in genre_names:
-            bonus += 0.2
-        if "science fiction" in genre_names:
-            bonus += 0.12
-        if media_type == "tv":
-            bonus += 0.12
-        if maturity_rating in {"TV-Y7", "TV-PG", "PG", "G", "PG-13"}:
-            bonus += 0.08
-        if original_language and original_language != "en":
-            bonus += 0.18
-        for keyword in (
-            "magic",
-            "magical",
-            "dragon",
-            "creature",
-            "enchanted",
-            "forest",
-            "legend",
-            "portal",
-            "quest",
-            "heroic",
-            "princess",
-            "warrior",
-            "friend",
-            "friends",
-        ):
-            if keyword in haystack:
-                bonus += 0.16
-        if "crime" in genre_names or "thriller" in genre_names or "horror" in genre_names:
-            bonus -= 0.24
-        if "action" in genre_names and not (
-            {
-                "family",
-                "animation",
-                "kids",
-                "fantasy",
-                "sci-fi & fantasy",
-                "science fiction",
-                "action & adventure",
-            }
-            & genre_names
-        ):
-            bonus -= 0.18
-        for keyword in (
-            "assassin",
-            "gangster",
-            "serial killer",
-            "drug cartel",
-            "courtroom",
-            "boardroom",
-            "murder",
-            "terror",
-        ):
-            if keyword in haystack:
-                bonus -= 0.18
-    if _DATE_NIGHT_QUERY_PATTERN.search(raw_query) and "comedy" in raw_query:
-        runtime = getattr(item, "runtime", None)
+    return bonus
+
+
+def _constraint_bonus_for_romance_tone(
+    intent_signals: IntentSignals,
+    signals: Any,
+    ctx: ConstraintBonusContext,
+) -> float:
+    """
+    Apply romantic tone bonuses based on LLM-extracted intent signals.
+
+    Conditions:
+    1. Romantic mood: Apply romance genre bonuses
+    2. Feel-good/uplifting mood: Apply feel-good comedy bonuses
+    3. Rom-com signal: Apply romantic comedy bonuses
+
+    All mood detection is LLM-driven and immune to query paraphrasing.
+    """
+    bonus = 0.0
+    genre_names = ctx.genre_names
+    haystack = ctx.haystack
+
+    # Condition 1: Romantic mood
+    # NEW: Use LLM-extracted mood instead of keyword matching
+    is_romantic_date = intent_signals.mood in (
+        "romantic",
+        "uplifting",
+        "heartwarming",
+        "light",
+    )
+    if is_romantic_date:
         if "comedy" in genre_names:
             bonus += 0.22
         if "romance" in genre_names:
@@ -1858,14 +980,18 @@ def _constraint_query_bonus(intent: IntentFilters | None, item: Item) -> float:
         ):
             if keyword in haystack:
                 bonus += 0.14
-        if isinstance(runtime, int):
-            if runtime <= 125:
+        if isinstance(ctx.runtime, int):
+            if ctx.runtime <= 125:
                 bonus += 0.12
-                if runtime <= 115:
+                if ctx.runtime <= 115:
                     bonus += 0.05
-            elif runtime > 145:
+            elif ctx.runtime > 145:
                 bonus -= 0.14
-        if "action" in genre_names or "thriller" in genre_names or "crime" in genre_names:
+        if (
+            "action" in genre_names
+            or "thriller" in genre_names
+            or "crime" in genre_names
+        ):
             bonus -= 0.22
         if "horror" in genre_names:
             bonus -= 0.28
@@ -1898,322 +1024,16 @@ def _constraint_query_bonus(intent: IntentFilters | None, item: Item) -> float:
         ):
             if keyword in haystack:
                 bonus -= 0.18
-    if _is_cross_media_international_crime_query(raw_query):
-        if "crime" in genre_names:
-            bonus += 0.16
-        if original_language and original_language != "en":
-            bonus += 0.26
-        if original_language in {"es", "fr", "it", "pt", "de", "ko"}:
-            bonus += 0.08
-        for keyword in (
-            "heist",
-            "robbery",
-            "thief",
-            "mafia",
-            "mob",
-            "cartel",
-            "gang",
-            "corruption",
-            "underworld",
-            "gangster",
-            "detective",
-            "police",
-        ):
-            if keyword in haystack:
-                bonus += 0.14
-        for keyword in (
-            "fbi",
-            "ncis",
-            "csi",
-            "law & order",
-            "special agent",
-            "forensic",
-            "miami",
-            "new york",
-        ):
-            if keyword in haystack:
-                bonus -= 0.22
-    if _is_street_level_superhero_query(raw_query):
-        if getattr(item, "media_type", None) == "tv":
-            bonus += 0.16
-        if "action & adventure" in genre_names:
-            bonus += 0.2
-        if "crime" in genre_names:
-            bonus += 0.16
-        if "drama" in genre_names:
-            bonus += 0.1
-        for keyword in (
-            "vigilante",
-            "street",
-            "urban",
-            "masked",
-            "crime",
-            "corruption",
-            "gang",
-            "hell's kitchen",
-            "lawless",
-            "grounded",
-        ):
-            if keyword in haystack:
-                bonus += 0.16
-        if (
-            "fantasy" in genre_names
-            or "family" in genre_names
-            or "comedy" in genre_names
-            or "animation" in genre_names
-        ):
-            bonus -= 0.22
-        for keyword in (
-            "cosmic",
-            "galaxy",
-            "multiverse",
-            "magic school",
-            "cartoon",
-            "sitcom",
-            "fbi",
-            "ncis",
-            "csi",
-            "law & order",
-            "special agent",
-            "forensic",
-            "homicide",
-            "police procedural",
-            "rookie",
-            "consultant",
-        ):
-            if keyword in haystack:
-                bonus -= 0.22
-    if _SHORT_BINGEABLE_SCIFI_TV_QUERY_PATTERN.search(raw_query):
-        runtime = getattr(item, "runtime", None)
-        release_year = getattr(item, "release_year", None)
-        if getattr(item, "media_type", None) == "tv":
-            bonus += 0.12
-        if "science fiction" in genre_names or "sci-fi & fantasy" in genre_names:
-            bonus += 0.22
-        if "action & adventure" in genre_names:
-            bonus += 0.16
-        if "comedy" in genre_names:
-            bonus += 0.08
-        if "war & politics" in genre_names:
-            bonus -= 0.18
-        if isinstance(runtime, int):
-            if runtime <= 50:
-                bonus += 0.18
-            elif runtime > 60:
-                bonus -= 0.14
-        if isinstance(release_year, int) and release_year >= 1997:
-            bonus += 0.06
-        for keyword in (
-            "crew",
-            "ragtag",
-            "starship",
-            "spaceship",
-            "space",
-            "spaceship",
-            "ship",
-            "colony",
-            "frontier",
-            "mission",
-            "team",
-            "time travel",
-            "future",
-            "android",
-            "robot",
-            "alien",
-            "portal",
-            "adventure",
-            "exploration",
-            "exploratory",
-            "family",
-            "survive",
-            "survival",
-        ):
-            if keyword in haystack:
-                bonus += 0.14
-        if "crime" in genre_names or "horror" in genre_names:
-            bonus -= 0.2
-        for keyword in (
-            "detective",
-            "forensic",
-            "procedural",
-            "monster",
-            "haunting",
-            "serial killer",
-            "hospital",
-            "courtroom",
-            "space station",
-            "station",
-            "politics",
-            "political",
-            "time lord",
-        ):
-            if keyword in haystack:
-                bonus -= 0.18
-    if _is_anime_scifi_movie_query(raw_query):
-        if getattr(item, "media_type", None) == "movie":
-            bonus += 0.12
-        if "animation" in genre_names:
-            bonus += 0.22
-        if "science fiction" in genre_names or "sci-fi & fantasy" in genre_names:
-            bonus += 0.22
-        if original_language == "ja":
-            bonus += 0.2
-        for keyword in (
-            "anime",
-            "cyberpunk",
-            "mecha",
-            "robot",
-            "android",
-            "future",
-            "futuristic",
-            "tokyo",
-            "dream",
-            "memory",
-            "virtual",
-            "space",
-        ):
-            if keyword in haystack:
-                bonus += 0.16
-        if "family" in genre_names or "comedy" in genre_names:
-            bonus -= 0.18
-        for keyword in (
-            "princess",
-            "dragon",
-            "holiday",
-            "pets",
-            "school trip",
-            "musical",
-            "kids",
-            "pixar",
-        ):
-            if keyword in haystack:
-                bonus -= 0.18
-    if _is_optimistic_scifi_tv_query(raw_query):
-        if getattr(item, "media_type", None) == "tv":
-            bonus += 0.2
-        if "sci-fi & fantasy" in genre_names or "science fiction" in genre_names:
-            bonus += 0.3
-        if "action & adventure" in genre_names or "adventure" in genre_names:
-            bonus += 0.18
-        for keyword in (
-            "space",
-            "starship",
-            "spaceship",
-            "crew",
-            "captain",
-            "galaxy",
-            "planet",
-            "exploration",
-            "explore",
-            "alien",
-            "future",
-            "optimistic",
-            "adventure",
-        ):
-            if keyword in haystack:
-                bonus += 0.16
-        if "comedy" in genre_names and "sci-fi & fantasy" in genre_names:
-            bonus += 0.08
-        if "crime" in genre_names or "medical" in genre_names or "soap" in genre_names:
-            bonus -= 0.26
-        for keyword in (
-            "murder",
-            "killer",
-            "hospital",
-            "forensic",
-            "detective",
-            "anthology",
-            "horror",
-            "apocalypse",
-        ):
-            if keyword in haystack:
-                bonus -= 0.22
-    if _SHORT_BINGEABLE_SCIFI_TV_QUERY_PATTERN.search(raw_query):
-        runtime = getattr(item, "runtime", None)
-        if getattr(item, "media_type", None) == "tv":
-            bonus += 0.18
-        if "sci-fi & fantasy" in genre_names or "science fiction" in genre_names:
-            bonus += 0.3
-        if isinstance(runtime, int):
-            if runtime <= 50:
-                bonus += 0.22
-            elif runtime > 60:
-                bonus -= 0.18
-        for keyword in (
-            "space",
-            "future",
-            "time travel",
-            "timeline",
-            "android",
-            "robot",
-            "alien",
-            "starship",
-        ):
-            if keyword in haystack:
-                bonus += 0.16
-        if "comedy" in genre_names or "crime" in genre_names or "medical" in genre_names:
-            bonus -= 0.24
-        for keyword in (
-            "hospital",
-            "murder",
-            "detective",
-            "family sitcom",
-            "forensic",
-            "anthology",
-        ):
-            if keyword in haystack:
-                bonus -= 0.22
-    if _is_fantasy_epic_tv_query(raw_query):
-        if getattr(item, "media_type", None) == "tv":
-            bonus += 0.18
-        if "fantasy" in genre_names or "sci-fi & fantasy" in genre_names:
-            bonus += 0.32
-        if "action & adventure" in genre_names or "adventure" in genre_names:
-            bonus += 0.18
-        for keyword in (
-            "kingdom",
-            "throne",
-            "prophecy",
-            "monster",
-            "magic",
-            "wizard",
-            "quest",
-            "dragon",
-            "sword",
-            "saga",
-            "realm",
-        ):
-            if keyword in haystack:
-                bonus += 0.16
-        if "crime" in genre_names or "comedy" in genre_names or "family" in genre_names:
-            bonus -= 0.22
-    if _FANTASY_WORLDS_CROSS_MEDIA_QUERY_PATTERN.search(raw_query):
-        if "fantasy" in genre_names or "sci-fi & fantasy" in genre_names:
-            bonus += 0.26
-        if "action & adventure" in genre_names or "adventure" in genre_names:
-            bonus += 0.16
-        if getattr(item, "media_type", None) == "tv":
-            bonus += 0.14
-        for keyword in (
-            "world",
-            "realm",
-            "kingdom",
-            "magic",
-            "wizard",
-            "quest",
-            "dragon",
-            "prophecy",
-            "portal",
-            "fantasy",
-        ):
-            if keyword in haystack:
-                bonus += 0.14
-        if "crime" in genre_names or "horror" in genre_names:
-            bonus -= 0.22
-    if _ADULT_FEELGOOD_COMEDY_QUERY_PATTERN.search(raw_query):
-        runtime = getattr(item, "runtime", None)
-        media_type = str(getattr(item, "media_type", "") or "").lower()
-        is_movieish_query = _is_adult_feelgood_movieish_query(raw_query)
+
+    # Condition 2: Feel-good or uplifting mood
+    # NEW: Use LLM-extracted mood instead of regex pattern
+    is_feel_good = intent_signals.mood in (
+        "uplifting",
+        "light",
+        "heartwarming",
+        "cheerful",
+    )
+    if is_feel_good:
         if "comedy" in genre_names:
             bonus += 0.18
         if "romance" in genre_names:
@@ -2243,19 +1063,22 @@ def _constraint_query_bonus(intent: IntentFilters | None, item: Item) -> float:
         ):
             if keyword in haystack:
                 bonus += 0.14
-        if is_movieish_query:
-            if media_type == "movie":
-                bonus += 0.18
-            elif media_type == "tv":
-                bonus -= 0.26
-            if isinstance(runtime, int):
-                if runtime <= 125:
-                    bonus += 0.12
-                    if runtime <= 110:
-                        bonus += 0.04
-                elif runtime > 145:
-                    bonus -= 0.16
-        if "action" in genre_names or "thriller" in genre_names or "crime" in genre_names:
+        if ctx.media_type == "movie":
+            bonus += 0.18
+        elif ctx.media_type == "tv":
+            bonus -= 0.26
+        if isinstance(ctx.runtime, int):
+            if ctx.runtime <= 125:
+                bonus += 0.12
+                if ctx.runtime <= 110:
+                    bonus += 0.04
+            elif ctx.runtime > 145:
+                bonus -= 0.16
+        if (
+            "action" in genre_names
+            or "thriller" in genre_names
+            or "crime" in genre_names
+        ):
             bonus -= 0.2
         if "horror" in genre_names:
             bonus -= 0.26
@@ -2270,11 +1093,501 @@ def _constraint_query_bonus(intent: IntentFilters | None, item: Item) -> float:
         ):
             if keyword in haystack:
                 bonus -= 0.18
-    if (
-        _FAMILY_ADVENTURE_MOVIE_QUERY_PATTERN.search(raw_query)
-        and _explicit_query_maturity_cap(raw_query) == "PG-13"
-    ):
-        maturity_rating = str(getattr(item, "maturity_rating", "") or "").upper()
+
+    # Condition 3: Rom-com signal
+    # NEW: Use LLM-extracted mood + semantic facets instead of regex pattern
+    is_rom_com = (
+        intent_signals.mood == "romantic"
+        or "romantic" in intent_signals.semantic_facets
+    )
+    if is_rom_com:
+        if ctx.media_type == "movie":
+            bonus += 0.12
+        if "romance" in genre_names:
+            bonus += 0.22
+        if "comedy" in genre_names:
+            bonus += 0.22
+        if {"romance", "comedy"} <= genre_names:
+            bonus += 0.18
+        for keyword in (
+            "rom com",
+            "rom-com",
+            "romantic comedy",
+            "romantic",
+            "fall in love",
+            "falls in love",
+            "love story",
+            "meet cute",
+            "dating",
+            "date",
+            "wedding",
+            "breakup",
+            "relationship",
+            "boyfriend",
+            "girlfriend",
+            "marriage",
+            "proposal",
+        ):
+            if keyword in haystack:
+                bonus += 0.14
+        if isinstance(ctx.release_year, int):
+            if 2000 <= ctx.release_year <= 2009:
+                bonus += 0.18
+            elif ctx.release_year > 2010:
+                bonus -= 0.08
+            elif ctx.release_year < 1995:
+                bonus -= 0.12
+        if "action" in genre_names and "romance" not in genre_names:
+            bonus -= 0.2
+        if "thriller" in genre_names:
+            bonus -= 0.14
+        if "animation" in genre_names or "family" in genre_names:
+            bonus -= 0.18
+        if "adventure" in genre_names and "romance" not in genre_names:
+            bonus -= 0.12
+        for keyword in (
+            "assassin",
+            "spy",
+            "killer",
+            "warrior",
+            "dragon",
+            "zoo",
+            "animal",
+            "monster",
+            "superhero",
+            "mission",
+            "crime fighters",
+        ):
+            if keyword in haystack:
+                bonus -= 0.18
+    return bonus
+
+
+def _constraint_bonus_for_crime_facets(
+    intent_signals: IntentSignals,
+    signals: Any,
+    ctx: ConstraintBonusContext,
+) -> float:
+    """
+    Apply crime/heist/caper bonuses based on LLM-extracted semantic facets.
+
+    This replaces brittle keyword matching in the query with robust semantic detection.
+    Bonuses are applied based on the underlying intent (e.g., 'heist') and item
+    metadata (genres, media type, language) rather than query wording.
+    """
+    bonus = 0.0
+    genre_names = ctx.genre_names
+    haystack = ctx.haystack
+    facets = intent_signals.semantic_facets
+
+    # Condition 1: Caper/Crime/Heist (Semantic detection)
+    # Triggered by heist, caper, or robbery related facets
+    has_caper_crime = any(
+        f in facets for f in ("heist", "caper", "con-artist", "con", "robbery")
+    )
+    if has_caper_crime:
+        # Base facet bonus
+        bonus += 0.22
+
+        if "crime" in genre_names:
+            bonus += 0.25  # Increased from 0.2
+        if "drama" in genre_names:
+            bonus += 0.08  # Increased from 0.06
+        if "action & adventure" in genre_names:
+            bonus += 0.1  # Increased from 0.08
+
+        # Increased secondary boost and expanded keyword list
+        if any(
+            kw in haystack
+            for kw in (
+                "heist",
+                "robbery",
+                "con artist",
+                "thief",
+                "mastermind",
+                "score",
+                "scheme",
+                "inside job",
+            )
+        ):
+            bonus += 0.15  # Increased from 0.05
+
+        if "horror" in genre_names or "mystery" in genre_names:
+            bonus -= 0.2
+
+        # Penalty for procedural keywords (remains metadata-based for precision)
+        if any(
+            kw in haystack
+            for kw in ("fbi", "ncis", "csi", "police procedural", "courtroom")
+        ):
+            bonus -= 0.24
+
+        # Penalty for procedural facets
+        if "procedural" in facets:
+            bonus -= 0.24
+
+    # Condition 2: Heist TV (Semantic detection)
+    has_heist = "heist" in facets
+    if has_heist:
+        # Base heist facet bonus
+        bonus += 0.18
+
+        if ctx.media_type == "tv":
+            bonus += 0.12
+        if "crime" in genre_names:
+            bonus += 0.18
+        if "drama" in genre_names:
+            bonus += 0.08
+        if "action & adventure" in genre_names:
+            bonus += 0.1
+
+        if "mystery" in genre_names and "crime" not in genre_names:
+            bonus -= 0.12
+
+        # Law enforcement penalty
+        if any(kw in haystack for kw in ("fbi", "homicide", "forensic", "cop", "unit")):
+            bonus -= 0.22
+
+    # Condition 3: Noir / Mystery / Detective (Semantic detection)
+    is_noir_query = any(f in facets for f in ("noir", "mystery", "detective"))
+    if is_noir_query:
+        # Base noir/detective bonus
+        bonus += 0.22
+
+        # Additional boost for investigation facets
+        if any(f in facets for f in ("investigation", "homicide", "murder", "missing")):
+            bonus += 0.18
+
+        if {"crime", "mystery"} <= genre_names:
+            bonus += 0.2
+        if "thriller" in genre_names and "crime" in genre_names:
+            bonus += 0.12
+
+        # Heavy penalties for non-noir genres
+        if any(g in genre_names for g in ("science fiction", "family", "adventure")):
+            bonus -= 0.4
+        if "action" in genre_names and "mystery" not in genre_names:
+            bonus -= 0.22
+        if "comedy" in genre_names:
+            bonus -= 0.14
+
+        # Penalty for non-noir facets (semantic mismatch)
+        if any(
+            f in facets
+            for f in ("monster", "alien", "ghost", "supernatural", "beach", "wedding")
+        ):
+            bonus -= 0.22
+
+    # Condition 4: International Crime (Semantic + Context detection)
+    has_intl_crime = (
+        "crime" in facets and ctx.original_language and ctx.original_language != "en"
+    )
+    if has_intl_crime:
+        # Base international crime bonus
+        bonus += 0.16
+
+        if ctx.original_language != "en":
+            bonus += 0.26
+        if ctx.original_language in {"es", "fr", "it", "pt", "de", "ko"}:
+            bonus += 0.08
+
+        # Boost for crime-related facets in international context
+        if any(
+            f in facets
+            for f in ("heist", "mafia", "cartel", "corruption", "underworld")
+        ):
+            bonus += 0.14
+
+        # Procedural penalty (usually less desired in intl crime searches)
+        if any(f in facets for f in ("procedural", "police", "detective")):
+            bonus -= 0.22
+
+    return bonus
+
+
+def _constraint_bonus_for_thriller_facets(
+    intent_signals: IntentSignals,
+    signals: Any,
+    ctx: ConstraintBonusContext,
+) -> float:
+    bonus = 0.0
+    genre_names = ctx.genre_names
+    facets = intent_signals.semantic_facets
+
+    is_thriller_query = (
+        "thriller" in facets
+        or "psychological" in facets
+        or "mystery" in facets
+        or "temporal" in facets
+        or "time-loop" in facets
+        or intent_signals.mood == "dark"
+    )
+
+    if is_thriller_query:
+        if "thriller" in genre_names:
+            bonus += 0.2
+        if "mystery" in genre_names:
+            bonus += 0.12
+        if "crime" in genre_names:
+            bonus += 0.08
+
+        # Enhance via mood="dark"
+        if intent_signals.mood == "dark" or "dark" in facets:
+            if {"thriller", "mystery", "crime", "horror"} & genre_names:
+                bonus += 0.16
+            if {"comedy", "family"} & genre_names:
+                bonus -= 0.24
+
+        # Semantic detection instead of signals object
+        if "psychological" in facets:
+            if "drama" in genre_names:
+                bonus += 0.12
+            if "action" in genre_names and "crime" not in genre_names:
+                bonus -= 0.12
+            if "science fiction" in genre_names or "horror" in genre_names:
+                bonus -= 0.16
+            # Metadata-side keyword matching
+            if any(
+                kw in ctx.haystack
+                for kw in (
+                    "psychological",
+                    "obsession",
+                    "desperate",
+                    "parasite",
+                    "social climbing",
+                    "class divide",
+                )
+            ):
+                bonus += 0.08
+
+        if any(f in facets for f in ("time travel", "temporal", "time-loop")):
+            if "science fiction" in genre_names or "sci-fi & fantasy" in genre_names:
+                bonus += 0.28
+            if "horror" in genre_names:
+                bonus -= 0.24
+            if "crime" in genre_names and "science fiction" not in genre_names:
+                bonus -= 0.14
+            # Metadata-side keyword matching
+            if any(
+                kw in ctx.haystack
+                for kw in (
+                    "time travel",
+                    "time-travel",
+                    "temporal",
+                    "timeline",
+                    "timelines",
+                    "time loop",
+                    "loop",
+                    "paradox",
+                )
+            ):
+                bonus += 0.12
+
+        if "cerebral" in facets:
+            if "science fiction" in genre_names or "sci-fi & fantasy" in genre_names:
+                bonus += 0.16
+            if isinstance(ctx.runtime, int):
+                if ctx.runtime <= 125:
+                    bonus += 0.16
+                elif ctx.runtime > 140:
+                    bonus -= 0.16
+
+        # Quality baseline Check
+        if ctx.vote_count >= 500:
+            bonus += 0.1
+
+    return bonus
+
+
+def _constraint_bonus_for_prestige_and_superhero_facets(
+    intent_signals: IntentSignals,
+    signals: Any,
+    ctx: ConstraintBonusContext,
+) -> float:
+    bonus = 0.0
+    genre_names = ctx.genre_names
+    facets = intent_signals.semantic_facets
+
+    # Prestige replacement
+    # Using intent_signals.prestige_indicator which is now the source of truth
+    is_prestige = intent_signals.prestige_indicator
+    if is_prestige:
+        if "war & politics" in genre_names:
+            bonus += 0.22
+        if "sci-fi & fantasy" in genre_names:
+            bonus += 0.24
+        if {"drama", "sci-fi & fantasy"} <= genre_names:
+            bonus += 0.12
+        if {"drama", "action & adventure"} <= genre_names:
+            bonus += 0.08
+        if "drama" in genre_names or "history" in genre_names:
+            bonus += 0.15
+
+        if "soap" in genre_names:
+            bonus -= 0.28
+        if "family" in genre_names or "comedy" in genre_names:
+            bonus -= 0.22
+        if "crime" in genre_names and not (
+            {"war & politics", "sci-fi & fantasy", "action & adventure"} & genre_names
+        ):
+            bonus -= 0.08
+
+        # Quality metrics replace generic "oscar"/"acclaimed" keyword searches
+        if isinstance(ctx.release_year, int):
+            if ctx.release_year >= 2010:
+                bonus += 0.16
+            elif ctx.release_year < 2005:
+                bonus -= 0.18
+        if ctx.vote_count >= 5000:
+            bonus += 0.25  # boosted
+        elif 0 < ctx.vote_count < 200:
+            bonus -= 0.1
+        # Metadata keywords provide secondary boost only
+        if any(
+            kw in ctx.haystack
+            for kw in (
+                "oscar",
+                "nominated",
+                "nomination",
+                "academy award",
+                "golden globe",
+                "emmy",
+                "cannes",
+                "sundance",
+                "critical acclaim",
+                "acclaimed",
+                "masterpiece",
+                "best picture",
+            )
+        ):
+            bonus += 0.08
+
+    # Superhero / Vigilante
+    is_superhero = (
+        "superhero" in facets
+        or "vigilante" in facets
+        or (signals and getattr(signals, "street_level_superhero", False))
+    )
+    if is_superhero:
+        if ctx.media_type == "tv":
+            bonus += 0.16
+        if "action & adventure" in genre_names or "action" in genre_names:
+            bonus += 0.2
+        if "crime" in genre_names:
+            bonus += 0.16
+        if "drama" in genre_names:
+            bonus += 0.1
+
+        # Determine level/grittiness
+        is_gritty = any(f in facets for f in ("street-level", "gritty", "dark", "noir"))
+        if is_gritty:
+            if "crime" in genre_names or "thriller" in genre_names:
+                bonus += 0.16
+            if "comedy" in genre_names or "animation" in genre_names:
+                bonus -= 0.22
+
+        if (
+            "fantasy" in genre_names
+            or "family" in genre_names
+            or "animation" in genre_names
+        ):
+            bonus -= 0.18
+
+    return bonus
+
+
+def _constraint_bonus_for_audience_facets(
+    intent_signals: IntentSignals,
+    signals: Any,
+    ctx: ConstraintBonusContext,
+    explicit_cap: str | None,
+) -> float:
+    """
+    Apply audience-based bonuses (Kids, Family, Teen, Multilingual) using semantic facets.
+
+    Replaces brittle query keyword matching with robust LLM-extracted intent signals.
+    """
+    bonus = 0.0
+    genre_names = ctx.genre_names
+    facets = set(intent_signals.semantic_facets)
+
+    # Condition 1: Kids / Animation Adventure (Semantic)
+    is_kids_query = any(
+        f in facets for f in ("kids", "animation", "child-friendly", "kids-profile")
+    )
+    if is_kids_query:
+        if "adventure" in genre_names or "action & adventure" in genre_names:
+            bonus += 0.24
+        if "fantasy" in genre_names or "sci-fi & fantasy" in genre_names:
+            bonus += 0.24
+        if "science fiction" in genre_names:
+            bonus += 0.18
+        if "family" in genre_names:
+            bonus += 0.26
+        if "animation" in genre_names:
+            bonus += 0.3
+        if ctx.media_type == "tv":
+            bonus += 0.22
+        if ctx.maturity_rating in {"TV-Y7", "TV-PG", "PG", "G", "PG-13"}:
+            bonus += 0.12
+
+        # Semantic facet boosts
+        for facet in (
+            "quest",
+            "magic",
+            "wizard",
+            "galaxy",
+            "space",
+            "alien",
+            "dragon",
+            "heroic",
+        ):
+            if facet in facets:
+                bonus += 0.18
+
+        if any(g in genre_names for g in ("horror", "thriller", "crime")):
+            bonus -= 0.24
+
+    # Condition 2: Multilingual / International Family (Semantic + Context)
+    is_intl_family = "family" in facets and (
+        ctx.original_language != "en" or "multilingual" in facets
+    )
+    if is_intl_family:
+        if "family" in genre_names:
+            bonus += 0.22
+        if "animation" in genre_names:
+            bonus += 0.24
+        if "kids" in genre_names:
+            bonus += 0.28
+        if "adventure" in genre_names or "action & adventure" in genre_names:
+            bonus += 0.24
+        if "fantasy" in genre_names or "sci-fi & fantasy" in genre_names:
+            bonus += 0.20
+        if "science fiction" in genre_names:
+            bonus += 0.12
+        if ctx.media_type == "tv":
+            bonus += 0.12
+        if ctx.maturity_rating in {"TV-Y7", "TV-PG", "PG", "G", "PG-13"}:
+            bonus += 0.08
+        if ctx.original_language and ctx.original_language != "en":
+            bonus += 0.18
+
+        # Semantic facet boosts
+        for facet in (
+            "magic",
+            "dragon",
+            "creature",
+            "enchanted",
+            "legend",
+            "quest",
+            "warrior",
+        ):
+            if facet in facets:
+                bonus += 0.18
+
+    # Condition 3: Family Adventure (PG-13 Cap)
+    is_family_adventure = "family" in facets and "adventure" in facets
+    if is_family_adventure and explicit_cap == "PG-13":
         if "adventure" in genre_names or "action & adventure" in genre_names:
             bonus += 0.24
         if "family" in genre_names:
@@ -2283,93 +1596,242 @@ def _constraint_query_bonus(intent: IntentFilters | None, item: Item) -> float:
             bonus += 0.18
         if "science fiction" in genre_names:
             bonus += 0.12
-        if maturity_rating in {"PG", "PG-13", "TV-PG"}:
+        if ctx.maturity_rating in {"PG", "PG-13", "TV-PG"}:
             bonus += 0.16
-        for keyword in (
+
+        # Semantic facet boosts
+        for facet in (
             "quest",
             "heroic",
-            "kingdom",
             "magic",
             "wizard",
             "pirate",
-            "ring",
             "dragon",
             "space",
-            "galaxy",
             "princess",
         ):
-            if keyword in haystack:
+            if facet in facets:
                 bonus += 0.14
-        if "crime" in genre_names or "thriller" in genre_names or "horror" in genre_names:
+
+        if any(g in genre_names for g in ("crime", "thriller", "horror")):
             bonus -= 0.24
-        if "action" in genre_names and not (
-            {"family", "fantasy", "science fiction", "sci-fi & fantasy", "action & adventure"}
-            & genre_names
-        ):
-            bonus -= 0.18
-        for keyword in (
-            "assassin",
-            "spy",
-            "agent",
-            "gangster",
-            "serial killer",
-            "drug cartel",
-        ):
-            if keyword in haystack:
-                bonus -= 0.18
-    if _NOT_TOO_DARK_QUERY_PATTERN.search(raw_query) and _FANTASY_TV_QUERY_PATTERN.search(raw_query):
-        release_year = getattr(item, "release_year", None)
-        maturity_rating = str(getattr(item, "maturity_rating", "") or "").upper()
-        if "fantasy" in genre_names or "sci-fi & fantasy" in genre_names:
-            bonus += 0.32
-        if "action & adventure" in genre_names or "adventure" in genre_names:
-            bonus += 0.24
-        if "family" in genre_names or "animation" in genre_names:
-            bonus += 0.3
-        if maturity_rating in {"TV-Y7", "TV-PG", "PG", "PG-13"}:
-            bonus += 0.2
-        if isinstance(release_year, int) and release_year >= 2015:
-            bonus += 0.18
-        for keyword in ("quest", "magic", "magical", "dragon", "kingdom", "heroic", "portal"):
-            if keyword in haystack:
-                bonus += 0.22
-        if "crime" in genre_names or "thriller" in genre_names or "horror" in genre_names:
-            bonus -= 0.28
-        if (
-            "science fiction" in genre_names
-            and not ({"fantasy", "sci-fi & fantasy", "action & adventure"} & genre_names)
-        ):
-            bonus -= 0.2
-        if "comedy" in genre_names and "family" not in genre_names:
-            bonus -= 0.14
-        for keyword in ("zombie", "undead", "killer", "murder", "devil", "demonic", "apocalypse"):
-            if keyword in haystack:
-                bonus -= 0.22
-    if _TEEN_FRIENDLY_ADVENTURE_PROVIDER_QUERY_PATTERN.search(raw_query):
+
+    # Condition 4: Teen Friendly / Young Adult (Semantic)
+    is_teen_query = any(
+        f in facets for f in ("teen", "young-adult", "ya", "coming-of-age")
+    )
+    if is_teen_query:
         if "action & adventure" in genre_names or "adventure" in genre_names:
             bonus += 0.22
         if "fantasy" in genre_names or "sci-fi & fantasy" in genre_names:
             bonus += 0.2
         if "family" in genre_names or "animation" in genre_names:
             bonus += 0.16
-        if getattr(item, "media_type", None) == "tv":
+        if ctx.media_type == "tv":
             bonus += 0.18
-        for keyword in ("teen", "heroic", "quest", "dragon", "legend", "academy", "kingdom"):
-            if keyword in haystack:
+
+        # Semantic facet boosts
+        for facet in ("heroic", "quest", "dragon", "legend", "academy", "kingdom"):
+            if facet in facets:
                 bonus += 0.14
-        if "crime" in genre_names or "thriller" in genre_names or "horror" in genre_names:
+
+        if any(g in genre_names for g in ("crime", "thriller", "horror")):
             bonus -= 0.24
-        for keyword in ("murder", "killer", "terror", "blood", "cartel"):
-            if keyword in haystack:
-                bonus -= 0.2
-    if _MODERN_QUERY_PATTERN.search(raw_query):
-        release_year = getattr(item, "release_year", None)
-        if isinstance(release_year, int) and release_year >= 1990:
+
+    return bonus
+
+
+def _constraint_bonus_for_scifi_fantasy_facets(
+    intent_signals: IntentSignals,
+    signals: Any,
+    ctx: ConstraintBonusContext,
+) -> float:
+    """
+    Applies Sci-Fi & Fantasy bonuses using semantic facets.
+
+    Replaces brittle keyword matching with robust LLM-extracted intent signals.
+    """
+    bonus = 0.0
+    genre_names = ctx.genre_names
+    haystack = ctx.haystack
+    facets = set(intent_signals.semantic_facets)
+
+    # Condition 1: Bingeable Sci-Fi TV
+    if (
+        "short-form" in facets
+        and "bingeable" in facets
+        and any(f in facets for f in ("sci-fi", "science-fiction"))
+    ):
+        if ctx.media_type == "tv":
             bonus += 0.18
-    if "city" in raw_query or "cities" in raw_query or "urban" in raw_query:
-        for keyword in ("city", "urban", "los angeles", "new york", "miami", "chicago"):
-            if keyword in haystack:
-                bonus += 0.2
+        if "science fiction" in genre_names or "sci-fi & fantasy" in genre_names:
+            bonus += 0.3
+        if isinstance(ctx.runtime, int):
+            if ctx.runtime <= 50:
+                bonus += 0.22
+            elif ctx.runtime > 60:
+                bonus -= 0.18
+        if any(
+            kw in haystack
+            for kw in (
+                "space",
+                "future",
+                "time travel",
+                "timeline",
+                "android",
+                "robot",
+                "alien",
+                "starship",
+            )
+        ):
+            bonus += 0.16
+        if any(g in genre_names for g in ("comedy", "crime", "medical")):
+            bonus -= 0.24
+        if "war & politics" in genre_names:
+            bonus -= 0.18
+
+    # Condition 2: Anime Sci-Fi Movie
+    if "anime" in facets and "sci-fi" in facets and ctx.media_type == "movie":
+        if "animation" in genre_names:
+            bonus += 0.22
+        if "science fiction" in genre_names or "sci-fi & fantasy" in genre_names:
+            bonus += 0.22
+        if ctx.original_language == "ja":
+            bonus += 0.2
+        if any(
+            kw in haystack
+            for kw in (
+                "cyberpunk",
+                "mecha",
+                "robot",
+                "android",
+                "future",
+                "futuristic",
+                "tokyo",
+                "dream",
+                "memory",
+                "virtual",
+                "space",
+            )
+        ):
+            bonus += 0.16
+        if any(g in genre_names for g in ("family", "comedy")):
+            bonus -= 0.18
+
+    # Condition 3: Optimistic Sci-Fi / Space Opera TV
+    if "optimistic" in facets and "sci-fi" in facets and ctx.media_type == "tv":
+        if "sci-fi & fantasy" in genre_names or "science fiction" in genre_names:
+            bonus += 0.3
+        if "action & adventure" in genre_names or "adventure" in genre_names:
+            bonus += 0.18
+        if any(
+            kw in haystack
+            for kw in (
+                "space",
+                "starship",
+                "spaceship",
+                "crew",
+                "captain",
+                "galaxy",
+                "planet",
+                "exploration",
+                "explore",
+                "alien",
+                "future",
+                "optimistic",
+                "adventure",
+            )
+        ):
+            bonus += 0.16
+        if "comedy" in genre_names and "sci-fi & fantasy" in genre_names:
+            bonus += 0.08
+        if any(g in genre_names for g in ("crime", "medical", "soap")):
+            bonus -= 0.26
+
+    # Condition 4: Epic Fantasy TV
+    if "epic" in facets and "fantasy" in facets and ctx.media_type == "tv":
+        if "fantasy" in genre_names or "sci-fi & fantasy" in genre_names:
+            bonus += 0.32
+        if "action & adventure" in genre_names or "adventure" in genre_names:
+            bonus += 0.18
+        if any(
+            kw in haystack
+            for kw in (
+                "kingdom",
+                "throne",
+                "prophecy",
+                "monster",
+                "magic",
+                "wizard",
+                "quest",
+                "dragon",
+                "sword",
+                "saga",
+                "realm",
+            )
+        ):
+            bonus += 0.16
+        if any(g in genre_names for g in ("crime", "comedy", "family")):
+            bonus -= 0.22
+
+    # Condition 5: Fantasy Worlds (Cross-Media)
+    if "fantasy-world" in facets:
+        if "fantasy" in genre_names or "sci-fi & fantasy" in genre_names:
+            bonus += 0.26
+        if "action & adventure" in genre_names or "adventure" in genre_names:
+            bonus += 0.16
+        if ctx.media_type == "tv":
+            bonus += 0.14
+        if any(
+            kw in haystack
+            for kw in (
+                "world",
+                "realm",
+                "kingdom",
+                "magic",
+                "wizard",
+                "quest",
+                "dragon",
+                "prophecy",
+                "portal",
+                "fantasy",
+            )
+        ):
+            bonus += 0.14
+        if any(g in genre_names for g in ("crime", "horror")):
+            bonus -= 0.22
+
+    return bonus
+
+
+def _constraint_query_bonus(intent: IntentFilters | None, item: Item) -> float:
+    raw_query = (intent.raw_query or "").lower() if intent else ""
+    if not raw_query:
+        return 0.0
+
+    intent_signals = extract_intent_signals(raw_query)
+    ctx = _build_constraint_bonus_context(item)
+
+    bonus = 0.0
+    # All bonus functions are now driven by LLM-extracted intent_signals
+    bonus += _constraint_bonus_for_crime_facets(intent_signals, None, ctx)
+    bonus += _constraint_bonus_for_romance_tone(intent_signals, None, ctx)
+    bonus += _constraint_bonus_for_thriller_facets(intent_signals, None, ctx)
+    bonus += _constraint_bonus_for_prestige_and_superhero_facets(
+        intent_signals, None, ctx
+    )
+    bonus += _constraint_bonus_for_audience_facets(
+        intent_signals,
+        None,
+        ctx,
+        _explicit_query_maturity_cap(raw_query),
+    )
+    bonus += _constraint_bonus_for_scifi_fantasy_facets(intent_signals, None, ctx)
+
+    # Contextual signals are lightweight and can remain
+    query_profile = build_query_profile(raw_query)
+    bonus += _constraint_bonus_for_contextual_signals(query_profile.signals, ctx)
+
     return bonus
 
 
@@ -2383,27 +1845,38 @@ def _constraint_sort_key(
     semantic_score = _safe_constraint_similarity(rank_vector, item_vector)
     lexical_bonus = _constraint_query_bonus(intent, item)
     raw_query = (intent.raw_query or "").lower() if intent else ""
-    query_is_noir = _is_noir_movie_query(raw_query)
-    query_is_time_bending = _is_temporal_thriller_query(raw_query)
-    query_is_high_concept = _is_high_concept_thriller_query(raw_query)
-    query_is_serialized_tv = _is_serialized_prestige_tv_query(raw_query)
-    query_is_multilingual_family_adventure = _is_multilingual_family_adventure_query(
-        raw_query
+
+    intent_signals = extract_intent_signals(raw_query)
+    facets = set(intent_signals.semantic_facets)
+
+    query_is_noir = "noir" in facets
+    query_is_time_bending = "temporal" in facets or "time-loop" in facets
+    query_is_high_concept = "cerebral" in facets
+    query_is_serialized_tv = (
+        "serialized" in facets and intent and "tv" in intent.media_types
     )
+    query_is_multilingual_family_adventure = (
+        "multilingual" in facets and "family" in facets
+    )
+
     catalog_score = (
         (
             (
                 0.05
                 if query_is_multilingual_family_adventure
-                else 0.06
-                if query_is_noir
-                else 0.08
-                if query_is_time_bending
-                else 0.08
-                if query_is_high_concept
-                else 0.1
-                if query_is_serialized_tv
-                else 0.15
+                else (
+                    0.06
+                    if query_is_noir
+                    else (
+                        0.08
+                        if query_is_time_bending
+                        else (
+                            0.08
+                            if query_is_high_concept
+                            else 0.1 if query_is_serialized_tv else 0.15
+                        )
+                    )
+                )
             )
             * math.log1p(float(getattr(item, "popularity", None) or 0.0))
         )
@@ -2411,15 +1884,19 @@ def _constraint_sort_key(
             (
                 0.03
                 if query_is_multilingual_family_adventure
-                else 0.03
-                if query_is_noir
-                else 0.04
-                if query_is_time_bending
-                else 0.04
-                if query_is_high_concept
-                else 0.05
-                if query_is_serialized_tv
-                else 0.08
+                else (
+                    0.03
+                    if query_is_noir
+                    else (
+                        0.04
+                        if query_is_time_bending
+                        else (
+                            0.04
+                            if query_is_high_concept
+                            else 0.05 if query_is_serialized_tv else 0.08
+                        )
+                    )
+                )
             )
             * math.log1p(float(getattr(item, "vote_count", None) or 0.0))
         )
@@ -2427,39 +1904,41 @@ def _constraint_sort_key(
             (
                 0.6
                 if query_is_multilingual_family_adventure
-                else 0.8
-                if query_is_noir
-                else 0.9
-                if query_is_time_bending
-                else 0.9
-                if query_is_high_concept
-                else 1.0
-                if query_is_serialized_tv
-                else 2.0
+                else (
+                    0.8
+                    if query_is_noir
+                    else (
+                        0.9
+                        if query_is_time_bending
+                        else (
+                            0.9
+                            if query_is_high_concept
+                            else 1.0 if query_is_serialized_tv else 2.0
+                        )
+                    )
+                )
             )
-            / (
-                10.0
-                + float(getattr(item, "popular_rank", None) or _UNKNOWN_RANK)
-            )
+            / (10.0 + float(getattr(item, "popular_rank", None) or _UNKNOWN_RANK))
         )
         + (
             (
                 0.3
                 if query_is_multilingual_family_adventure
-                else 0.4
-                if query_is_noir
-                else 0.45
-                if query_is_time_bending
-                else 0.45
-                if query_is_high_concept
-                else 0.5
-                if query_is_serialized_tv
-                else 1.0
+                else (
+                    0.4
+                    if query_is_noir
+                    else (
+                        0.45
+                        if query_is_time_bending
+                        else (
+                            0.45
+                            if query_is_high_concept
+                            else 0.5 if query_is_serialized_tv else 1.0
+                        )
+                    )
+                )
             )
-            / (
-                10.0
-                + float(getattr(item, "trending_rank", None) or _UNKNOWN_RANK)
-            )
+            / (10.0 + float(getattr(item, "trending_rank", None) or _UNKNOWN_RANK))
         )
     )
     return (
@@ -2606,68 +2085,7 @@ def _build_constraint_relaxation_ladder(
 
 
 def _query_semantic_facets(query: str | None) -> set[str]:
-    text = _normalize_query_text(query)
-    if not text:
-        return set()
-
-    facets: set[str] = set()
-    if _is_temporal_thriller_query(text):
-        facets.add("temporal_thriller")
-    if _is_high_concept_thriller_query(text):
-        facets.add("high_concept_thriller")
-    if _is_cerebral_temporal_thriller_query(text):
-        facets.add("cerebral_temporal")
-    if _is_noir_movie_query(text):
-        facets.add("noir")
-    if _is_caper_crime_tv_query(text) or _is_heist_tv_query(text):
-        facets.add("caper_crime")
-    if _is_street_level_superhero_query(text):
-        facets.add("street_level_superhero")
-    if _is_serialized_prestige_tv_query(text):
-        facets.add("serialized_prestige_tv")
-    if _is_optimistic_scifi_tv_query(text):
-        facets.add("optimistic_scifi_tv")
-    if _is_fantasy_epic_tv_query(text):
-        facets.add("fantasy_epic_tv")
-    if _is_cross_media_international_crime_query(text):
-        facets.add("international_crime")
-    if _is_multilingual_family_adventure_query(text):
-        facets.add("multilingual_family_adventure")
-    if _is_anime_scifi_movie_query(text):
-        facets.add("anime_scifi_movie")
-    if _COMPARISON_SIGNAL_PATTERN.search(text):
-        facets.add("comparison")
-    if _query_has_any(
-        text,
-        (
-            "detective",
-            "investigation",
-            "courtroom",
-            "political",
-            "survival",
-            "noir",
-            "neo noir",
-            "film noir",
-            "heist",
-            "caper",
-            "grifter",
-            "con artist",
-            "robbery",
-            "vigilante",
-            "street level",
-            "gritty",
-            "grounded",
-            "urban",
-            "crew",
-            "quest",
-            "bilingual",
-            "international",
-            "paradox",
-            "mind bending",
-        ),
-    ):
-        facets.add("fine_grained_theme")
-    return facets
+    return set(build_query_profile(query).semantic_facets)
 
 
 def _semantic_specificity_score(
@@ -2994,7 +2412,9 @@ def _debug_id_snapshot(
     *,
     limit: int = 10,
 ) -> List[Dict[str, Any]]:
-    return [_debug_item_identity(item_id, items_with_data) for item_id in list(ids)[:limit]]
+    return [
+        _debug_item_identity(item_id, items_with_data) for item_id in list(ids)[:limit]
+    ]
 
 
 def _debug_scored_id_snapshot(
@@ -3033,9 +2453,7 @@ def _debug_candidate_snapshot(
                 "tmdb_keywords": list(candidate.get("tmdb_keywords") or [])[:5],
                 "original_rank": candidate.get("original_rank"),
                 "ann_rank": candidate.get("ann_rank"),
-                "retrieval_score": _round_debug_float(
-                    candidate.get("retrieval_score")
-                ),
+                "retrieval_score": _round_debug_float(candidate.get("retrieval_score")),
                 "score": _round_debug_float(candidate.get("score")),
                 "source_scores": source_scores,
             }
@@ -3129,7 +2547,7 @@ async def _compute_recommendations_async(
     if params.use_llm_intent:
         llm_intent = _parse_llm_intent(params.query, llm_user_context, linked_entities)
     else:
-        llm_intent = Intent()
+        llm_intent = llm_parser.default_intent()
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(
                 "LLM intent parser disabled for user %s; using manual/default intent.",
@@ -3158,19 +2576,24 @@ async def _compute_recommendations_async(
         ]
         if custom_genres:
             intent.genres = custom_genres
-            llm_intent = Intent(include_genres=custom_genres)
+            llm_intent = llm_parser.default_intent()
+            llm_intent.include_genres = custom_genres
 
     preferred_services = _normalize_streaming_services(llm_intent.streaming_providers)
     llm_media_types = list(intent.media_types or [])
     legacy_filters = legacy_parse_intent(params.query) if params.query else None
     if legacy_filters:
         intent = _merge_with_legacy_filters(intent, legacy_filters)
-    intent = _apply_explicit_query_overrides(intent, params.query, llm_intent=llm_intent)
+    intent = _apply_explicit_query_overrides(
+        intent, params.query, llm_intent=llm_intent
+    )
     intent = _normalize_merged_intent(intent, params.query, llm_intent=llm_intent)
     preferred_media_types = _normalized_preferred_media_types(
         profile_meta.get("preferred_media_types")
     )
-    soften_provider_preference = bool(preferred_services) and _should_soften_provider_preference(
+    soften_provider_preference = bool(
+        preferred_services
+    ) and _should_soften_provider_preference(
         intent,
         params.query,
     )
@@ -3195,7 +2618,8 @@ async def _compute_recommendations_async(
     if params.ann_description_override:
         llm_intent.ann_description = params.ann_description_override.strip()
     candidate_limit = _resolve_candidate_limit(params, intent)
-    semantic_facets = sorted(_query_semantic_facets(intent.raw_query))
+    query_profile = build_query_profile(intent.raw_query)
+    semantic_facets = list(query_profile.semantic_facets)
     semantic_specificity_score = _semantic_specificity_score(
         intent,
         preferred_services=sorted(preferred_services),
@@ -3225,14 +2649,20 @@ async def _compute_recommendations_async(
     constraint_rank_vec: np.ndarray | None = None
     primary_retrieval_ids: List[int] = []
     primary_retrieval_stage = "none"
-    manual_rewrite_text = (
-        (params.rewrite_override or "").strip() if params.rewrite_override else ""
-    )
-    if manual_rewrite_text:
-        manual_rewrite_text = " ".join(manual_rewrite_text.split()[:8])
-        rewrite_result = Rewrite(rewritten_text=manual_rewrite_text)
+    # Task 2.1: Intent-Injected Vector Query
+    # Append semantic facets to the query string to anchor the vector embedding
+    effective_query = params.query or ""
+    if semantic_facets:
+        facet_str = " ".join(f"[{f}]" for f in semantic_facets)
+        effective_query = f"{effective_query} {facet_str}"
+        logger.debug("Intent-injected query for embedding: %s", effective_query)
+
+    if params.rewrite_override:
+        manual_rewrite_text = " ".join(params.rewrite_override.split()[:8])
+        rewrite_result = llm_parser.default_rewrite()
+        rewrite_result.rewritten_text = manual_rewrite_text
     elif params.query:
-        rewrite_result = rewrite_query(params.query or "", llm_intent)
+        rewrite_result = rewrite_query(effective_query, llm_intent)
 
     effective_ann_description = _effective_ann_description(
         raw_query=params.query,
@@ -3283,7 +2713,9 @@ async def _compute_recommendations_async(
                 intent,
                 candidate_limit,
                 allowlist,
-                preferred_media_types=preferred_media_types if not params.query else None,
+                preferred_media_types=(
+                    preferred_media_types if not params.query else None
+                ),
             )
             logger.debug(
                 "Cold-start retrieval | candidate_count=%d allowlist_size=%s enforce_genres=%s",
@@ -3306,23 +2738,37 @@ async def _compute_recommendations_async(
         constraint_rank_vec = rewrite_vec if rewrite_vec is not None else q_vec
 
         with timer("recommend.ann_latency_ms"):
-            ids = _ann_candidates_with_version(
+            ann_ids = _ann_candidates_with_version(
                 db,
                 q_vec,
                 exclude,
                 limit=candidate_limit,
                 allowed_ids=allowlist,
             )
-        rewrite_applied = bool(rewrite_vec is not None)
+
+        # New: Lexical candidate retrieval
+        lexical_ids = []
+        if params.query:
+            lexical_ids = lexical_candidates(
+                db,
+                params.query,
+                exclude,
+                limit=candidate_limit,
+                allowed_ids=allowlist,
+            )
+
+        # Merge ANN and Lexical candidates using RRF
+        ids = _rrf_merge(ann_ids, lexical_ids)
+
+        bool(rewrite_vec is not None)
         logger.debug(
-            "ANN retrieval | candidate_count=%d allowlist_size=%s enforce_genres=%s rewrite=%s",
+            "Retrieval results | ann_count=%d lexical_count=%d merged_count=%d",
+            len(ann_ids),
+            len(lexical_ids),
             len(ids),
-            len(allowlist) if allowlist is not None else None,
-            enforce_genres,
-            rewrite_applied,
         )
         primary_retrieval_ids = list(ids)
-        primary_retrieval_stage = "ann"
+        primary_retrieval_stage = "hybrid_rrf" if lexical_ids else "ann"
 
     collab_results = _collaborative_candidates(
         db,
@@ -3651,9 +3097,7 @@ async def _compute_recommendations_async(
         ordered = _apply_franchise_cap(ordered)
 
     pre_mixer_count = len(ordered)
-    pre_mixer_candidates = (
-        _debug_candidate_snapshot(ordered) if debug_mode else None
-    )
+    pre_mixer_candidates = _debug_candidate_snapshot(ordered) if debug_mode else None
     ann_weight_override = params.mixer_ann_weight
     collab_weight_override = params.mixer_collab_weight
     trending_weight_override = params.mixer_trending_weight
@@ -3681,9 +3125,7 @@ async def _compute_recommendations_async(
         novelty_weight_override=novelty_weight_override,
     )
     post_mixer_count = len(ordered)
-    post_mixer_candidates = (
-        _debug_candidate_snapshot(ordered) if debug_mode else None
-    )
+    post_mixer_candidates = _debug_candidate_snapshot(ordered) if debug_mode else None
     ordered = apply_business_rules(ordered, intent=intent)
     if not ordered:
         return ComputeResult(items=[], debug_context={})
@@ -3746,6 +3188,7 @@ async def _compute_recommendations_async(
         },
         "legacy_intent": _serialize_intent_filters(legacy_filters),
         "final_intent": _serialize_intent_filters(intent),
+        "query_profile": query_profile.to_debug_dict(),
         "prefilter": {
             "allowlist_count": len(allowlist) if allowlist is not None else None,
             "allowlist_preview": list(allowlist[:10]) if allowlist is not None else [],
@@ -3783,9 +3226,11 @@ async def _compute_recommendations_async(
         debug_ctx["source_counts"] = {
             "primary_stage": primary_retrieval_stage,
             "primary_candidates": len(primary_retrieval_ids),
-            "ann_candidates": len(primary_retrieval_ids)
-            if primary_retrieval_stage in {"ann", "rewrite_ann"}
-            else 0,
+            "ann_candidates": (
+                len(primary_retrieval_ids)
+                if primary_retrieval_stage in {"ann", "rewrite_ann"}
+                else 0
+            ),
             "collab_candidates": len(collab_results),
             "trending_candidates": len(trending_results),
             "constraint_prior_candidates": len(constraint_prior_ids),
@@ -4322,7 +3767,9 @@ def _constraint_prior_candidates(
         intent,
         rank_vector=rank_vector,
     )
-    stmt = select(Item, ItemEmbedding.vector).join(ItemEmbedding, ItemEmbedding.item_id == Item.id)
+    stmt = select(Item, ItemEmbedding.vector).join(
+        ItemEmbedding, ItemEmbedding.item_id == Item.id
+    )
 
     if allowlist is not None:
         if not allowlist:
@@ -4333,9 +3780,13 @@ def _constraint_prior_candidates(
         if media_types:
             stmt = stmt.where(Item.media_type.in_(media_types))
         if intent.year_min is not None:
-            stmt = stmt.where(Item.release_year.is_not(None), Item.release_year >= intent.year_min)
+            stmt = stmt.where(
+                Item.release_year.is_not(None), Item.release_year >= intent.year_min
+            )
         if intent.year_max is not None:
-            stmt = stmt.where(Item.release_year.is_not(None), Item.release_year <= intent.year_max)
+            stmt = stmt.where(
+                Item.release_year.is_not(None), Item.release_year <= intent.year_max
+            )
         if enforce_genres:
             genres = intent.effective_genres()
             if genres:
@@ -4433,9 +3884,13 @@ def _run_prefilter_query(
                 stmt = stmt.where(or_(*filters))
 
     if intent.year_min is not None:
-        stmt = stmt.where(Item.release_year.is_not(None), Item.release_year >= intent.year_min)
+        stmt = stmt.where(
+            Item.release_year.is_not(None), Item.release_year >= intent.year_min
+        )
     if intent.year_max is not None:
-        stmt = stmt.where(Item.release_year.is_not(None), Item.release_year <= intent.year_max)
+        stmt = stmt.where(
+            Item.release_year.is_not(None), Item.release_year <= intent.year_max
+        )
 
     stmt = stmt.order_by(
         Item.trending_rank.asc().nullslast(),
@@ -4490,7 +3945,9 @@ def _cold_start_candidates(
     allowlist: List[int] | None,
     preferred_media_types: Sequence[str] | None = None,
 ) -> List[int]:
-    stmt = select(Item.id, Item.media_type).join(ItemEmbedding, ItemEmbedding.item_id == Item.id)
+    stmt = select(Item.id, Item.media_type).join(
+        ItemEmbedding, ItemEmbedding.item_id == Item.id
+    )
 
     if allowlist is not None:
         if not allowlist:
@@ -4500,9 +3957,13 @@ def _cold_start_candidates(
         if intent.media_types:
             stmt = stmt.where(Item.media_type.in_(intent.media_types))
         if intent.year_min is not None:
-            stmt = stmt.where(Item.release_year.is_not(None), Item.release_year >= intent.year_min)
+            stmt = stmt.where(
+                Item.release_year.is_not(None), Item.release_year >= intent.year_min
+            )
         if intent.year_max is not None:
-            stmt = stmt.where(Item.release_year.is_not(None), Item.release_year <= intent.year_max)
+            stmt = stmt.where(
+                Item.release_year.is_not(None), Item.release_year <= intent.year_max
+            )
         genres = intent.effective_genres()
         if genres:
             genre_filters = [

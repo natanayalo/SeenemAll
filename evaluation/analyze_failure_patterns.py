@@ -130,7 +130,9 @@ def _sort_group_items(grouped: Dict[str, List[Dict[str, Any]]]) -> List[Dict[str
     return ranked
 
 
-def _render_group_table(title: str, rows: List[Dict[str, Any]], limit: int) -> List[str]:
+def _render_group_table(
+    title: str, rows: List[Dict[str, Any]], limit: int
+) -> List[str]:
     lines = [f"## {title}", ""]
     lines.append(
         "| Name | Count | Zero-hit % | Zero-recall % | Avg nDCG@10 | Avg MAP |"
@@ -205,7 +207,9 @@ def main() -> None:
     results = _load_results(Path(args.results_csv))
     case_meta = _load_case_meta(Path(args.evaluation_set))
 
-    scenario_rows_raw = [row for row in results if str(row.get("params_name")) == args.scenario]
+    scenario_rows_raw = [
+        row for row in results if str(row.get("params_name")) == args.scenario
+    ]
     if not scenario_rows_raw:
         raise ValueError(f"No rows found for scenario '{args.scenario}'.")
 
@@ -332,7 +336,9 @@ def main() -> None:
     md_lines.append(f"# Failure Pattern Report ({args.scenario})")
     md_lines.append("")
     md_lines.append(f"- Cases: {int(overall['count'])}")
-    md_lines.append(f"- Zero-hit cases: {len(zero_hit_cases)} ({overall['zero_hit_rate'] * 100:.1f}%)")
+    md_lines.append(
+        f"- Zero-hit cases: {len(zero_hit_cases)} ({overall['zero_hit_rate'] * 100:.1f}%)"
+    )
     md_lines.append(
         "- Recoverable zero-hit cases (other scenarios hit): "
         f"{len(recoverable_misses)}"

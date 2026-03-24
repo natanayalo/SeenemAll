@@ -29,9 +29,7 @@ class Item(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    tmdb_id: Mapped[int] = mapped_column(
-        Integer, index=True, nullable=False
-    )
+    tmdb_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
     media_type: Mapped[str] = mapped_column(
         String(10), nullable=False
     )  # 'movie' or 'tv'

@@ -1,7 +1,7 @@
 # Evaluation Set V2 - Milestone A Backlog
 
-Milestone A target: 30 cases (`m1`)  
-Current count: 30  
+Milestone A target: 30 cases (`m1`)
+Current count: 30
 Cases to add: 0
 
 Status: Completed (all m1 bucket and slice deficits closed).

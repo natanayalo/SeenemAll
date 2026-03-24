@@ -47,7 +47,9 @@ def _preferred_media_types_for_history(
         return []
     return [
         media_type
-        for media_type, _ in sorted(scores.items(), key=lambda entry: (-entry[1], entry[0]))
+        for media_type, _ in sorted(
+            scores.items(), key=lambda entry: (-entry[1], entry[0])
+        )
     ]
 
 
@@ -58,7 +60,9 @@ def load_user_state(
     effective_user_id = user_id
     if (not user or user.short_vec is None) and "::" in user_id:
         base_user_id, _, _ = user_id.partition("::")
-        fallback_user = db.query(User).filter(User.user_id == base_user_id).one_or_none()
+        fallback_user = (
+            db.query(User).filter(User.user_id == base_user_id).one_or_none()
+        )
         if fallback_user is not None and fallback_user.short_vec is not None:
             user = fallback_user
             effective_user_id = base_user_id

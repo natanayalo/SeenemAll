@@ -340,7 +340,10 @@ async def _backfill_metadata(
         for i in range(0, len(targets), batch_size):
             batch = targets[i : i + batch_size]
             details_list = await asyncio.gather(
-                *[client.details(media_type, tmdb_id) for _, tmdb_id, media_type in batch],
+                *[
+                    client.details(media_type, tmdb_id)
+                    for _, tmdb_id, media_type in batch
+                ],
                 return_exceptions=True,
             )
 

@@ -1,0 +1,104 @@
+{
+  "algo_version": "v2",
+  "evaluation_set": "evaluation/evaluation_set_v2.json",
+  "api": {
+    "base_url": "http://localhost:8000/recommend",
+    "timeout_s": 30.0,
+    "default_user_id": "u1"
+  },
+  "metrics": {
+    "k": 10,
+    "baseline_name": "default",
+    "bootstrap_samples": 400,
+    "bootstrap_seed": 42
+  },
+  "paths": {
+    "output_csv": "evaluation/artifacts/evaluation_results_latest.csv",
+    "summary_json": "evaluation/artifacts/evaluation_summary_latest.json"
+  },
+  "splits": {
+    "manifest": "evaluation/evaluation_split_manifest_v1.json"
+  },
+  "judge": {
+    "provider": "offline_golden_set",
+    "openai": {
+      "enabled": false,
+      "model": "gpt-5-mini"
+    }
+  },
+  "param_grid": [
+    {
+      "name": "default",
+      "mode": "static",
+      "params": {
+        "use_llm_intent": false
+      }
+    },
+    {
+      "name": "ann_only",
+      "mode": "static",
+      "params": {
+        "mixer_ann_weight": 1.2,
+        "mixer_collab_weight": 0.0,
+        "mixer_trending_weight": 0.0,
+        "mixer_popularity_weight": 0.0,
+        "mixer_vote_weight": 0.0,
+        "mixer_novelty_weight": 0.0,
+        "diversify": false,
+        "use_llm_intent": false
+      }
+    },
+    {
+      "name": "collab_boost",
+      "mode": "static",
+      "params": {
+        "mixer_ann_weight": 0.4,
+        "mixer_collab_weight": 0.8,
+        "mixer_trending_weight": 0.2,
+        "use_llm_intent": false
+      }
+    },
+    {
+      "name": "popularity_boost",
+      "mode": "static",
+      "params": {
+        "mixer_ann_weight": 0.3,
+        "mixer_collab_weight": 0.2,
+        "mixer_trending_weight": 0.2,
+        "mixer_popularity_weight": 1.0,
+        "mixer_vote_weight": 0.6,
+        "use_llm_intent": false
+      }
+    },
+    {
+      "name": "no_diversify",
+      "mode": "static",
+      "params": {
+        "diversify": false,
+        "use_llm_intent": false
+      }
+    },
+    {
+      "name": "high_ann_blend",
+      "mode": "static",
+      "params": {
+        "mixer_ann_weight": 0.9,
+        "mixer_collab_weight": 0.2,
+        "mixer_trending_weight": 0.1,
+        "mixer_popularity_weight": 0.1,
+        "use_llm_intent": false
+      }
+    },
+    {
+      "name": "previous_default_mixer",
+      "mode": "static",
+      "params": {
+        "mixer_ann_weight": 0.7,
+        "mixer_collab_weight": 0.2,
+        "mixer_trending_weight": 0.1,
+        "mixer_popularity_weight": 0.1,
+        "use_llm_intent": false
+      }
+    }
+  ]
+}

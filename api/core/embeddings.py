@@ -30,12 +30,12 @@ def get_model() -> SentenceTransformer:
 
 def encode_texts(texts: Iterable[str]) -> np.ndarray:
     """
-    Returns float32 numpy array shape (N, 384) for MiniLM, L2-normalized row-wise.
+    Returns float32 numpy array shape (N, 768) for all-mpnet-base-v2, L2-normalized row-wise.
     """
     # Convert generator to list once to avoid double iteration
     texts = list(texts)
     if not texts:
-        return np.zeros((0, 384), dtype="float32")
+        return np.zeros((0, 768), dtype="float32")
     model = get_model()
     emb = model.encode(
         texts,

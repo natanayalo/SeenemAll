@@ -178,7 +178,9 @@ def _resolve_judge_provider(
     cli_value: str | None,
     config: Dict[str, Any],
 ) -> str:
-    judge_config = config.get("judge", {}) if isinstance(config.get("judge"), dict) else {}
+    judge_config = (
+        config.get("judge", {}) if isinstance(config.get("judge"), dict) else {}
+    )
     provider = str(
         _choose_value(
             cli_value,
@@ -210,14 +212,18 @@ def load_split_manifest(path: str) -> Dict[str, str]:
 
     raw_assignments = loaded.get("splits") if isinstance(loaded, dict) else loaded
     if not isinstance(raw_assignments, dict):
-        raise ValueError("Split manifest must be a JSON object or contain a 'splits' object.")
+        raise ValueError(
+            "Split manifest must be a JSON object or contain a 'splits' object."
+        )
 
     assignments: Dict[str, str] = {}
     for raw_case_id, raw_split in raw_assignments.items():
         case_id = str(raw_case_id).strip()
         split_name = str(raw_split).strip().lower()
         if not case_id or not split_name:
-            raise ValueError("Split manifest entries must include non-empty case ids and split names.")
+            raise ValueError(
+                "Split manifest entries must include non-empty case ids and split names."
+            )
         assignments[case_id] = split_name
     return assignments
 
@@ -322,9 +328,16 @@ def filter_evaluation_entries(
     allowed_buckets = {
         bucket.strip() for bucket in distribution_buckets or [] if bucket.strip()
     }
-    allowed_case_ids = {case_id.strip() for case_id in case_ids or [] if case_id.strip()}
+    allowed_case_ids = {
+        case_id.strip() for case_id in case_ids or [] if case_id.strip()
+    }
     allowed_splits = {split.strip().lower() for split in splits or [] if split.strip()}
-    if not allowed_tags and not allowed_buckets and not allowed_case_ids and not allowed_splits:
+    if (
+        not allowed_tags
+        and not allowed_buckets
+        and not allowed_case_ids
+        and not allowed_splits
+    ):
         return evaluation_set
 
     filtered: List[Dict[str, Any]] = []
@@ -377,7 +390,9 @@ def _build_progress_line(
     params_completed: int | None = None,
     params_total: int | None = None,
 ) -> str:
-    progress_pct = 100.0 if total_requests <= 0 else (completed_requests / total_requests) * 100.0
+    progress_pct = (
+        100.0 if total_requests <= 0 else (completed_requests / total_requests) * 100.0
+    )
     average_seconds = 0.0 if completed_requests <= 0 else elapsed_s / completed_requests
     remaining_requests = max(total_requests - completed_requests, 0)
     eta_s = average_seconds * remaining_requests
@@ -432,8 +447,7 @@ def _validate_split_assignments(
     if missing_case_ids:
         preview = ", ".join(missing_case_ids[:5])
         raise ValueError(
-            "Split manifest is missing assignments for evaluation cases: "
-            f"{preview}"
+            "Split manifest is missing assignments for evaluation cases: " f"{preview}"
         )
 
 
@@ -470,7 +484,11 @@ def _format_compact_summary_table(summary: Dict[str, Any], k: int) -> List[str]:
 
     def _format_row(row: Dict[str, str]) -> str:
         return "  ".join(
-            row.get(header, "").ljust(widths[header]) if header == "scenario" else row.get(header, "").rjust(widths[header])
+            (
+                row.get(header, "").ljust(widths[header])
+                if header == "scenario"
+                else row.get(header, "").rjust(widths[header])
+            )
             for header in headers
         )
 
@@ -580,7 +598,9 @@ def call_recommendation_api(
                     continue
                 media_type = item.get("media_type")
                 normalized_media = (
-                    str(media_type).strip().lower() if isinstance(media_type, str) else None
+                    str(media_type).strip().lower()
+                    if isinstance(media_type, str)
+                    else None
                 )
                 if normalized_media not in {"movie", "tv"}:
                     normalized_media = None
@@ -904,14 +924,18 @@ def _per_query_diffs(
         base_hit_items = _pipe_to_items(str(baseline_row.get("hit_items_top_k", "")))
 
         cand_rec_items = _pipe_to_items(str(row.get("recommended_items_top_k", "")))
-        base_rec_items = _pipe_to_items(str(baseline_row.get("recommended_items_top_k", "")))
+        base_rec_items = _pipe_to_items(
+            str(baseline_row.get("recommended_items_top_k", ""))
+        )
 
         cand_hits = {_item_to_token(item) for item in cand_hit_items}
         base_hits = {_item_to_token(item) for item in base_hit_items}
         cand_recs = {_item_to_token(item) for item in cand_rec_items}
         base_recs = {_item_to_token(item) for item in base_rec_items}
 
-        ndcg_delta = round(float(row[ndcg_key]) - float(baseline_row.get(ndcg_key, 0.0)), 4)
+        ndcg_delta = round(
+            float(row[ndcg_key]) - float(baseline_row.get(ndcg_key, 0.0)), 4
+        )
         status = "no_change"
         if ndcg_delta > 0:
             status = "improved"
@@ -926,7 +950,8 @@ def _per_query_diffs(
                 "slice_tags": row["slice_tags"],
                 "status": status,
                 f"{precision_key}_delta": round(
-                    float(row[precision_key]) - float(baseline_row.get(precision_key, 0.0)),
+                    float(row[precision_key])
+                    - float(baseline_row.get(precision_key, 0.0)),
                     4,
                 ),
                 f"{recall_key}_delta": round(
@@ -944,7 +969,8 @@ def _per_query_diffs(
                     4,
                 ),
                 f"{mrr_key}_delta": round(
-                    float(row.get(mrr_key, 0.0)) - float(baseline_row.get(mrr_key, 0.0)),
+                    float(row.get(mrr_key, 0.0))
+                    - float(baseline_row.get(mrr_key, 0.0)),
                     4,
                 ),
                 f"{negative_rate_key}_delta": round(
@@ -958,7 +984,8 @@ def _per_query_diffs(
                     4,
                 ),
                 "latency_ms_delta": round(
-                    float(row["latency_ms"]) - float(baseline_row.get("latency_ms", 0.0)),
+                    float(row["latency_ms"])
+                    - float(baseline_row.get("latency_ms", 0.0)),
                     2,
                 ),
                 "added_hits": sorted(cand_hits - base_hits),
@@ -979,7 +1006,9 @@ def _per_query_diffs(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run offline recommendation evaluation.")
+    parser = argparse.ArgumentParser(
+        description="Run offline recommendation evaluation."
+    )
     parser.add_argument(
         "--config",
         default=DEFAULT_CONFIG_PATH,
@@ -1123,7 +1152,9 @@ def main() -> None:
     config_metrics = (
         config.get("metrics", {}) if isinstance(config.get("metrics"), dict) else {}
     )
-    config_paths = config.get("paths", {}) if isinstance(config.get("paths"), dict) else {}
+    config_paths = (
+        config.get("paths", {}) if isinstance(config.get("paths"), dict) else {}
+    )
 
     evaluation_set_path = str(
         _choose_value(
@@ -1144,11 +1175,15 @@ def main() -> None:
         _choose_value(args.default_user_id, config_api.get("default_user_id"), "u1")
     )
     baseline_name = str(
-        _choose_value(args.baseline_name, config_metrics.get("baseline_name"), "default")
+        _choose_value(
+            args.baseline_name, config_metrics.get("baseline_name"), "default"
+        )
     )
     k = max(int(_choose_value(args.k, config_metrics.get("k"), 10)), 1)
     bootstrap_samples = int(
-        _choose_value(args.bootstrap_samples, config_metrics.get("bootstrap_samples"), 400)
+        _choose_value(
+            args.bootstrap_samples, config_metrics.get("bootstrap_samples"), 400
+        )
     )
     bootstrap_seed = int(
         _choose_value(args.bootstrap_seed, config_metrics.get("bootstrap_seed"), 42)
@@ -1167,9 +1202,13 @@ def main() -> None:
             "evaluation/artifacts/evaluation_summary_latest.json",
         )
     )
-    judge_provider = _resolve_judge_provider(cli_value=args.judge_provider, config=config)
+    judge_provider = _resolve_judge_provider(
+        cli_value=args.judge_provider, config=config
+    )
     algo_version = str(config.get("algo_version", "v1"))
-    config_splits = config.get("splits", {}) if isinstance(config.get("splits"), dict) else {}
+    config_splits = (
+        config.get("splits", {}) if isinstance(config.get("splits"), dict) else {}
+    )
     split_manifest_path = _choose_value(
         args.split_manifest,
         config_splits.get("manifest"),
@@ -1194,7 +1233,9 @@ def main() -> None:
     eval_plan = _build_eval_plan(evaluation_set, param_specs)
     total_requests = sum(len(entries) for _, entries in eval_plan)
     if total_requests <= 0:
-        raise ValueError("No evaluation cases remain after applying the requested filters.")
+        raise ValueError(
+            "No evaluation cases remain after applying the requested filters."
+        )
 
     print(
         f"Starting evaluation: {len(evaluation_set)} cases x {len(param_specs)} parameter sets "
@@ -1227,7 +1268,9 @@ def main() -> None:
                 f"({param_index}/{len(eval_plan)}) | requests {len(planned_entries)}"
             )
 
-        for params_completed, (index, entry, base_params) in enumerate(planned_entries, start=1):
+        for params_completed, (index, entry, base_params) in enumerate(
+            planned_entries, start=1
+        ):
             query_value = entry.get("query")
             query: str | None = None
             if query_value not in (None, ""):
@@ -1259,16 +1302,16 @@ def main() -> None:
             ndcg = calculate_ndcg_at_k(recommended_items, golden_targets, k)
             hit_rate = calculate_hit_rate_at_k(recommended_items, golden_targets, k)
             mrr = calculate_mrr_at_k(recommended_items, golden_targets, k)
-            negative_rate = calculate_negative_rate_at_k(recommended_items, negative_targets, k)
+            negative_rate = calculate_negative_rate_at_k(
+                recommended_items, negative_targets, k
+            )
             negative_hit_rate = calculate_negative_hit_rate_at_k(
                 recommended_items, negative_targets, k
             )
             slices = _slice_tags(entry)
             top_k_recs = recommended_items[:k]
             golden_lookup = _golden_lookup(golden_targets)
-            top_k_hits = [
-                rec for rec in top_k_recs if _is_hit(rec, golden_lookup)
-            ]
+            top_k_hits = [rec for rec in top_k_recs if _is_hit(rec, golden_lookup)]
 
             row = {
                 "params_name": params_name,
@@ -1342,7 +1385,9 @@ def main() -> None:
             "algo_version": algo_version,
             "config_path": args.config,
             "split_manifest": split_manifest_path or "",
-            "split_filter": [split.strip().lower() for split in args.split if split.strip()],
+            "split_filter": [
+                split.strip().lower() for split in args.split if split.strip()
+            ],
         }
     }
     tracked_metric_keys = [

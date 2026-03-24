@@ -113,7 +113,9 @@ def _deficit(actual: int, target: int) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Check evaluation set distribution targets.")
+    parser = argparse.ArgumentParser(
+        description="Check evaluation set distribution targets."
+    )
     parser.add_argument(
         "--evaluation-set",
         default="evaluation/evaluation_set.json",
@@ -158,7 +160,9 @@ def main() -> None:
         if not isinstance(entry, dict):
             continue
         bucket_counts[_infer_bucket(entry)] += 1
-    slice_counts = _slice_counter([entry for entry in evaluation_set if isinstance(entry, dict)])
+    slice_counts = _slice_counter(
+        [entry for entry in evaluation_set if isinstance(entry, dict)]
+    )
 
     total_target = int(milestone["target_total_cases"])
     total_deficit = _deficit(total_cases, total_target)
@@ -186,7 +190,9 @@ def main() -> None:
     print(f"Milestone: {args.milestone} ({milestone['name']})")
     print(f"Total cases: {total_cases} / {total_target}")
     print("Bucket counts:")
-    for bucket in sorted(set(bucket_counts.keys()) | set(milestone["bucket_targets"].keys())):
+    for bucket in sorted(
+        set(bucket_counts.keys()) | set(milestone["bucket_targets"].keys())
+    ):
         actual = int(bucket_counts.get(bucket, 0))
         target = int(milestone["bucket_targets"].get(bucket, 0))
         deficit = _deficit(actual, target)

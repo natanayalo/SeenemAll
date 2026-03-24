@@ -76,4 +76,3 @@ Outputs:
 - Gate status: `<pass/fail>`
 - Concentrated zero-hit cohorts: `<top buckets/slices with counts>`
 - Next fixes: `<ranked list with expected impact>`
-

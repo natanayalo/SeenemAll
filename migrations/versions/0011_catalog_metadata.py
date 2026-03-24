@@ -5,9 +5,6 @@ Revises: 0008_add_item_maturity_rating
 Create Date: 2026-03-19 00:00:00.000000
 """
 
-from alembic import op
-
-
 # revision identifiers, used by Alembic.
 revision = "0011_catalog_metadata"
 down_revision = "0008_add_item_maturity_rating"

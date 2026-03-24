@@ -97,7 +97,7 @@ def _collect_collaborative_vector(
     return averaged, diagnostics
 
 
-DIM = 384
+DIM = 768
 
 
 def _time_decay_weights(n: int, half_life: float | None = None) -> np.ndarray:

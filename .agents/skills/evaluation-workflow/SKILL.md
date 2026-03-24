@@ -24,4 +24,3 @@ Use this skill for repeatable evaluation runs and regression analysis.
 - Flag likely phrase-level overfit when code changes mirror exact benchmark wording.
 
 Use [references/checklist.md](references/checklist.md) for command sequence and triage rules.
-

@@ -263,7 +263,11 @@ class FakeSession:
             return _EmbeddingVectorQuery(self.embeddings)
         if len(entities) == 2 and entities[0] is Item.id and entities[1] is Item.genres:
             return _ItemQuery(self.item_rows)
-        if len(entities) == 2 and entities[0] is Item.id and entities[1] is Item.media_type:
+        if (
+            len(entities) == 2
+            and entities[0] is Item.id
+            and entities[1] is Item.media_type
+        ):
             return _ItemMediaTypeQuery(self.item_media_types)
         if len(entities) == 1 and entities[0] is UserHistory.item_id:
             return _HistoryIdsQuery(self.history_ids)
@@ -301,6 +305,9 @@ class FakeResult:
                 row[0] if isinstance(row, (tuple, list)) else row for row in self._rows
             ]
         return list(self._rows)
+
+    def fetchall(self) -> List[Any]:
+        return self.all()
 
     def first(self) -> Any | None:
         if not self._rows:

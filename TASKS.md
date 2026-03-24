@@ -20,12 +20,12 @@ Goal: replace family-by-family query shaping in `api/routes/recommend.py` with a
 | Task | Status | Notes |
 |---|---|---|
 | **QPR.1** Freeze current recommendation baseline before refactor | Completed | Accepted baseline is now `default 0.5072 / 0.3641 / 1.0000` on `2026-03-20`; keep this as the rollback point for the refactor |
-| **QPR.2** Define `QueryProfile` schema | Pending | Introduce shared dimensions like audience, tone, structure, semantic domains, and hard constraints so normalization and ranking stop depending on per-family helpers |
-| **QPR.3** Build query-profile extraction layer | Pending | Centralize current regex/helper signals behind one profile builder instead of calling `*_query` helpers throughout the route |
-| **QPR.4** Route normalization through `QueryProfile` | Pending | Replace direct family mutations in `_normalize_merged_intent()` and explicit override paths with profile-driven transformations |
-| **QPR.5** Route `constraint_prior` bonuses through generic profile dimensions | Pending | Replace many query-family blocks in `_constraint_query_bonus()` with reusable audience/tone/structure/domain signals |
-| **QPR.6** Preserve debug observability during refactor | Pending | Expose the computed query profile in `/recommend/debug` and keep enough detail to compare old vs new behavior |
-| **QPR.7** Re-baseline after refactor | Pending | Run `pytest tests/unit/test_recommend_route.py tests/unit/test_metrics.py --no-cov` plus full eval and compare against the frozen `2026-03-20` baseline |
+| **QPR.2** Define `QueryProfile` schema | Completed | Added `api/core/query_profile.py` with a reusable `QueryProfile` model covering audience, tone, structure, semantic domains, semantic facets, derived hard constraints, and explicit debug serialization |
+| **QPR.3** Build query-profile extraction layer | Completed | Centralized query-family detection behind cached `build_query_profile()` and removed duplicate detector implementations from `api/routes/recommend.py` so route/query-profile logic stays aligned |
+| **QPR.4** Route normalization through `QueryProfile` | Completed | `_apply_explicit_query_overrides()` and `_normalize_merged_intent()` now read profile signals/hard constraints instead of rebuilding family flags inline; existing normalization behavior remains test-backed |
+| **QPR.5** Route `constraint_prior` bonuses through generic profile dimensions | Completed | `_constraint_query_bonus()` now routes through shared profile signals, a reusable `ConstraintBonusContext`, and extracted helper families for romance/context, crime, thriller, prestige/superhero, audience, and sci-fi/fantasy scoring instead of one large inline branch ladder |
+| **QPR.6** Preserve debug observability during refactor | Completed | `/recommend/debug` now exposes the computed query profile alongside existing intent/debug data, and targeted debug-route assertions were updated to validate the new surface |
+| **QPR.7** Re-baseline after refactor | Pending | Targeted verification is green so far: `pytest tests/unit/test_query_profile.py tests/unit/test_recommend_route.py tests/unit/test_metrics.py --no-cov`; still need the full post-refactor re-baseline/eval comparison against the frozen `2026-03-20` baseline |
 
 ## Embeddings V2 Experiment
 

@@ -46,7 +46,9 @@ def _safe_float(row: Dict[str, Any], key: str) -> float:
         return 0.0
 
 
-def _bootstrap_mean_ci(values: List[float], *, samples: int, seed: int) -> Dict[str, float]:
+def _bootstrap_mean_ci(
+    values: List[float], *, samples: int, seed: int
+) -> Dict[str, float]:
     if not values:
         return {"low": 0.0, "high": 0.0}
     if len(values) == 1:
@@ -81,7 +83,10 @@ def _paired_deltas(
             cand_tags = _parse_slice_tags(candidate_row)
             if slice_name not in base_tags or slice_name not in cand_tags:
                 continue
-        deltas.append(_safe_float(candidate_row, metric_key) - _safe_float(baseline_row, metric_key))
+        deltas.append(
+            _safe_float(candidate_row, metric_key)
+            - _safe_float(baseline_row, metric_key)
+        )
     return deltas
 
 
@@ -110,13 +115,19 @@ def _paired_significance_check(
         f"mean={observed_mean:+.4f} ci95=[{ci95['low']:+.4f}, {ci95['high']:+.4f}] "
         f"allowed_drop={allowed_drop:.4f} n={len(deltas)}"
     )
-    return passed, message, {"count": len(deltas), "mean_delta": observed_mean, "ci95": ci95}
+    return (
+        passed,
+        message,
+        {"count": len(deltas), "mean_delta": observed_mean, "ci95": ci95},
+    )
 
 
 def _find_metric_key(payload: Dict[str, Any], prefix: str) -> str:
     for key, value in payload.items():
-        if key.startswith(prefix) and not key.endswith("_ci95") and isinstance(
-            value, (float, int)
+        if (
+            key.startswith(prefix)
+            and not key.endswith("_ci95")
+            and isinstance(value, (float, int))
         ):
             return key
     raise KeyError(f"Could not find metric starting with '{prefix}' in payload.")
@@ -277,19 +288,30 @@ def main() -> None:
             baseline_value=float(baseline_overall.get(metric_name, 0.0)),
             allowed_drop=allowed_drop,
         )
-        checks.append({"scope": "overall", "metric": metric_name, "passed": passed, "message": message})
+        checks.append(
+            {
+                "scope": "overall",
+                "metric": metric_name,
+                "passed": passed,
+                "message": message,
+            }
+        )
         print(message)
         if not passed:
             failures.append(message)
 
     baseline_slices = baseline_payload.get("by_slice", {})
     candidate_slices = candidate_payload.get("by_slice", {})
-    critical_slices = [name.strip() for name in args.critical_slices.split(",") if name.strip()]
+    critical_slices = [
+        name.strip() for name in args.critical_slices.split(",") if name.strip()
+    ]
 
     for slice_name in critical_slices:
         if slice_name not in baseline_slices or slice_name not in candidate_slices:
             note = f"[SKIP] slice {slice_name}: missing from baseline or candidate summary."
-            checks.append({"scope": f"slice:{slice_name}", "passed": True, "message": note})
+            checks.append(
+                {"scope": f"slice:{slice_name}", "passed": True, "message": note}
+            )
             print(note)
             continue
 
@@ -297,12 +319,17 @@ def main() -> None:
         candidate_slice = candidate_slices[slice_name]
         baseline_count = float(baseline_slice.get("count", 0.0))
         candidate_count = float(candidate_slice.get("count", 0.0))
-        if baseline_count < args.min_slice_count or candidate_count < args.min_slice_count:
+        if (
+            baseline_count < args.min_slice_count
+            or candidate_count < args.min_slice_count
+        ):
             note = (
                 f"[SKIP] slice {slice_name}: count too low "
                 f"(baseline={baseline_count:.1f}, candidate={candidate_count:.1f})."
             )
-            checks.append({"scope": f"slice:{slice_name}", "passed": True, "message": note})
+            checks.append(
+                {"scope": f"slice:{slice_name}", "passed": True, "message": note}
+            )
             print(note)
             continue
 

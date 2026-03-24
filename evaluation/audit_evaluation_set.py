@@ -245,7 +245,9 @@ def main() -> None:
         else:
             no_query_cases += 1
 
-        if not (isinstance(entry.get("case_id"), str) and str(entry["case_id"]).strip()):
+        if not (
+            isinstance(entry.get("case_id"), str) and str(entry["case_id"]).strip()
+        ):
             missing_case_id.append(case_id)
         if not (
             isinstance(entry.get("distribution_bucket"), str)
@@ -295,7 +297,9 @@ def main() -> None:
         with_negative = sum(1 for row in rows if int(row["negative_count"]) > 0)
         by_bucket[bucket] = {
             "count": len(rows),
-            "avg_golden": sum(golden_counts) / len(golden_counts) if golden_counts else 0.0,
+            "avg_golden": (
+                sum(golden_counts) / len(golden_counts) if golden_counts else 0.0
+            ),
             "min_golden": min(golden_counts) if golden_counts else 0,
             "max_golden": max(golden_counts) if golden_counts else 0,
             "negative_coverage_rate": with_negative / len(rows) if rows else 0.0,
@@ -336,7 +340,9 @@ def main() -> None:
             "total_cases": len(payload),
             "query_cases": query_cases,
             "no_query_cases": no_query_cases,
-            "golden_avg": (sum(golden_sizes) / len(golden_sizes)) if golden_sizes else 0.0,
+            "golden_avg": (
+                (sum(golden_sizes) / len(golden_sizes)) if golden_sizes else 0.0
+            ),
             "golden_median": statistics.median(golden_sizes) if golden_sizes else 0.0,
             "golden_min": min(golden_sizes) if golden_sizes else 0,
             "golden_max": max(golden_sizes) if golden_sizes else 0,

@@ -21,7 +21,9 @@ GENERATED_PATTERNS = (
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Clean evaluation generated artifacts.")
+    parser = argparse.ArgumentParser(
+        description="Clean evaluation generated artifacts."
+    )
     parser.add_argument(
         "--evaluation-dir",
         default="evaluation",

@@ -85,7 +85,9 @@ def _load_debug_samples(path: Path, limit: int) -> List[Dict[str, Any]]:
     return samples
 
 
-def _resolve_default_commands(snapshot_date: str, config_path: Path) -> tuple[str, str, str]:
+def _resolve_default_commands(
+    snapshot_date: str, config_path: Path
+) -> tuple[str, str, str]:
     if shutil.which("make"):
         return f'make eval EVAL_CONFIG="{config_path}"', "make metrics", "make"
 
@@ -267,14 +269,17 @@ def main() -> None:
     output_path = (
         Path(args.output)
         if args.output
-        else Path("evaluation") / "artifacts" / "baselines" / f"baseline_{snapshot_date}.md"
+        else Path("evaluation")
+        / "artifacts"
+        / "baselines"
+        / f"baseline_{snapshot_date}.md"
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     config_path = Path(args.config)
     config = _load_evaluation_config(config_path)
 
-    default_eval_command, default_metrics_command, command_mode = _resolve_default_commands(
-        snapshot_date, config_path
+    default_eval_command, default_metrics_command, command_mode = (
+        _resolve_default_commands(snapshot_date, config_path)
     )
     eval_command = args.eval_command or default_eval_command
     metrics_command = args.metrics_command or default_metrics_command
@@ -295,9 +300,7 @@ def main() -> None:
     ]
 
     algo_version = str(
-        os.getenv("RECOMMEND_ALGO_VERSION")
-        or config.get("algo_version")
-        or "v1"
+        os.getenv("RECOMMEND_ALGO_VERSION") or config.get("algo_version") or "v1"
     )
 
     lines = [

@@ -7,6 +7,7 @@ import numpy as np
 
 from api.config import EMBED_VERSION
 
+
 def ann_candidates(
     db: Session,
     user_vec: np.ndarray,
@@ -73,3 +74,56 @@ def ann_candidates(
         ordered.append(item_id)
 
     return ordered
+
+
+def lexical_candidates(
+    db: Session,
+    query: str,
+    exclude_ids: List[int],
+    limit: int = 300,
+    allowed_ids: Sequence[int] | None = None,
+) -> List[int]:
+    """
+    Returns item_ids ordered by full-text search relevance.
+    Uses PostgreSQL websearch_to_tsquery for natural language query support.
+    """
+    if not query:
+        return []
+
+    if allowed_ids is not None and len(allowed_ids) == 0:
+        return []
+
+    # Using to_tsvector on title, overview, tagline, and keywords.
+    # We use websearch_to_tsquery for user-friendly query syntax.
+    q = text(
+        """
+        SELECT item_id
+        FROM (
+            SELECT id AS item_id,
+                   setweight(to_tsvector('english', COALESCE(title, '')), 'A') ||
+                   setweight(to_tsvector('english', COALESCE(overview, '')), 'B') ||
+                   setweight(to_tsvector('english', COALESCE(tagline, '')), 'C') ||
+                   setweight(to_tsvector('english', COALESCE(array_to_string(tmdb_keywords, ' '), '')), 'D')
+                   AS document
+            FROM items
+            WHERE NOT (id = ANY(:exclude))
+            {allowed_clause}
+        ) AS search
+        WHERE document @@ websearch_to_tsquery('english', :query)
+        ORDER BY ts_rank(document, websearch_to_tsquery('english', :query)) DESC
+        LIMIT :lim
+    """.format(
+            allowed_clause=" AND id = ANY(:allowed)" if allowed_ids is not None else ""
+        )
+    )
+
+    params = {
+        "exclude": exclude_ids or [],
+        "query": query,
+        "lim": limit,
+    }
+    if allowed_ids is not None:
+        params["allowed"] = list(allowed_ids)
+
+    rows = db.execute(q, params).fetchall()
+    return [int(row[0]) for row in rows]

@@ -45,6 +45,8 @@ def format_basic(
     title: str,
     overview: str,
     genres: List[str],
+    tagline: Optional[str] = None,
+    tmdb_keywords: Optional[List[str]] = None,
     year: Optional[int] = None,
     media_type: Optional[str] = None,
     runtime: Optional[int] = None,
@@ -68,6 +70,8 @@ def format_structured(
     title: str,
     overview: str,
     genres: List[str],
+    tagline: Optional[str] = None,
+    tmdb_keywords: Optional[List[str]] = None,
     year: Optional[int] = None,
     media_type: Optional[str] = None,
     runtime: Optional[int] = None,
@@ -98,6 +102,8 @@ def format_natural(
     title: str,
     overview: str,
     genres: List[str],
+    tagline: Optional[str] = None,
+    tmdb_keywords: Optional[List[str]] = None,
     year: Optional[int] = None,
     media_type: Optional[str] = None,
     runtime: Optional[int] = None,
@@ -114,6 +120,8 @@ def format_emphasized(
     title: str,
     overview: str,
     genres: List[str],
+    tagline: Optional[str] = None,
+    tmdb_keywords: Optional[List[str]] = None,
     year: Optional[int] = None,
     media_type: Optional[str] = None,
     runtime: Optional[int] = None,
@@ -136,6 +144,8 @@ def format_hybrid(
     title: str,
     overview: str,
     genres: List[str],
+    tagline: Optional[str] = None,
+    tmdb_keywords: Optional[List[str]] = None,
     year: Optional[int] = None,
     media_type: Optional[str] = None,
     runtime: Optional[int] = None,
@@ -158,6 +168,8 @@ def format_catalog_rich(
     title: str,
     overview: str,
     genres: List[str],
+    tagline: Optional[str] = None,
+    tmdb_keywords: Optional[List[str]] = None,
     year: Optional[int] = None,
     media_type: Optional[str] = None,
     runtime: Optional[int] = None,
@@ -165,6 +177,8 @@ def format_catalog_rich(
 ) -> str:
     """Catalog-rich format with explicit fields but concise natural text."""
     genre_text = ", ".join(genres) if genres else "None"
+    keyword_text = ", ".join(tmdb_keywords) if tmdb_keywords else "None"
+    tagline_text = f"Tagline: {tagline}" if tagline else ""
     era = _get_era(year) or "Unknown"
     decade = _get_decade(year) or "Unknown"
     media_label = (media_type or "unknown").strip() or "unknown"
@@ -173,7 +187,9 @@ def format_catalog_rich(
     return (
         f"Title: {title}\n"
         f"Media: {media_label}\n"
+        f"Tagline: {tagline_text}\n"
         f"Genres: {genre_text}\n"
+        f"Keywords: {keyword_text}\n"
         f"Era: {era}\n"
         f"Decade: {decade}\n"
         f"Runtime: {runtime_bucket}\n"
@@ -199,6 +215,7 @@ def format_with_template(template: str, item: Dict[str, Any]) -> str:
         raise ValueError(f"Unknown template: {template}")
 
     genres_list = _extract_genre_names(item.get("genres"))
+    tmdb_keywords = _extract_keyword_names(item.get("tmdb_keywords"))
     year = item.get("release_year")
 
     template_fn = TEMPLATES[template]
@@ -206,6 +223,8 @@ def format_with_template(template: str, item: Dict[str, Any]) -> str:
         title=item.get("title", ""),
         overview=item.get("overview", ""),
         genres=genres_list,
+        tagline=item.get("tagline"),
+        tmdb_keywords=tmdb_keywords,
         year=year,
         media_type=item.get("media_type"),
         runtime=item.get("runtime"),
@@ -232,3 +251,19 @@ def _extract_genre_names(raw_genres: Any) -> List[str]:
         genres_list.append(raw_genres)
 
     return genres_list
+
+
+def _extract_keyword_names(raw_keywords: Any) -> List[str]:
+    keywords_list = []
+    if isinstance(raw_keywords, list):
+        for entry in raw_keywords:
+            if isinstance(entry, dict):
+                name = entry.get("name")
+            else:
+                name = entry
+            if isinstance(name, str) and name:
+                keywords_list.append(name)
+    elif isinstance(raw_keywords, str) and raw_keywords:
+        keywords_list.append(raw_keywords)
+
+    return keywords_list

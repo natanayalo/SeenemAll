@@ -17,6 +17,7 @@ from .legacy_intent_parser import (
     parse_intent as legacy_parse_intent,
     canonical_genres,
 )
+from .query_profile import IntentSignals
 from .rewrite import Rewrite
 from api.core.prompt_eval import load_prompt_template
 
@@ -32,6 +33,9 @@ INTENT_CACHE: TTLCache[Tuple[str, str, str, str], Intent] = TTLCache(
     maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS
 )
 REWRITE_CACHE: TTLCache[str, Rewrite] = TTLCache(
+    maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS
+)
+INTENT_SIGNALS_CACHE: TTLCache[str, IntentSignals] = TTLCache(
     maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS
 )
 
@@ -75,6 +79,56 @@ class IntentFallbackRule:
 
 
 _DEFAULT_FALLBACK_RULES: Tuple[IntentFallbackRule, ...] = tuple()
+
+_SUPPORTED_MOODS = (
+    "romantic",
+    "dark",
+    "exciting",
+    "uplifting",
+    "heartwarming",
+    "light",
+    "serious",
+    "intense",
+    "action-packed",
+)
+_SUPPORTED_FACETS = (
+    "action-packed",
+    "alien",
+    "caper",
+    "cerebral",
+    "con-artist",
+    "crime",
+    "dark",
+    "detective",
+    "dragon",
+    "exciting",
+    "galaxy",
+    "gritty",
+    "heist",
+    "heroic",
+    "high concept",
+    "homicide",
+    "investigation",
+    "light",
+    "magic",
+    "mind bending",
+    "missing",
+    "mystery",
+    "noir",
+    "psychological",
+    "quest",
+    "robbery",
+    "romantic",
+    "space",
+    "street-level",
+    "superhero",
+    "temporal",
+    "thriller",
+    "time travel",
+    "uplifting",
+    "vigilante",
+    "wizard",
+)
 
 
 @lru_cache(maxsize=1)
@@ -886,50 +940,28 @@ def _is_post_apocalyptic_tv_query(text: str) -> bool:
 
 
 def _is_short_bingeable_scifi_tv_query(text: str) -> bool:
-    return _has_any_keyword(text, ("tv", "series", "show")) and _has_any_keyword(
-        text, ("sci fi", "science fiction", "space")
-    ) and _has_any_keyword(text, ("short", "bingeable", "quick"))
+    return (
+        _has_any_keyword(text, ("tv", "series", "show"))
+        and _has_any_keyword(text, ("sci fi", "science fiction", "space"))
+        and _has_any_keyword(text, ("short", "bingeable", "quick"))
+    )
 
 
 def _is_feel_good_comedy_query(text: str) -> bool:
-    return _has_any_keyword(text, ("feel good", "feel-good", "uplifting", "heartwarming")) and _has_any_keyword(
+    return _has_any_keyword(
+        text, ("feel good", "feel-good", "uplifting", "heartwarming")
+    ) and _has_any_keyword(
         text, ("comedy", "comedies", "funny", "dramedy", "dramedies")
     )
 
 
-def _is_family_pg13_adventure_movie_query(text: str) -> bool:
-    return _has_any_keyword(text, ("movie", "movies", "film", "films")) and _has_any_keyword(
-        text, ("family", "teen friendly", "teen-friendly")
-    ) and _has_any_keyword(text, ("adventure", "fantasy", "quest")) and _has_any_keyword(
-        text, ("pg13", "pg 13", "pg-13", "or below", "or lower")
-    )
-
-
-def _is_date_night_comedy_query(text: str) -> bool:
-    return _has_any_keyword(text, ("date night", "date-night", "rom com", "rom-com")) and _has_any_keyword(
-        text, ("comedy", "comedies", "romantic", "relationship", "rom com", "rom-com")
-    )
-
-
 def _is_fantasy_worlds_cross_media_query(text: str) -> bool:
-    has_cross_media = _has_any_keyword(text, ("movies and tv", "tv and movies", "films and series"))
+    has_cross_media = _has_any_keyword(
+        text, ("movies and tv", "tv and movies", "films and series")
+    )
     return has_cross_media and _has_any_keyword(
         text, ("fantasy", "magic", "kingdoms", "worlds", "quest")
     )
-
-
-def _is_serialized_prestige_tv_query(text: str) -> bool:
-    return _has_any_keyword(text, ("tv", "series", "show")) and _has_any_keyword(
-        text, ("serialized", "prestige", "high stakes", "high-stakes")
-    ) and _has_any_keyword(text, ("drama", "power struggle", "survival", "antihero"))
-
-
-def _is_kids_multilingual_adventure_query(text: str) -> bool:
-    return _has_any_keyword(text, ("kids profile", "kids", "children", "family")) and _has_any_keyword(
-        text, ("bilingual", "multilingual", "international")
-    ) and _has_any_keyword(
-        text, ("adventure", "fantasy", "quest", "magic")
-    ) and _has_any_keyword(text, ("movie", "movies", "film", "films", "tv", "series", "show"))
 
 
 def _is_epic_fantasy_tv_query(text: str) -> bool:
@@ -940,53 +972,23 @@ def _is_epic_fantasy_tv_query(text: str) -> bool:
     return (
         (has_tv_signal or has_comparison_signal)
         and "fantasy" in text
-        and _has_any_keyword(text, ("epic", "epics", "quest", "kingdom", "prophecy", "monster"))
-    )
-
-
-def _is_caper_crime_tv_query(text: str) -> bool:
-    return _has_any_keyword(text, ("tv", "series", "show")) and "crime" in text and _has_any_keyword(
-        text,
-        (
-            "short episode",
-            "short episodes",
-            "heist",
-            "caper",
-            "con artist",
-            "con artists",
-            "thief",
-            "thieves",
-            "grifter",
-            "robbery",
-        ),
-    )
-
-
-def _is_heist_tv_query(text: str) -> bool:
-    return _has_any_keyword(text, ("tv", "series", "show")) and _has_any_keyword(
-        text,
-        (
-            "heist",
-            "caper",
-            "con artist",
-            "con artists",
-            "conman",
-            "grifter",
-            "thief",
-            "thieves",
-            "robbery",
-            "robber",
-        ),
+        and _has_any_keyword(
+            text, ("epic", "epics", "quest", "kingdom", "prophecy", "monster")
+        )
     )
 
 
 def _is_noir_movie_query(text: str) -> bool:
-    return _has_any_keyword(text, ("noir", "neo noir", "neo-noir", "film noir")) and (
-        _has_any_keyword(text, ("movie", "movies", "film", "films"))
-        or _has_any_keyword(text, ("city", "cities", "urban", "modern"))
-    ) and _has_any_keyword(
-        text,
-        ("crime", "mystery", "mysteries", "thriller", "detective", "investigation"),
+    return (
+        _has_any_keyword(text, ("noir", "neo noir", "neo-noir", "film noir"))
+        and (
+            _has_any_keyword(text, ("movie", "movies", "film", "films"))
+            or _has_any_keyword(text, ("city", "cities", "urban", "modern"))
+        )
+        and _has_any_keyword(
+            text,
+            ("crime", "mystery", "mysteries", "thriller", "detective", "investigation"),
+        )
     )
 
 
@@ -1022,14 +1024,14 @@ def _is_temporal_thriller_query(text: str) -> bool:
 def _is_high_concept_thriller_query(text: str) -> bool:
     return _has_any_keyword(
         text, ("high concept", "brainy", "cerebral", "mind bending", "mind-bending")
-    ) and _has_any_keyword(text, ("thriller", "thrillers", "movie", "movies", "film", "films"))
+    ) and _has_any_keyword(
+        text, ("thriller", "thrillers", "movie", "movies", "film", "films")
+    )
 
 
 def _heuristic_rewrite(normalized_query: str) -> Optional[str]:
     """Fallback heuristics for common queries when LLM intent is unavailable."""
     normalized = _normalize_query_text(normalized_query)
-    caper_crime_tv_signal = _is_caper_crime_tv_query(normalized)
-    heist_tv_signal = _is_heist_tv_query(normalized)
     international_crime_signal = (
         "crime" in normalized
         and any(
@@ -1054,7 +1056,13 @@ def _heuristic_rewrite(normalized_query: str) -> Optional[str]:
         and any(keyword in normalized for keyword in ("superhero", "vigilante"))
         and any(
             keyword in normalized
-            for keyword in ("street level", "street-level", "gritty", "grounded", "urban")
+            for keyword in (
+                "street level",
+                "street-level",
+                "gritty",
+                "grounded",
+                "urban",
+            )
         )
     )
     anime_scifi_movie_signal = (
@@ -1074,10 +1082,10 @@ def _heuristic_rewrite(normalized_query: str) -> Optional[str]:
             )
         )
     )
-    noir_movie_signal = _is_noir_movie_query(normalized)
-    temporal_signal = _is_temporal_thriller_query(normalized)
-    high_concept_thriller_signal = _is_high_concept_thriller_query(normalized)
-    thriller_signal = _has_any_keyword(
+    _is_noir_movie_query(normalized)
+    _is_temporal_thriller_query(normalized)
+    _is_high_concept_thriller_query(normalized)
+    _has_any_keyword(
         normalized,
         (
             "thriller",
@@ -1090,45 +1098,30 @@ def _heuristic_rewrite(normalized_query: str) -> Optional[str]:
             "twisty",
         ),
     )
-    optimistic_scifi_tv_signal = (
-        any(keyword in normalized for keyword in ("tv", "series", "show"))
-        and (
-            "space opera" in normalized
-            or (
-                any(
-                    keyword in normalized
-                    for keyword in ("sci fi", "science fiction", "space")
-                )
-                and any(
-                    keyword in normalized
-                    for keyword in (
-                        "optimistic",
-                        "hopeful",
-                        "uplifting",
-                        "adventure",
-                        "crew",
-                        "starship",
-                        "exploration",
-                        "not too dark",
-                    )
+    any(keyword in normalized for keyword in ("tv", "series", "show")) and (
+        "space opera" in normalized
+        or (
+            any(
+                keyword in normalized
+                for keyword in ("sci fi", "science fiction", "space")
+            )
+            and any(
+                keyword in normalized
+                for keyword in (
+                    "optimistic",
+                    "hopeful",
+                    "uplifting",
+                    "adventure",
+                    "crew",
+                    "starship",
+                    "exploration",
+                    "not too dark",
                 )
             )
         )
     )
     fantasy_epic_tv_signal = _is_epic_fantasy_tv_query(normalized)
 
-    if high_concept_thriller_signal and temporal_signal:
-        return "cerebral science fiction temporal paradox mystery thriller movies"
-    if temporal_signal and thriller_signal:
-        if "short" in normalized:
-            return "short temporal twisty thriller movies"
-        return "temporal paradox time loop thriller movies"
-    if high_concept_thriller_signal and "short" in normalized:
-        return "short temporal twisty thriller movies"
-    if caper_crime_tv_signal:
-        return "crime caper heist con artist tv series"
-    if heist_tv_signal:
-        return "crime caper heist con artist tv series"
     if international_crime_signal:
         return "international european crime heist thriller movies tv series"
     if street_level_superhero_signal:
@@ -1136,13 +1129,11 @@ def _heuristic_rewrite(normalized_query: str) -> Optional[str]:
     if anime_scifi_movie_signal:
         return "anime cyberpunk mecha science fiction movies"
     if noir_movie_signal:
-        if any(keyword in normalized for keyword in ("city", "cities", "urban", "modern")):
+        if any(
+            keyword in normalized for keyword in ("city", "cities", "urban", "modern")
+        ):
             return "urban noir mystery thriller movies modern city"
         return "urban noir crime mystery thriller movies"
-    if optimistic_scifi_tv_signal:
-        return "optimistic space crew adventure sci fi tv"
-    if _is_kids_multilingual_adventure_query(normalized):
-        return "family animation fantasy adventure kids movies tv multilingual"
     if _is_fantasy_worlds_cross_media_query(normalized):
         return "fantasy magic adventure kingdoms movies tv"
     if fantasy_epic_tv_signal:
@@ -1156,18 +1147,8 @@ def _heuristic_rewrite(normalized_query: str) -> Optional[str]:
         if _has_any_keyword(normalized, ("dramedy", "heartwarming", "uplifting")):
             return "heartwarming uplifting comedy drama movies"
         return "feel-good uplifting short comedy movies"
-    if "space opera" in normalized:
-        return "optimistic space exploration adventure tv series"
-    if _is_family_pg13_adventure_movie_query(normalized):
-        return "family fantasy quest adventure movies pg13"
-    if _is_date_night_comedy_query(normalized):
-        return "romantic feel good comedy relationship movies"
     if _has_any_keyword(normalized, ("rom com", "rom-com")):
         return "romantic comedy films from the 2000s"
-    if _is_epic_fantasy_tv_query(normalized):
-        return "high fantasy epic quest tv series"
-    if _is_serialized_prestige_tv_query(normalized):
-        return "dark prestige fantasy apocalypse antihero political tv series"
     return None
 
 
@@ -1245,6 +1226,359 @@ def _increment_metric(name: str) -> Dict[str, int]:
     with METRICS_LOCK:
         CACHE_METRICS[name] += 1
         return dict(CACHE_METRICS)
+
+
+def _build_intent_signals_prompt(
+    query: str, intent: Optional[Intent] = None
+) -> Tuple[str, str]:
+    """
+    Builds system and user prompts for extracting intent signals.
+    Returns (system_prompt, user_prompt).
+    """
+    system_prompt = """You are an expert movie recommendation system that extracts semantic intent signals from user queries.
+Your task is to understand what the user is looking for and extract structured signals that are robust to paraphrasing and synonyms.
+
+Key principles:
+1. Extract emotional tone (mood) from the query, not query keywords. "feel-good" and "uplifting" should both → mood="romantic".
+2. Extract semantic concepts (facets) like crime-related themes, not keywords. "heist", "robbery", "caper" should all → same facets.
+3. Prestige indicator: Extract from query intent about awards/quality, NOT from keywords like "oscar" (that's brittle).
+4. Quality mode: "high_quality" if seeking award-winners or critically acclaimed, "newest" if seeking recent, "trending" if viral/popular.
+5. Temporal preference: "recent" (last 5 years), "classic" (pre-2015), "timeless" (all eras), or null if unspecified.
+
+Example transformations:
+- "feel-good movies" → mood="uplifting", quality_mode="high_quality"
+- "dark heist thriller" → mood="dark", semantic_facets=["heist", "crime"], intent_type="exploration"
+- "oscar-winning dramas" → prestige_indicator=true, mood=null, quality_mode="high_quality"
+- "new sci-fi series" → temporal_preference="recent", semantic_facets=["sci-fi"], intent_type="discovery"
+
+Respond with valid JSON only. No explanation or markdown."""
+
+    # Build user prompt with examples
+    genre_hint = ""
+    if intent and intent.include_genres:
+        genre_hint = f"\nDetected genres: {', '.join(intent.include_genres[:5])}"
+
+    user_prompt = f"""Extract intent signals from this query:{genre_hint}
+
+Query: "{query}"
+
+Respond with JSON containing these fields (all optional):
+{{
+  "mood": "Choose one from: {', '.join(_SUPPORTED_MOODS)} or null",
+  "intent_type": "discovery|specific_title|exploration|comfort|challenge or null",
+  "semantic_facets": "List of semantic concepts from: {', '.join(_SUPPORTED_FACETS)}",
+  "prestige_indicator": true/false,
+  "quality_mode": "high_quality|newest|trending or null",
+  "temporal_preference": "recent|classic|timeless or null"
+}}"""
+
+    return system_prompt, user_prompt
+
+
+def _extract_intent_signals_from_llm(
+    settings: IntentParserSettings,
+    query: str,
+    intent: Optional[Intent] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Calls LLM to extract intent signals. Returns dict or None on failure.
+    """
+    if not settings.enabled or not settings.api_key:
+        return None
+
+    try:
+        system_prompt, user_prompt = _build_intent_signals_prompt(query, intent)
+
+        if settings.provider == "openai":
+            headers = {
+                "Authorization": f"Bearer {settings.api_key}",
+                "Content-Type": "application/json",
+            }
+            project = os.getenv("OPENAI_PROJECT")
+            if project:
+                headers["OpenAI-Project"] = project
+
+            payload = {
+                "model": settings.model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": 0.3,
+                "response_format": {"type": "json_object"},
+                "max_tokens": 256,
+            }
+
+            with httpx.Client(timeout=settings.timeout) as client:
+                response = client.post(settings.endpoint, headers=headers, json=payload)
+                response.raise_for_status()
+                rdata = response.json()
+                content = (
+                    rdata.get("choices", [{}])[0].get("message", {}).get("content", "")
+                )
+                if content:
+                    return json.loads(content)
+
+        elif settings.provider == "gemini":
+            payload = {
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": user_prompt}],
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.3,
+                    "responseMimeType": "application/json",
+                    "maxOutputTokens": 256,
+                },
+                "systemInstruction": {
+                    "role": "system",
+                    "parts": [{"text": system_prompt}],
+                },
+            }
+
+            url = f"{settings.endpoint}/generateContent?key={settings.api_key}"
+            with httpx.Client(timeout=settings.timeout) as client:
+                response = client.post(url, json=payload)
+                response.raise_for_status()
+                rdata = response.json()
+                content = (
+                    rdata.get("candidates", [{}])[0]
+                    .get("content", {})
+                    .get("parts", [{}])[0]
+                    .get("text", "")
+                )
+                if content:
+                    return json.loads(content)
+
+    except Exception as exc:
+        logger.debug("Failed to extract intent signals from LLM: %s", exc)
+
+    return None
+
+
+def _heuristic_intent_signals(query: str) -> IntentSignals:
+    """Fallback heuristics to populate IntentSignals when LLM is unavailable."""
+    normalized = _normalize_query_text(query)
+
+    mood = None
+    facets = []
+    prestige_indicator = False
+    quality_mode = None
+    temporal_preference = None
+
+    # 1. Mood
+    if _has_any_keyword(
+        normalized,
+        (
+            "romance",
+            "romantic",
+            "love",
+            "date night",
+            "feel good",
+            "feel-good",
+            "uplifting",
+            "heartwarming",
+            "light",
+        ),
+    ):
+        mood = "romantic"
+    elif _has_any_keyword(normalized, ("dark", "gritty", "serious", "intense")):
+        mood = "dark"
+    elif _has_any_keyword(
+        normalized, ("exciting", "action packed", "action-packed", "fast paced")
+    ):
+        mood = "exciting"
+
+    # 2. Semantic Facets
+    # Crime/Heist
+    if _has_any_keyword(
+        normalized,
+        (
+            "heist",
+            "robbery",
+            "caper",
+            "con artist",
+            "con-artist",
+            "conman",
+            "grifter",
+            "mastermind",
+        ),
+    ):
+        facets.extend(["heist", "caper"])
+    if _has_any_keyword(normalized, ("noir", "neo noir", "neo-noir")):
+        facets.append("noir")
+    if "mystery" in normalized:
+        facets.append("mystery")
+    if "detective" in normalized:
+        facets.append("detective")
+    if "crime" in normalized:
+        facets.append("crime")
+    if _has_any_keyword(normalized, ("investigation", "homicide", "murder", "missing")):
+        facets.append("investigation")
+
+    # Thriller
+    if "thriller" in normalized:
+        facets.append("thriller")
+    if "psychological" in normalized:
+        facets.append("psychological")
+    if _has_any_keyword(
+        normalized,
+        (
+            "time travel",
+            "time traveling",
+            "time loop",
+            "temporal",
+            "paradox",
+            "timeline",
+        ),
+    ):
+        facets.extend(["time travel", "temporal"])
+    if _has_any_keyword(
+        normalized,
+        (
+            "high concept",
+            "brainy",
+            "cerebral",
+            "mind bending",
+            "mind-bending",
+            "twisty",
+        ),
+    ):
+        facets.extend(["high concept", "cerebral", "mind bending"])
+
+    # Superhero
+    if "superhero" in normalized:
+        facets.append("superhero")
+    if "vigilante" in normalized:
+        facets.append("vigilante")
+    if _has_any_keyword(normalized, ("street level", "street-level")):
+        facets.append("street-level")
+    if "gritty" in normalized:
+        facets.append("gritty")
+
+    # Audience/Fantasy
+    for keyword in (
+        "quest",
+        "magic",
+        "wizard",
+        "galaxy",
+        "space",
+        "alien",
+        "dragon",
+        "heroic",
+    ):
+        if keyword in normalized:
+            facets.append(keyword)
+
+    # 3. Prestige
+    if _has_any_keyword(
+        normalized,
+        ("oscar", "academy", "award", "acclaimed", "critics", "masterpiece", "best"),
+    ):
+        prestige_indicator = True
+        quality_mode = "high_quality"
+
+    # 4. Temporal
+    if _has_any_keyword(
+        normalized, ("new", "recent", "latest", "2024", "2025", "2026")
+    ):
+        temporal_preference = "recent"
+    elif _has_any_keyword(normalized, ("classic", "old", "80s", "90s", "70s")):
+        temporal_preference = "classic"
+
+    return IntentSignals(
+        mood=mood,
+        semantic_facets=tuple(facets),
+        prestige_indicator=prestige_indicator,
+        quality_mode=quality_mode,
+        temporal_preference=temporal_preference,
+    )
+
+
+def _default_intent_signals() -> IntentSignals:
+    """Return default (empty) intent signals."""
+    return IntentSignals()
+
+
+def extract_intent_signals(
+    query: str,
+    intent: Optional[Intent] = None,
+) -> IntentSignals:
+    """
+    Extracts LLM-driven intent signals from a query.
+    Robust to paraphrasing and synonym variations.
+    Results cached for 5 minutes.
+
+    Args:
+        query: User's query text
+        intent: Optional pre-parsed Intent object (from parse_intent)
+
+    Returns:
+        IntentSignals with mood, facets, prestige_indicator, etc.
+        Falls back to default (empty) signals if LLM fails or is disabled.
+    """
+    normalized_query = (query or "").strip().lower()
+    if not normalized_query:
+        return _default_intent_signals()
+
+    cache_key = f"signals:{hashlib.sha256(normalized_query.encode()).hexdigest()}"
+
+    # Check cache
+    cached_signals = INTENT_SIGNALS_CACHE.get(cache_key)
+    if cached_signals is not None:
+        logger.debug("Intent signals cache hit for query '%s'", query)
+        return cached_signals
+
+    settings = _get_settings()
+
+    logger.debug(
+        "Extracting intent signals for query '%s' (provider=%s, enabled=%s)",
+        query,
+        settings.provider,
+        settings.enabled,
+    )
+
+    # Try LLM extraction
+    llm_output = _extract_intent_signals_from_llm(settings, query, intent)
+
+    if not llm_output:
+        logger.debug("LLM intent signals extraction failed; falling back to heuristics")
+        signals = _heuristic_intent_signals(query)
+        INTENT_SIGNALS_CACHE[cache_key] = signals
+        return signals
+
+    # Parse extracted signals
+    try:
+        signals_dict = {
+            "mood": llm_output.get("mood") or None,
+            "intent_type": llm_output.get("intent_type") or None,
+            "semantic_facets": tuple(
+                f.lower().strip()
+                for f in (llm_output.get("semantic_facets") or [])
+                if isinstance(f, str) and f.strip()
+            ),
+            "prestige_indicator": bool(llm_output.get("prestige_indicator", False)),
+            "quality_mode": llm_output.get("quality_mode") or None,
+            "temporal_preference": llm_output.get("temporal_preference") or None,
+        }
+        signals = IntentSignals(**signals_dict)
+        logger.debug(
+            "Extracted intent signals: mood=%s, facets=%s, prestige=%s",
+            signals.mood,
+            signals.semantic_facets,
+            signals.prestige_indicator,
+        )
+    except Exception as exc:
+        logger.debug(
+            "Failed to construct IntentSignals from LLM output: %s. Using default.",
+            exc,
+        )
+        signals = _default_intent_signals()
+
+    INTENT_SIGNALS_CACHE[cache_key] = signals
+    return signals
 
 
 def _snapshot_metrics() -> Dict[str, int]:
