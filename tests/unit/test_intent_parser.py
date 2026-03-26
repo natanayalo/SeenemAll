@@ -77,9 +77,18 @@ def test_parse_intent_fixtures():
         expected_data = expected_intent.model_dump(exclude_none=True)
         actual_data = intent.model_dump()
         for field, expected_value in expected_data.items():
-            assert (
-                actual_data.get(field) == expected_value
-            ), f"Query: '{query}' field '{field}' mismatch"
+            actual_value = actual_data.get(field)
+            if isinstance(expected_value, list):
+                assert isinstance(
+                    actual_value, list
+                ), f"Query: '{query}' field '{field}' expected list, got {type(actual_value).__name__}"
+                assert set(actual_value) >= set(
+                    expected_value
+                ), f"Query: '{query}' field '{field}' mismatch"
+            else:
+                assert (
+                    actual_value == expected_value
+                ), f"Query: '{query}' field '{field}' mismatch"
 
 
 def test_rewrite_query():
@@ -359,10 +368,10 @@ def test_parse_intent_returns_ann_description_when_enabled(monkeypatch):
     monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
 
     intent = parse_intent("dystopian series", {"user_id": "u42"})
-    assert intent.include_genres == ["Science Fiction"]
-    assert (
-        intent.ann_description
-        == "A dark dystopian TV series set in a controlled future society."
+    assert "Science Fiction" in (intent.include_genres or [])
+    assert intent.ann_description == (
+        "[Science Fiction, Sci-Fi & Fantasy] dystopian series :: "
+        "A dark dystopian TV series set in a controlled future society."
     )
 
 

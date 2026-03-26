@@ -15,6 +15,7 @@ from api.config import (
 from api.db.models import Availability, Item
 from api.db.session import get_engine, get_sessionmaker
 from etl.justwatch_client import JustWatchClient, flatten_offers
+from tqdm.auto import tqdm
 
 CONCURRENCY = 6
 CHUNK_SIZE = 25
@@ -177,9 +178,16 @@ async def _sync_availability(
         with SessionLocal() as db:
             items = _fetch_catalog_items(db, limit)
 
-        total_processed = 0
         total_updated = 0
-        for idx in range(0, len(items), CHUNK_SIZE):
+        chunk_indices = range(0, len(items), CHUNK_SIZE)
+        progress = tqdm(
+            chunk_indices,
+            desc="JustWatch sync",
+            unit="chunk",
+            total=(len(items) + CHUNK_SIZE - 1) // CHUNK_SIZE,
+            leave=False,
+        )
+        for idx in progress:
             chunk = items[idx : idx + CHUNK_SIZE]
             responses = await _fetch_chunk(client, chunk)
 
@@ -196,11 +204,8 @@ async def _sync_availability(
                     total_updated += len(prepared)
                     _replace_availability(db, row.item_id, country, prepared)
                 db.commit()
-            total_processed += len(chunk)
-            print(
-                f"[justwatch] processed {total_processed} titles "
-                f"(updated {total_updated} offers so far)"
-            )
+            progress.set_postfix(updated=total_updated)
+        progress.close()
     finally:
         await client.aclose()
 

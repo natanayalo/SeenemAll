@@ -888,6 +888,37 @@ def _execute_small_rerank(
         return []
 
     scored.sort(key=lambda entry: (-entry[1], entry[2]))
+    if logger.isEnabledFor(logging.DEBUG):
+        id_to_title: Dict[int, str] = {}
+        for item in items:
+            ident = item.get("id")
+            if isinstance(ident, int):
+                title = str(item.get("title") or item.get("name") or "")
+                id_to_title[ident] = title
+        debug_sample = [
+            {
+                "id": item_id,
+                "title": id_to_title.get(item_id, ""),
+                "score": round(score, 4),
+                "base_rank": base_rank,
+            }
+            for item_id, score, base_rank in scored[: min(20, len(scored))]
+        ]
+        highlights = [
+            {
+                "id": item_id,
+                "title": id_to_title.get(item_id, ""),
+                "score": round(score, 4),
+                "base_rank": base_rank,
+            }
+            for item_id, score, base_rank in scored
+            if base_rank < 10
+        ]
+        logger.debug(
+            "Small reranker scored candidates | sample=%s | base_top=%s",
+            debug_sample,
+            highlights,
+        )
     trimmed = scored[:limit]
     return [(item_id, score) for item_id, score, _ in trimmed]
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 from typing import List, Dict, Any, Optional, cast
 import logging
+from tqdm.auto import tqdm
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from api.db.session import get_engine, get_sessionmaker
@@ -92,6 +93,141 @@ def _extract_maturity_rating(media_type: str, data: Dict[str, Any]) -> Optional[
     return None
 
 
+def _safe_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _safe_int(value: Any) -> Optional[int]:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_cast(
+    data: Dict[str, Any], limit: int = 5
+) -> Optional[List[Dict[str, Any]]]:
+    credits = data.get("credits") or {}
+    raw_cast = credits.get("cast") or []
+    if not isinstance(raw_cast, list):
+        return None
+
+    def sort_key(entry: Dict[str, Any]):
+        order = entry.get("order")
+        order = order if isinstance(order, int) else 10_000
+        return (order, -_safe_float(entry.get("popularity")))
+
+    cast_members: List[Dict[str, Any]] = []
+    seen_ids: set[int] = set()
+    for entry in sorted(raw_cast, key=sort_key):
+        person_id = _safe_int(entry.get("id"))
+        name = entry.get("name")
+        if person_id is None or not name:
+            continue
+        if person_id in seen_ids:
+            continue
+        cast_members.append(
+            {
+                "id": person_id,
+                "name": name,
+                "character": entry.get("character"),
+                "order": entry.get("order"),
+            }
+        )
+        seen_ids.add(person_id)
+        if len(cast_members) >= limit:
+            break
+    return cast_members or None
+
+
+def _filter_crew(
+    data: Dict[str, Any],
+    *,
+    jobs: set[str],
+    departments: set[str],
+    limit: int,
+) -> Optional[List[Dict[str, Any]]]:
+    credits = data.get("credits") or {}
+    raw_crew = credits.get("crew") or []
+    if not isinstance(raw_crew, list):
+        return None
+
+    def matches(entry: Dict[str, Any]) -> bool:
+        job = entry.get("job")
+        department = entry.get("department")
+        job_match = job in jobs if jobs else False
+        dept_match = department in departments if departments else False
+        return job_match or dept_match
+
+    def sort_key(entry: Dict[str, Any]):
+        order = entry.get("order")
+        order = order if isinstance(order, int) else 10_000
+        return (order, -_safe_float(entry.get("popularity")))
+
+    selected: List[Dict[str, Any]] = []
+    seen_ids: set[int] = set()
+    for entry in sorted(raw_crew, key=sort_key):
+        if not matches(entry):
+            continue
+        person_id = _safe_int(entry.get("id"))
+        name = entry.get("name")
+        if person_id is None or not name or person_id in seen_ids:
+            continue
+        selected.append(
+            {
+                "id": person_id,
+                "name": name,
+                "job": entry.get("job"),
+                "department": entry.get("department"),
+            }
+        )
+        seen_ids.add(person_id)
+        if len(selected) >= limit:
+            break
+    return selected or None
+
+
+def _extract_keywords(
+    data: Dict[str, Any], limit: int = 30
+) -> Optional[List[Dict[str, Any]]]:
+    payload = data.get("keywords") or {}
+    if isinstance(payload, dict):
+        raw_keywords = payload.get("keywords") or payload.get("results") or []
+    else:
+        raw_keywords = []
+    if not isinstance(raw_keywords, list):
+        return None
+    keywords: List[Dict[str, Any]] = []
+    seen_ids: set[int] = set()
+    for entry in raw_keywords:
+        keyword_id = _safe_int(entry.get("id"))
+        name = entry.get("name")
+        if keyword_id is None or not name or keyword_id in seen_ids:
+            continue
+        keywords.append({"id": keyword_id, "name": name})
+        seen_ids.add(keyword_id)
+        if len(keywords) >= limit:
+            break
+    return keywords or None
+
+
+def _extract_spoken_languages(data: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+    payload = data.get("spoken_languages") or []
+    if not isinstance(payload, list):
+        return None
+    languages: List[Dict[str, Any]] = []
+    for entry in payload:
+        code = entry.get("iso_639_1")
+        name = entry.get("english_name") or entry.get("name")
+        if not code and not name:
+            continue
+        languages.append({"iso_639_1": code, "name": name})
+    return languages or None
+
+
 def map_item_payload(d: Dict[str, Any]) -> Dict[str, Any]:
     media_type = d.get("media_type") or ("tv" if "name" in d else "movie")
     title = d.get("title") or d.get("name")
@@ -141,6 +277,42 @@ def map_item_payload(d: Dict[str, Any]) -> Dict[str, Any]:
         collection_id = collection.get("id")
         collection_name = collection.get("name")
 
+    cast_members = _extract_cast(d, limit=5)
+    directors = _filter_crew(
+        d,
+        jobs={"Director", "Co-Director"},
+        departments={"Directing"},
+        limit=2,
+    )
+    producers = _filter_crew(
+        d,
+        jobs={
+            "Producer",
+            "Executive Producer",
+            "Co-Producer",
+            "Associate Producer",
+            "Line Producer",
+        },
+        departments={"Production"},
+        limit=2,
+    )
+    writers = _filter_crew(
+        d,
+        jobs={
+            "Writer",
+            "Screenplay",
+            "Story",
+            "Author",
+            "Teleplay",
+            "Adaptation",
+            "Novel",
+        },
+        departments={"Writing"},
+        limit=2,
+    )
+    keywords = _extract_keywords(d)
+    spoken_languages = _extract_spoken_languages(d)
+
     return dict(
         tmdb_id=int(d["id"]),
         media_type=media_type,
@@ -160,6 +332,12 @@ def map_item_payload(d: Dict[str, Any]) -> Dict[str, Any]:
         popular_rank=list_ranks.get("popular_rank"),
         trending_rank=list_ranks.get("trending_rank"),
         top_rated_rank=list_ranks.get("top_rated_rank"),
+        cast=cast_members,
+        directors=directors,
+        producers=producers,
+        writers=writers,
+        keywords=keywords,
+        spoken_languages=spoken_languages,
     )
 
 
@@ -212,7 +390,15 @@ async def _fetch_and_upsert(sessionmaker, pages: int):
 
         # Fetch details concurrently in batches
         BATCH = 20
-        for i in range(0, len(candidate_ids), BATCH):
+        batch_indices = range(0, len(candidate_ids), BATCH)
+        progress = tqdm(
+            batch_indices,
+            desc="TMDB sync",
+            unit="batch",
+            total=(len(candidate_ids) + BATCH - 1) // BATCH,
+            leave=False,
+        )
+        for i in progress:
             batch = candidate_ids[i : i + BATCH]
             details_list = await asyncio.gather(
                 *[client.details(m, tid) for (m, tid) in batch],
@@ -233,11 +419,7 @@ async def _fetch_and_upsert(sessionmaker, pages: int):
             with SessionLocal as db:
                 _upsert_items(db, enriched)
                 db.commit()
-            logger.info(
-                "Processed batch %d/%d.",
-                (i // BATCH) + 1,
-                (len(candidate_ids) + BATCH - 1) // BATCH,
-            )
+        progress.close()
         logger.info("TMDB sync completed successfully.")
     finally:
         await client.aclose()
@@ -248,20 +430,17 @@ def _upsert_items(db: Session, items: List[Dict[str, Any]]):
     ids = [int(x["id"]) for x in items if "id" in x]
     if not ids:
         return
-    existing = set(
-        [
-            row[0]
-            for row in db.execute(
-                select(Item.tmdb_id).where(Item.tmdb_id.in_(ids))
-            ).all()
-        ]
-    )
+    result = db.execute(
+        select(Item.tmdb_id, Item.media_type).where(Item.tmdb_id.in_(ids))
+    ).all()
+    existing = {(row.tmdb_id, row.media_type) for row in result}
     to_insert = []
     to_update = []
 
     for d in items:
         mapped = map_item_payload(d)
-        if mapped["tmdb_id"] in existing:
+        key = (mapped["tmdb_id"], mapped["media_type"])
+        if key in existing:
             to_update.append(mapped)
         else:
             to_insert.append(mapped)
@@ -271,10 +450,18 @@ def _upsert_items(db: Session, items: List[Dict[str, Any]]):
 
     for u in to_update:
         db.execute(
-            select(Item).where(Item.tmdb_id == u["tmdb_id"])
-        )  # touch to ensure table exists (paranoia)
-
-        db.query(Item).filter(Item.tmdb_id == u["tmdb_id"]).update(u)
+            select(Item).where(
+                Item.tmdb_id == u["tmdb_id"], Item.media_type == u["media_type"]
+            )
+        )
+        (
+            db.query(Item)
+            .filter(
+                Item.tmdb_id == u["tmdb_id"],
+                Item.media_type == u["media_type"],
+            )
+            .update(u)
+        )
 
 
 def run(pages: int = TMDB_PAGE_LIMIT):

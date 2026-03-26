@@ -24,11 +24,12 @@ class Base(DeclarativeBase):
 
 class Item(Base):
     __tablename__ = "items"
+    __table_args__ = (
+        UniqueConstraint("tmdb_id", "media_type", name="uq_items_tmdb_media_type"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    tmdb_id: Mapped[int] = mapped_column(
-        Integer, unique=True, index=True, nullable=False
-    )
+    tmdb_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     media_type: Mapped[str] = mapped_column(
         String(10), nullable=False
     )  # 'movie' or 'tv'
@@ -52,6 +53,12 @@ class Item(Base):
     popular_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     trending_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     top_rated_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    cast: Mapped[Optional[List[dict]]] = mapped_column(JSON, nullable=True)
+    directors: Mapped[Optional[List[dict]]] = mapped_column(JSON, nullable=True)
+    producers: Mapped[Optional[List[dict]]] = mapped_column(JSON, nullable=True)
+    writers: Mapped[Optional[List[dict]]] = mapped_column(JSON, nullable=True)
+    keywords: Mapped[Optional[List[dict]]] = mapped_column(JSON, nullable=True)
+    spoken_languages: Mapped[Optional[List[dict]]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -131,3 +138,13 @@ class Feedback(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+
+class CatalogMetadata(Base):
+    __tablename__ = "catalog_metadata"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    data: Mapped[dict] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

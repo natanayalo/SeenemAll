@@ -1,7 +1,8 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes.health import router as health_router
@@ -11,6 +12,7 @@ from api.routes.recommend import router as recommend_router
 from api.routes.watch import router as watch_router
 from api.routes.feedback import router as feedback_router
 from api.config import TMDB_API_KEY
+from api.security import require_api_key
 from api.core.entity_linker import EntityLinker
 from api.core.logger import RequestIdMiddleware
 from etl.tmdb_client import TMDBClient
@@ -46,10 +48,15 @@ async def app_lifespan(app: FastAPI):
 
 app = FastAPI(title="Seen'emAll", version="0.1.0", lifespan=app_lifespan)
 
+_cors_origins_raw = (os.getenv("CORS_ALLOW_ORIGINS") or "http://localhost:3000").strip()
+_cors_allow_origins = [
+    origin.strip() for origin in _cors_origins_raw.split(",") if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_allow_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -61,10 +68,11 @@ app.add_middleware(RequestIdMiddleware)
 app.include_router(health_router, prefix="")
 app.include_router(
     user_router,
+    dependencies=[Depends(require_api_key)],
 )
-app.include_router(recommend_router)
-app.include_router(watch_router)
-app.include_router(feedback_router)
+app.include_router(recommend_router, dependencies=[Depends(require_api_key)])
+app.include_router(watch_router, dependencies=[Depends(require_api_key)])
+app.include_router(feedback_router, dependencies=[Depends(require_api_key)])
 
 
 def _initialise_application(app: FastAPI) -> None:

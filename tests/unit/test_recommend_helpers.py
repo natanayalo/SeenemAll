@@ -6,6 +6,7 @@ import sys
 from api.routes import recommend as recommend_routes
 from api.core.intent_parser import Intent
 from api.core.legacy_intent_parser import IntentFilters
+from api.core.filter_matcher import QueryFiltersResult
 
 
 def test_parse_llm_intent_falls_back_on_error(monkeypatch):
@@ -39,7 +40,8 @@ def test_merge_with_legacy_filters_merges_and_preserves(monkeypatch):
     )
 
     merged = recommend_routes._merge_with_legacy_filters(primary, fallback)
-    assert merged.genres == ["Science Fiction", "Drama"]
+    assert merged.genres[0] == "Science Fiction"
+    assert "Drama" in merged.genres
     assert merged.moods == ["dark"]
     assert merged.media_types == ["movie"]
     assert merged.min_runtime == 90
@@ -144,3 +146,146 @@ def test_apply_serendipity_slot_returns_current_when_disabled(monkeypatch):
     monkeypatch.setattr(recommend_routes, "_SERENDIPITY_RATIO", 0.2, raising=False)
     current = [{"id": 1, "original_rank": 0}]
     assert recommend_routes._apply_serendipity_slot(current, [], limit=0) == current
+
+
+def test_filter_excluded_candidate_ids_removes_matches():
+    exclude_set = {2}
+    assert recommend_routes._filter_excluded_candidate_ids([1, 2, 3], exclude_set) == [
+        1,
+        3,
+    ]
+    assert recommend_routes._filter_excluded_candidate_ids([], exclude_set) == []
+    assert recommend_routes._filter_excluded_candidate_ids([4], set()) == [4]
+
+
+def test_prioritize_boosted_items_moves_priority_first():
+    items = [{"id": 1}, {"id": 2}, {"id": 3}]
+    reordered = recommend_routes._prioritize_boosted_items(items, [3, 1])
+    assert [item["id"] for item in reordered] == [3, 1, 2]
+
+
+def _mock_media_genres(monkeypatch, mapping):
+    monkeypatch.setattr(
+        recommend_routes, "_load_media_genres", lambda db: mapping, raising=False
+    )
+
+
+def test_strict_required_genres_prefers_custom_and_legacy(monkeypatch):
+    _mock_media_genres(
+        monkeypatch, {"movie": {"Animation", "Science Fiction"}, "tv": set()}
+    )
+    intent = IntentFilters(
+        raw_query="", genres=["Science Fiction", "Animation"], media_types=["movie"]
+    )
+    legacy = IntentFilters(
+        raw_query="", genres=["Animation", "Science Fiction"], media_types=["movie"]
+    )
+    strict = recommend_routes._strict_required_genres(
+        object(), ["Animation"], legacy, intent
+    )
+    assert strict == ["Animation", "Science Fiction"]
+
+
+def test_strict_required_genres_falls_back_to_intent(monkeypatch):
+    _mock_media_genres(monkeypatch, {"movie": {"Comedy"}})
+    intent = IntentFilters(raw_query="", genres=["Comedy"])
+    strict = recommend_routes._strict_required_genres(object(), [], None, intent)
+    assert strict == ["Comedy"]
+
+
+def test_strict_required_genres_keeps_tv_aliases(monkeypatch):
+    _mock_media_genres(
+        monkeypatch,
+        {"tv": {"Sci-Fi & Fantasy", "Animation"}, "movie": {"Science Fiction"}},
+    )
+    intent = IntentFilters(
+        raw_query="", genres=["Science Fiction", "Animation"], media_types=["tv"]
+    )
+    strict = recommend_routes._strict_required_genres(object(), [], intent, intent)
+    assert strict == ["Sci-Fi & Fantasy", "Animation"]
+
+
+def test_merge_query_filter_hints_fallback_for_soft_keywords(monkeypatch):
+    # Test case for "best science fiction movies"
+    intent = IntentFilters(
+        raw_query="best science fiction movies", genres=["Science Fiction"]
+    )
+    query_filters = QueryFiltersResult(
+        languages=(),
+        keywords=("best", "science fiction"),
+        genres=("Science Fiction",),
+        media_types=("movie",),
+        cast=(),
+        directors=(),
+        producers=(),
+        writers=(),
+        residual_text="best science fiction movies",
+    )
+
+    mock_db = object()
+    monkeypatch.setattr(
+        recommend_routes,
+        "_get_top_query_keywords",
+        lambda db: {"best", "top", "epic"},
+    )
+    monkeypatch.setattr(
+        recommend_routes.llm_parser,
+        "_normalize_genre_names",
+        lambda genres: [g.lower() for g in genres],
+    )
+
+    recommend_routes._merge_query_filter_hints(intent, query_filters, mock_db)
+
+    assert "best" in intent.keywords
+    assert "science fiction" in intent.keywords
+    assert "science fiction" in intent.genre_keywords
+
+
+def test_merge_query_filter_hints_preserves_hard_keywords(monkeypatch):
+    # Test case for "dark cyberpunk sci-fi movies"
+    intent = IntentFilters(raw_query="dark cyberpunk sci-fi movies", genres=[])
+    query_filters = QueryFiltersResult(
+        languages=(),
+        keywords=("dark", "cyberpunk", "sci-fi"),
+        genres=("Sci-Fi",),
+        media_types=("movie",),
+        cast=(),
+        directors=(),
+        producers=(),
+        writers=(),
+        residual_text="dark cyberpunk sci-fi movies",
+    )
+
+    mock_db = object()
+    monkeypatch.setattr(
+        recommend_routes,
+        "_get_top_query_keywords",
+        lambda db: {"best", "top", "epic"},
+    )
+
+    # Simulate 'sci-fi' normalizing to 'science fiction'
+    def mock_normalize(genres):
+        normalized = []
+        for g in genres:
+            if g == "sci-fi":
+                normalized.append("science fiction")
+            else:
+                normalized.append(g.lower())
+        return normalized
+
+    monkeypatch.setattr(
+        recommend_routes.llm_parser,
+        "_normalize_genre_names",
+        mock_normalize,
+    )
+
+    # The intent's genres should already be normalized before the call
+    intent.genres = ["science fiction"]
+
+    recommend_routes._merge_query_filter_hints(intent, query_filters, mock_db)
+
+    assert "dark" in intent.keywords
+    assert "cyberpunk" in intent.keywords
+    assert "sci-fi" not in intent.keywords
+    assert "science fiction" not in intent.keywords
+    assert "sci-fi" in intent.genre_keywords

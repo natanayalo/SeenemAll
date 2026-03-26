@@ -22,6 +22,7 @@ from api.core.legacy_intent_parser import IntentFilters
 from api.core.entity_linker import ENTITY_LINKER_CACHE
 from api.core.intent_parser import Intent
 from api.core.rewrite import Rewrite
+from api.core.filter_matcher import QueryFiltersResult
 
 ORIGINAL_PREFILTER = recommend_routes._prefilter_allowed_ids
 
@@ -74,7 +75,7 @@ def _reset_prefilter(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             None, [], True
         ),
     )
@@ -100,6 +101,16 @@ def _disable_trending_prior(monkeypatch, request):
     yield
 
 
+@pytest.fixture(autouse=True)
+def _stub_query_filters(monkeypatch):
+    monkeypatch.setattr(
+        recommend_routes,
+        "get_query_filters",
+        lambda query: QueryFiltersResult((), (), (), (), (), (), (), (), query or ""),
+    )
+    yield
+
+
 class DummySession:
     def execute(self, *_, **__):
         raise AssertionError("execute should not be called when no IDs are returned")
@@ -110,6 +121,15 @@ def test_recommend_returns_empty_when_no_candidates(monkeypatch):
         yield DummySession()
 
     app.dependency_overrides[get_db] = override_get_db
+    monkeypatch.setattr(
+        recommend_routes,
+        "_load_media_genres",
+        lambda db: {
+            "movie": {"Animation", "Science Fiction"},
+            "tv": {"Sci-Fi & Fantasy", "Animation"},
+        },
+        raising=False,
+    )
     captured = {}
 
     def fake_load_user_state(db, user_id):
@@ -125,7 +145,7 @@ def test_recommend_returns_empty_when_no_candidates(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [],
     )
 
     with TestClient(app) as client:
@@ -326,7 +346,10 @@ def test_recommend_includes_reranker_output(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1,
+            2,
+        ],
     )
 
     def fake_rerank(items_payload, intent, query, user):
@@ -415,7 +438,10 @@ def test_recommend_paginates_with_cursor(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1,
+            2,
+        ],
     )
 
     monkeypatch.setattr(
@@ -489,14 +515,23 @@ def test_recommend_prefilter_passes_allowed_ids(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             [101, 202], [101, 202], True
         ),
     )
 
     recorded = {}
 
-    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        text_query=None,
+    ):
         recorded["allowed"] = allowed_ids
         return [1]
 
@@ -554,14 +589,16 @@ def test_recommend_relaxed_prefilter_allows_mismatched_genres(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             None, [], False
         ),
     )
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [sci_fi_item.id],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            sci_fi_item.id
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -673,7 +710,10 @@ def test_recommend_merges_collaborative_candidates(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1,
+            2,
+        ],
     )
 
     monkeypatch.setattr(
@@ -792,7 +832,11 @@ def test_recommend_mixer_scores_items(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2, 3],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1,
+            2,
+            3,
+        ],
     )
 
     def fake_rerank(items_payload, intent, query, user):
@@ -882,7 +926,9 @@ def test_recommend_injects_serendipity_items(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [item.id for item in items],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            item.id for item in items
+        ],
     )
 
     monkeypatch.setattr(
@@ -943,7 +989,7 @@ def test_recommend_supports_profile_parameter(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [],
     )
 
     with TestClient(app) as client:
@@ -994,7 +1040,9 @@ def test_recommend_filters_negative_items(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -1065,7 +1113,9 @@ def test_recommend_filters_streaming_providers(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [item.id for item in items],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            item.id for item in items
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -1147,7 +1197,9 @@ def test_recommend_provider_fallback_when_insufficient(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [item.id for item in items],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            item.id for item in items
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -1225,7 +1277,12 @@ def test_recommend_applies_franchise_cap_when_diversify_enabled(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2, 3, 4],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1,
+            2,
+            3,
+            4,
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -1291,7 +1348,12 @@ def test_recommend_skips_franchise_cap_when_diversify_disabled(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1, 2, 3, 4],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1,
+            2,
+            3,
+            4,
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -1413,8 +1475,53 @@ def test_prefilter_allowed_ids_returns_ordered_unique(monkeypatch):
     assert isinstance(result, PrefilterDecision)
     assert result.allowed_ids is None
     assert result.boost_ids == [2, 1]
-    assert result.enforce_genres is False
+    assert result.enforce_genres is True
     assert session.last_statement is not None
+
+
+def test_prefilter_prefers_keyword_boosts(monkeypatch):
+    class PrefilterSession:
+        def __init__(self):
+            self.bind = SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+
+    session = PrefilterSession()
+    intent = IntentFilters(
+        raw_query="",
+        genres=["Crime"],
+        keywords=["heist"],
+        media_types=["movie"],
+    )
+
+    def fake_run_prefilter(
+        db,
+        intent,
+        *,
+        fetch_limit,
+        include_genres,
+        required_services=None,
+        prefer_top_rated=False,
+        require_all_genres=False,
+        genres_override=None,
+        include_keywords=False,
+        require_all_keywords=False,
+        keywords_override=None,
+    ):
+        if include_keywords and include_genres:
+            return [10, 11]
+        if include_keywords and not include_genres:
+            return [12]
+        if include_genres:
+            return list(range(30, 43))
+        return list(range(50, 55))
+
+    monkeypatch.setattr(
+        recommend_routes, "_run_prefilter_query", fake_run_prefilter, raising=False
+    )
+
+    result = ORIGINAL_PREFILTER(session, intent, limit=10)
+    assert isinstance(result, PrefilterDecision)
+    assert result.allowed_ids == list(range(30, 43))
+    assert result.boost_ids[:3] == [10, 11, 12]
 
 
 def test_float_from_env_parses_values(monkeypatch):
@@ -1594,7 +1701,16 @@ def test_recommend_uses_entity_linker_and_blends_query_vector(
             recorded["searched_query"] = query
             return {"movie": [101], "tv": [], "person": []}
 
-    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        text_query=None,
+    ):
         recorded["allowed_ids"] = allowed_ids
         recorded["q_vec"] = vec
         return [1, 2]
@@ -1609,7 +1725,7 @@ def test_recommend_uses_entity_linker_and_blends_query_vector(
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             [1], [1], True
         ),
     )
@@ -1692,7 +1808,7 @@ def test_recommend_logs_cold_start_path(monkeypatch, caplog):
     monkeypatch.setattr(
         recommend_routes,
         "_cold_start_candidates",
-        lambda db, intent, limit, allowlist: [1],
+        lambda db, intent, limit, allowlist, prefer_top_rated=False: [1],
     )
 
     monkeypatch.setattr(
@@ -1751,7 +1867,7 @@ def test_recommend_cold_start_uses_rewrite_ann(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             [1], [], True
         ),
     )
@@ -1767,12 +1883,21 @@ def test_recommend_cold_start_uses_rewrite_ann(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_build_rewrite_vector",
-        lambda rewrite_text, ann_desc, ann_w, rewrite_w: rewrite_vec,
+        lambda rewrite_text, ann_desc, ann_w, rewrite_w, reference_titles=None: rewrite_vec,
     )
 
     ann_called = {}
 
-    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        text_query=None,
+    ):
         ann_called["vec"] = vec
         return [1]
 
@@ -1846,7 +1971,16 @@ def test_recommend_skips_llm_when_disabled(monkeypatch):
 
     monkeypatch.setattr(recommend_routes, "_parse_llm_intent", fail_parse)
 
-    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        text_query=None,
+    ):
         return [1]
 
     monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
@@ -1870,7 +2004,7 @@ def test_recommend_skips_llm_when_disabled(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             [1], [], True
         ),
     )
@@ -1938,7 +2072,16 @@ def test_recommend_manual_rewrite_override(monkeypatch):
 
     ann_calls = {"count": 0}
 
-    def fake_ann(db, vec, exclude, limit, allowed_ids=None):
+    def fake_ann(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        text_query=None,
+    ):
         ann_calls["count"] += 1
         assert vec.shape[0] == 384
         return [1]
@@ -1952,7 +2095,7 @@ def test_recommend_manual_rewrite_override(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "_prefilter_allowed_ids",
-        lambda db, intent, limit, preferred_services=None: PrefilterDecision(
+        lambda db, intent, limit, preferred_services=None, prefer_top_rated=False: PrefilterDecision(
             [1], [], True
         ),
     )
@@ -2029,7 +2172,9 @@ def test_recommend_query_resets_mixer_weights(monkeypatch):
     monkeypatch.setattr(
         recommend_routes,
         "ann_candidates",
-        lambda db, vec, exclude, limit, allowed_ids=None: [1],
+        lambda db, vec, exclude, limit, allowed_ids=None, backend_override=None, **kwargs: [
+            1
+        ],
     )
     monkeypatch.setattr(
         recommend_routes,
@@ -2058,3 +2203,482 @@ def test_recommend_query_resets_mixer_weights(monkeypatch):
     assert captured["popularity_weight_override"] == 0.0
     assert captured["vote_weight_override"] == 0.0
     assert captured["novelty_weight_override"] == 0.0
+
+
+def test_recommend_normalizes_query_filters(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Sample Anime Sci-Fi",
+            overview="Animated sci-fi adventure.",
+            poster_url=None,
+            runtime=100,
+            original_language="ja",
+            genres=[
+                {"id": 16, "name": "Animation"},
+                {"id": 878, "name": "Science Fiction"},
+            ],
+            release_year=2010,
+            collection_id=None,
+            collection_name=None,
+            watch_options=[],
+        )
+    ]
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "_load_media_genres",
+        lambda db: {
+            "movie": {"Animation", "Science Fiction"},
+            "tv": {"Sci-Fi & Fantasy", "Animation"},
+        },
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "legacy_parse_intent",
+        lambda query: IntentFilters(
+            raw_query=query or "",
+            genres=["Science Fiction", "Animation"],
+            media_types=["movie"],
+        ),
+    )
+
+    def fake_get_query_filters(query):
+        return QueryFiltersResult(
+            languages=("ja",),
+            keywords=("anime", "sci-fi"),
+            genres=("Sci-Fi & Fantasy",),
+            media_types=("tv",),
+            cast=(),
+            directors=(),
+            producers=(),
+            writers=(),
+            residual_text=query or "",
+            reference_titles=("Akira",),
+        )
+
+    monkeypatch.setattr(recommend_routes, "get_query_filters", fake_get_query_filters)
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    captured: Dict[str, Any] = {}
+
+    def fake_ann_candidates(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        **kwargs,
+    ):
+        captured["search_filters"] = search_filters
+        return [items[0].id]
+
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann_candidates)
+
+    def fake_prefilter(
+        db, intent, limit, preferred_services=None, prefer_top_rated=False, **kwargs
+    ):
+        return PrefilterDecision([items[0].id], [], True)
+
+    monkeypatch.setattr(recommend_routes, "_prefilter_allowed_ids", fake_prefilter)
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend",
+            params={
+                "user_id": "u1",
+                "query": "anime sci-fi movies",
+                "limit": 1,
+                "strict_filters": "true",
+            },
+        )
+
+    assert resp.status_code == 200
+    search_filters = captured.get("search_filters")
+    assert search_filters is not None
+    assert search_filters.media_types == ("movie",)
+    assert search_filters.genres == ("Science Fiction", "Animation")
+    assert search_filters.keywords == ("anime",)
+
+
+def test_query_filter_keywords_skip_genre_synonyms(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Classic Horror",
+            overview="Found footage horror.",
+            poster_url=None,
+            runtime=100,
+            original_language="en",
+            genres=[{"name": "Horror"}],
+            release_year=1980,
+            collection_id=None,
+            collection_name=None,
+            watch_options=[],
+        )
+    ]
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "_load_media_genres",
+        lambda db: {
+            "movie": {"Horror"},
+        },
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "legacy_parse_intent",
+        lambda query: IntentFilters(
+            raw_query=query or "",
+            genres=["Horror"],
+            media_types=["movie"],
+        ),
+    )
+
+    def fake_get_query_filters(query):
+        return QueryFiltersResult(
+            languages=(),
+            keywords=("horror", "possession"),
+            genres=("Horror",),
+            media_types=("movie",),
+            cast=(),
+            directors=(),
+            producers=(),
+            writers=(),
+            residual_text=query or "",
+        )
+
+    monkeypatch.setattr(recommend_routes, "get_query_filters", fake_get_query_filters)
+
+    def fake_prefilter(
+        db, intent, limit, preferred_services=None, prefer_top_rated=False, **kwargs
+    ):
+        return PrefilterDecision([items[0].id], [], True)
+
+    monkeypatch.setattr(recommend_routes, "_prefilter_allowed_ids", fake_prefilter)
+
+    search_capture: Dict[str, Any] = {}
+
+    def fake_ann_candidates(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        search_filters=None,
+        **kwargs,
+    ):
+        search_capture["filters"] = search_filters
+        return [items[0].id]
+
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann_candidates)
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend",
+            params={
+                "user_id": "u1",
+                "query": "must-watch horror movies",
+                "limit": 1,
+                "strict_filters": "true",
+            },
+        )
+
+    assert resp.status_code == 200
+    filters = search_capture.get("filters")
+    assert filters is not None
+    assert filters.genres == ("Horror",)
+    assert filters.keywords == ("possession",)
+
+
+def test_recommend_preserves_boost_order_after_rerank(monkeypatch, _stub_llm_intent):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=101,
+            media_type="movie",
+            title="Prime Western",
+            overview="Classic western hit.",
+            poster_url=None,
+            runtime=120,
+            original_language="en",
+            genres=[{"name": "Western"}],
+            release_year=1960,
+            collection_id=None,
+            collection_name=None,
+            watch_options=[],
+        ),
+        SimpleNamespace(
+            id=2,
+            tmdb_id=202,
+            media_type="movie",
+            title="Second Western",
+            overview="Another staple.",
+            poster_url=None,
+            runtime=110,
+            original_language="en",
+            genres=[{"name": "Western"}],
+            release_year=1970,
+            collection_id=None,
+            collection_name=None,
+            watch_options=[],
+        ),
+        SimpleNamespace(
+            id=3,
+            tmdb_id=303,
+            media_type="movie",
+            title="LLM Favorite",
+            overview="Recent stylized western.",
+            poster_url=None,
+            runtime=105,
+            original_language="en",
+            genres=[{"name": "Western"}],
+            release_year=2024,
+            collection_id=None,
+            collection_name=None,
+            watch_options=[],
+        ),
+    ]
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "_prefilter_allowed_ids",
+        lambda *args, **kwargs: PrefilterDecision(
+            [items[0].id, items[1].id, items[2].id],
+            [items[0].id, items[1].id, items[2].id],
+            True,
+            True,
+        ),
+    )
+    monkeypatch.setattr(recommend_routes, "_SERENDIPITY_RATIO", 0.0, raising=False)
+    monkeypatch.setattr(
+        recommend_routes,
+        "legacy_parse_intent",
+        lambda query: IntentFilters(
+            raw_query=query or "", genres=["Western"], media_types=["movie"]
+        ),
+    )
+
+    def fake_get_query_filters(query):
+        return QueryFiltersResult(
+            languages=(),
+            keywords=("classic western",),
+            genres=("Western",),
+            media_types=("movie",),
+            cast=(),
+            directors=(),
+            producers=(),
+            writers=(),
+            residual_text=query or "",
+            reference_titles=(),
+        )
+
+    monkeypatch.setattr(recommend_routes, "get_query_filters", fake_get_query_filters)
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    def fake_ann_candidates(*_, **__):
+        return [items[2].id, items[0].id, items[1].id]
+
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann_candidates)
+
+    def fake_rerank(payload, *_, **__):
+        # Force reranker to prefer the non-boosted item first.
+        sorted_payload = sorted(payload, key=lambda entry: entry["id"], reverse=True)
+        return sorted_payload
+
+    monkeypatch.setattr(recommend_routes, "rerank_with_explanations", fake_rerank)
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend",
+            params={"user_id": "u1", "query": "classic western movies", "limit": 2},
+        )
+        assert resp.status_code == 200
+        payload = resp.json()["items"]
+        assert [item["tmdb_id"] for item in payload] == [
+            items[0].tmdb_id,
+            items[1].tmdb_id,
+        ]
+
+        resp_full = client.get(
+            "/recommend",
+            params={"user_id": "u1", "query": "classic western movies", "limit": 3},
+        )
+
+    assert resp_full.status_code == 200
+    payload_full = resp_full.json()["items"]
+    assert [item["tmdb_id"] for item in payload_full] == [
+        items[0].tmdb_id,
+        items[1].tmdb_id,
+        items[2].tmdb_id,
+    ]
+
+
+def test_recommend_falls_back_to_keyword_text(monkeypatch):
+    items = [
+        SimpleNamespace(
+            id=1,
+            tmdb_id=201,
+            media_type="movie",
+            title="Classic Western Sample",
+            overview="A classic western adventure.",
+            poster_url=None,
+            runtime=120,
+            original_language="en",
+            genres=[{"name": "Western"}],
+            release_year=1965,
+            collection_id=None,
+            collection_name=None,
+            watch_options=[],
+        )
+    ]
+    session = CandidateSession(items)
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "_load_media_genres",
+        lambda db: {"movie": {"Western"}},
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "legacy_parse_intent",
+        lambda query: IntentFilters(raw_query=query or "", media_types=["movie"]),
+    )
+
+    def fake_get_query_filters(query):
+        return QueryFiltersResult(
+            languages=(),
+            keywords=("classic western",),
+            genres=(),
+            media_types=("movie",),
+            cast=(),
+            directors=(),
+            producers=(),
+            writers=(),
+            residual_text="",
+            reference_titles=(),
+        )
+
+    monkeypatch.setattr(recommend_routes, "get_query_filters", fake_get_query_filters)
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "load_user_state",
+        lambda db, user_id: (
+            np.zeros(384, dtype="float32"),
+            np.ones(384, dtype="float32"),
+            [],
+            {"genre_prefs": {}, "neighbors": [], "negative_items": []},
+        ),
+    )
+
+    def fake_prefilter(
+        db,
+        intent,
+        limit,
+        preferred_services=None,
+        prefer_top_rated=False,
+        **kwargs,
+    ):
+        return PrefilterDecision([items[0].id], [], True)
+
+    monkeypatch.setattr(recommend_routes, "_prefilter_allowed_ids", fake_prefilter)
+
+    captured: Dict[str, Any] = {}
+
+    def fake_ann_candidates(
+        db,
+        vec,
+        exclude,
+        limit,
+        allowed_ids=None,
+        backend_override=None,
+        *,
+        search_filters=None,
+        text_query=None,
+    ):
+        captured["text_query"] = text_query
+        return [items[0].id]
+
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann_candidates)
+
+    with TestClient(app) as client:
+        resp = client.get(
+            "/recommend",
+            params={
+                "user_id": "u1",
+                "query": "classic western movies",
+                "limit": 1,
+                "strict_filters": "true",
+            },
+        )
+
+    assert resp.status_code == 200
+    assert captured.get("text_query") == "classic western"
