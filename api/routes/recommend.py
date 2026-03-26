@@ -1958,6 +1958,7 @@ def _trending_prior_candidates(
                 normalized = llm_parser._normalize_genre_names([genre])
                 if normalized:
                     mapped_genres.extend(normalized)
+            genre_filters = []
             if mapped_genres:
                 genre_filters = [
                     _genre_contains_clause(db, genre)
