@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 import numpy as np
@@ -9,6 +10,7 @@ from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 from tests.helpers import FakeResult
 
 from api.main import app
@@ -23,6 +25,13 @@ from api.core.rewrite import Rewrite
 from api.core.filter_matcher import QueryFiltersResult
 
 ORIGINAL_PREFILTER = recommend_routes._prefilter_allowed_ids
+
+
+@pytest.fixture(autouse=True)
+def _clear_recommend_cache():
+    recommend_routes._clear_recommend_cache_for_tests()
+    yield
+    recommend_routes._clear_recommend_cache_for_tests()
 
 
 @pytest.fixture(autouse=True)
@@ -1522,6 +1531,113 @@ def test_float_from_env_parses_values(monkeypatch):
     assert recommend_routes._float_from_env("FLOAT_ENV", 0.0) == 0.0
     monkeypatch.delenv("FLOAT_ENV", raising=False)
     assert recommend_routes._float_from_env("FLOAT_ENV", 2.5) == 2.5
+
+
+def _make_recommend_params(**overrides):
+    payload = {
+        "user_id": "u1",
+        "limit": 20,
+        "query": "space opera",
+        "diversify": True,
+        "profile": None,
+        "use_llm_intent": True,
+        "ann_description_override": "high stakes",
+        "rewrite_override": "space survival",
+        "ann_weight_override": 0.6,
+        "rewrite_weight_override": 0.4,
+        "genre_override": "Drama, Sci-Fi",
+        "mixer_ann_weight": 0.7,
+        "mixer_collab_weight": 0.2,
+        "mixer_trending_weight": 0.1,
+        "mixer_popularity_weight": 0.05,
+        "mixer_vote_weight": 0.03,
+        "mixer_novelty_weight": 0.02,
+    }
+    payload.update(overrides)
+    return recommend_routes.RecommendParams(**payload)
+
+
+def test_get_cache_key_tracks_all_recommendation_overrides():
+    canonical_id = "u1"
+    baseline = _make_recommend_params()
+    baseline_key = recommend_routes._get_cache_key(canonical_id, baseline)
+
+    overrides = [
+        {"use_llm_intent": False},
+        {"ann_description_override": "grim dystopia"},
+        {"rewrite_override": "dark competition"},
+        {"ann_weight_override": 0.9},
+        {"rewrite_weight_override": 0.1},
+        {"genre_override": "Thriller"},
+        {"mixer_ann_weight": 0.4},
+        {"mixer_collab_weight": 0.35},
+        {"mixer_trending_weight": 0.25},
+        {"mixer_popularity_weight": 0.2},
+        {"mixer_vote_weight": 0.15},
+        {"mixer_novelty_weight": 0.05},
+        {"query": "mystery"},
+        {"limit": 10},
+        {"diversify": False},
+    ]
+
+    for override in overrides:
+        key = recommend_routes._get_cache_key(
+            canonical_id, _make_recommend_params(**override)
+        )
+        assert key != baseline_key
+
+    assert recommend_routes._get_cache_key("u1:kids", baseline) != baseline_key
+
+
+def test_clear_user_cache_removes_only_target_user_entries():
+    params = _make_recommend_params()
+    user_one = "u1"
+    user_two = "u2"
+    key_one = recommend_routes._get_cache_key(user_one, params)
+    key_two = recommend_routes._get_cache_key(user_two, params)
+
+    recommend_routes._cache_set(user_one, key_one, [{"id": 1}])
+    recommend_routes._cache_set(user_two, key_two, [{"id": 2}])
+
+    recommend_routes.clear_user_cache(user_one)
+
+    assert recommend_routes._cache_get(key_one) is None
+    assert recommend_routes._cache_get(key_two) is not None
+
+
+@pytest.mark.anyio
+async def test_recommend_deduplicates_inflight_cache_miss(monkeypatch):
+    params = _make_recommend_params(user_id="u1")
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/recommend",
+            "headers": [],
+            "query_string": b"",
+        }
+    )
+
+    call_count = {"value": 0}
+
+    async def fake_compute(*args, **kwargs):
+        call_count["value"] += 1
+        await asyncio.sleep(0.01)
+        return recommend_routes.ComputeResult(
+            items=[{"id": 1, "title": "Alpha"}], debug_context={}
+        )
+
+    monkeypatch.setattr(
+        recommend_routes, "_compute_recommendations_async", fake_compute
+    )
+
+    results = await asyncio.gather(
+        recommend_routes.recommend(request, params=params, cursor=None, db=object()),
+        recommend_routes.recommend(request, params=params, cursor=None, db=object()),
+    )
+
+    assert call_count["value"] == 1
+    assert results[0]["items"] == results[1]["items"]
 
 
 def test_recommend_uses_entity_linker_and_blends_query_vector(

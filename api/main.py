@@ -14,6 +14,7 @@ from api.routes.feedback import router as feedback_router
 from api.config import TMDB_API_KEY
 from api.security import require_api_key
 from api.core.entity_linker import EntityLinker
+from api.core.logger import RequestIdMiddleware
 from etl.tmdb_client import TMDBClient
 
 # Configure logging
@@ -59,6 +60,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add structured request-id logging timing middleware
+app.add_middleware(RequestIdMiddleware)
 
 # Include routes
 app.include_router(health_router, prefix="")

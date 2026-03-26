@@ -2,6 +2,9 @@ FROM node:18-alpine as builder
 
 WORKDIR /app
 
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+
 # Copy package files first for better cache utilization
 COPY package*.json ./
 RUN npm ci --prefer-offline

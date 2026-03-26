@@ -109,3 +109,23 @@ These weights are used in the `_build_rewrite_vector` function to create a query
     - **Higher Value:** Increases the number of serendipitous recommendations, potentially introducing the user to new and interesting content.
     - **Lower Value:** Reduces the number of serendipitous recommendations, leading to a more predictable set of popular items.
 - **Component:** Scoring and Reranking (`_apply_serendipity_slot`)
+
+---
+
+## 🔍 Verification & Auditing
+
+You can now audit the impact of these weights and flags using the built-in diagnostic tools:
+
+### 1. Real-time Latency Auditing
+Use `GET /healthz/metrics` to monitor the performance overhead of mixing and reranking. If `rerank_latency_ms` is too high, consider reducing `SMALL_RERANK_INPUT_WINDOW` or switching to `small` provider.
+
+### 2. Scoring & Retrieval Deep-Dive
+Use `GET /recommend/debug` to see exactly how many candidates passed the initial ANN filters (`initial_candidates` vs `post_filter_candidates`) and how they were eventually ranked.
+- If `post_filter_candidates` is consistently low, your `mixer_ann_weight` might be too aggressive or your filters too restrictive.
+- Check `source_scores` in the debug output to see the relative contribution of `ann`, `trending`, and `popularity` to the final score of a specific item.
+
+### 3. Metric-Driven Tuning
+Compare metrics across different `.env` weight configurations:
+1.  Change a weight (e.g., `ANN_DESCRIPTION_WEIGHT`).
+2.  Restart the stack.
+3.  Check `/recommend/debug` to verify the `score` and `explanation` shifts for the same query.

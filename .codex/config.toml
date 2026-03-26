@@ -1,0 +1,6 @@
+﻿# Codex project defaults
+# Additional filenames Codex should treat as instruction files when AGENTS.md is missing.
+project_doc_fallback_filenames = ["CLAUDE.md", "GEMINI.md", "COPILOT.md"]
+
+# Maximum bytes read from AGENTS.md (and fallback instruction files) for project guidance.
+project_doc_max_bytes = 32768

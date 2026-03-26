@@ -34,4 +34,5 @@ def post_history(payload: HistoryIn, db: Session = Depends(get_db)):
     db.commit()
     upsert_user_vectors(db, canonical_id)
     db.commit()
+
     return {"ok": True, "user_id": payload.user_id, "profile": payload.profile}

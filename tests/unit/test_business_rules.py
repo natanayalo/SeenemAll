@@ -224,7 +224,7 @@ def _reset_rules_cache():
 def test_get_rules_path_defaults(monkeypatch):
     monkeypatch.delenv("BUSINESS_RULES_PATH", raising=False)
     path = business_rules._get_rules_path()
-    assert path.endswith("config/business_rules.json")
+    assert path.replace("\\", "/").endswith("config/business_rules.json")
 
 
 def test_load_rules_uses_cache(tmp_path, monkeypatch):
