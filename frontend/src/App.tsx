@@ -32,6 +32,15 @@ interface Recommendation {
 }
 
 const apiBaseUrl = (process.env.REACT_APP_API_URL ?? '').trim().replace(/\/$/, '');
+const apiKey = (process.env.REACT_APP_API_KEY ?? '').trim();
+
+const getApiHeaders = (extraHeaders?: Record<string, string>): HeadersInit => {
+  const headers: Record<string, string> = { ...extraHeaders };
+  if (apiKey) {
+    headers['X-API-Key'] = apiKey;
+  }
+  return headers;
+};
 
 const buildApiUrl = (path: string, params?: URLSearchParams) => {
   const query = params && params.toString() ? `?${params.toString()}` : '';
@@ -74,9 +83,9 @@ function App() {
     try {
       await fetch(buildApiUrl('/user/history'), {
         method: 'POST',
-        headers: {
+        headers: getApiHeaders({
           'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({
           user_id: userId,
           items: []  // Start with empty history
@@ -142,9 +151,9 @@ function App() {
 
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
+        headers: getApiHeaders({
           'Accept': 'application/json',
-        },
+        }),
         cache: 'no-store',
       });
       console.log('Recommendations response status:', response.status);
@@ -182,9 +191,9 @@ function App() {
     try {
       await fetch(buildApiUrl('/user/history'), {
         method: 'POST',
-        headers: {
+        headers: getApiHeaders({
           'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({
           user_id: userId,
           items: [recommendationId],

@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import asyncio
 import base64
+import hashlib
 import json
-import os
 import logging
+import os
+import re
 import time
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
+from threading import Lock
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Sequence, Set
 
+from cachetools import TTLCache
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_, cast, bindparam
 from sqlalchemy.types import Text
@@ -28,7 +33,7 @@ from api.db.models import (
 from api.config import COUNTRY_DEFAULT
 from api.core.user_utils import load_user_state, canonical_profile_id
 from api.core.candidate_gen import ann_candidates
-from api.core.elasticsearch_search import SearchFilters
+from api.core.elasticsearch_search import SearchFilters, ElasticsearchSearchError
 from api.core.filter_matcher import QueryFiltersResult, get_query_filters
 from api.core import llm_parser
 from api.core.intent_parser import Intent
@@ -44,11 +49,182 @@ from api.core.embeddings import encode_texts
 from api.core.user_profile import NEGATIVE_EVENT_TYPES, _event_weight
 from api.core.maturity import rating_level
 from api.core.rewrite import Rewrite
+from api.core.metrics import METRICS
 
 router = APIRouter(prefix="/recommend", tags=["recommend"])
 logger = logging.getLogger(__name__)
 
 _SUPPORTED_ANN_BACKENDS = {"elasticsearch", "pgvector"}
+
+
+@dataclass
+class ComputeResult:
+    items: List[Dict[str, Any]]
+    debug_context: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class RecommendParams:
+    user_id: str = Query(..., description="Seen'emAll user_id (e.g., 'u1')")
+    limit: int = Query(20, ge=1, le=100)
+    query: str | None = Query(
+        None,
+        description="Optional natural-language intent (e.g. 'light sci-fi < 2h')",
+    )
+    diversify: bool = Query(True, description="Whether to diversify recommendations.")
+    profile: str | None = Query(None, description="Optional profile identifier")
+    use_llm_intent: bool = Query(
+        True,
+        description="Enable the LLM intent parser (set to false for manual overrides).",
+    )
+    ann_description_override: str | None = Query(
+        None,
+        description="Manual ANN description override to blend into the rewrite vector.",
+    )
+    rewrite_override: str | None = Query(
+        None,
+        description="Manual rewrite text override (skips rewrite_query when provided).",
+    )
+    ann_weight_override: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override weight for the ANN description component.",
+    )
+    rewrite_weight_override: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override weight for the rewrite text component.",
+    )
+    ann_backend_override: str | None = Query(
+        None,
+        description="Force ANN backend ('elasticsearch' or 'pgvector') for this request.",
+    )
+    genre_override: str | None = Query(
+        None,
+        description="Comma-separated manual genres to enforce (e.g., 'Drama, Sci-Fi').",
+    )
+    classic_top_rated: bool | None = Query(
+        None,
+        description=(
+            "Prioritize top-rated catalog titles over trending suggestions. "
+            "When omitted, a heuristic may enable this automatically for "
+            "queries like 'best classic movies'."
+        ),
+    )
+    mixer_ann_weight: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override hybrid ANN weight (default from HYBRID_ANN_WEIGHT).",
+    )
+    mixer_collab_weight: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override collaborative weight (default MIXER_COLLAB_WEIGHT).",
+    )
+    mixer_trending_weight: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override trending weight (default HYBRID_TRENDING_WEIGHT).",
+    )
+    mixer_popularity_weight: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override popularity weight (default HYBRID_POPULARITY_WEIGHT).",
+    )
+    mixer_vote_weight: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override vote-count weight (default HYBRID_VOTE_WEIGHT).",
+    )
+    mixer_novelty_weight: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override novelty weight (default MIXER_NOVELTY_WEIGHT).",
+    )
+    strict_filters: bool = Query(
+        False,
+        description="Require items to satisfy every inferred genre (AND semantics).",
+    )
+    debug: bool = Query(False, description="Include debug diagnostics in response.")
+
+
+# --- Caching ---
+_RECOMMEND_CACHE_TTL_SECONDS = int(os.getenv("RECOMMEND_CACHE_TTL_SECONDS", "300"))
+_RECOMMEND_CACHE_MAXSIZE = int(os.getenv("RECOMMEND_CACHE_MAXSIZE", "512"))
+_RECOMMEND_CACHE: TTLCache[str, Dict[str, Any]] = TTLCache(
+    maxsize=_RECOMMEND_CACHE_MAXSIZE, ttl=_RECOMMEND_CACHE_TTL_SECONDS
+)
+_RECOMMEND_CACHE_LOCK = Lock()
+_RECOMMEND_CACHE_USER_KEYS: Dict[str, Set[str]] = {}
+_INFLIGHT_RECOMMEND_TASKS: Dict[Tuple[int, str], asyncio.Task[ComputeResult]] = {}
+_INFLIGHT_TASKS_LOCK = Lock()
+
+
+def _cache_get(cache_key: str) -> Dict[str, Any] | None:
+    with _RECOMMEND_CACHE_LOCK:
+        return _RECOMMEND_CACHE.get(cache_key)
+
+
+def _cache_set(
+    canonical_id: str,
+    cache_key: str,
+    items: List[Dict[str, Any]],
+    debug_context: Dict[str, Any] | None = None,
+) -> None:
+    with _RECOMMEND_CACHE_LOCK:
+        entry: Dict[str, Any] = {"items": items}
+        if debug_context is not None:
+            entry["debug_context"] = debug_context
+        _RECOMMEND_CACHE[cache_key] = entry
+        user_keys = _RECOMMEND_CACHE_USER_KEYS.setdefault(canonical_id, set())
+        user_keys.add(cache_key)
+
+
+def _cache_remove_user(canonical_id: str) -> int:
+    with _RECOMMEND_CACHE_LOCK:
+        keys_to_remove = _RECOMMEND_CACHE_USER_KEYS.pop(canonical_id, set())
+        removed = 0
+        for cache_key in keys_to_remove:
+            if _RECOMMEND_CACHE.pop(cache_key, None) is not None:
+                removed += 1
+        return removed
+
+
+def _clear_recommend_cache_for_tests() -> None:
+    """Reset cache internals for test isolation."""
+    with _RECOMMEND_CACHE_LOCK:
+        _RECOMMEND_CACHE.clear()
+        _RECOMMEND_CACHE_USER_KEYS.clear()
+    with _INFLIGHT_TASKS_LOCK:
+        _INFLIGHT_RECOMMEND_TASKS.clear()
+
+
+def clear_user_cache(canonical_id: str) -> None:
+    """Clear all cached recommendations for a specific user profile."""
+    removed = _cache_remove_user(canonical_id)
+    logger.debug(
+        "Cleared recommendation cache for %s (removed %d entries)",
+        canonical_id,
+        removed,
+    )
+
+
+def _get_cache_key(
+    canonical_id: str,
+    params: RecommendParams,
+) -> str:
+    # Serialize params canonically so future fields are automatically reflected in the key.
+    if hasattr(params, "__dataclass_fields__"):
+        params_dict = asdict(params)
+    elif isinstance(params, dict):
+        params_dict = dict(params)
+    else:
+        params_dict = getattr(params, "__dict__", {})
+    params_dict.pop("user_id", None)
+    params_dict.pop("profile", None)
+    hash_payload = json.dumps(params_dict, sort_keys=True, default=str)
+    hashed = hashlib.sha256(hash_payload.encode("utf-8")).hexdigest()
+    return f"{canonical_id}:{hashed}"
 
 
 def _has_people_filters(filters: SearchFilters | None) -> bool:
@@ -266,11 +442,14 @@ def _normalize_streaming_services(
 
 
 def _matches_keywords(text: str | None, keywords: Set[str]) -> bool:
-    if not text:
+    if not text or not keywords:
         return False
     lowered = text.lower()
     for keyword in keywords:
-        if keyword in lowered:
+        if not keyword:
+            continue
+        pattern = rf"\b{re.escape(keyword.lower().strip())}\b"
+        if re.search(pattern, lowered):
             return True
     return False
 
@@ -842,100 +1021,40 @@ def _prioritize_boosted_items(
     return ordered
 
 
-@router.get("")
-async def recommend(
+async def _compute_recommendations_async(
     request: Request,
-    user_id: str = Query(..., description="Seen'emAll user_id (e.g., 'u1')"),
-    limit: int = Query(20, ge=1, le=100),
-    query: str | None = Query(
-        None,
-        description="Optional natural-language intent (e.g. 'light sci-fi < 2h')",
-    ),
-    cursor: str | None = Query(
-        None,
-        description="Opaque cursor returned by a previous request for pagination.",
-    ),
-    diversify: bool = Query(True, description="Whether to diversify recommendations."),
-    profile: str | None = Query(None, description="Optional profile identifier"),
-    use_llm_intent: bool = Query(
-        True,
-        description="Enable the LLM intent parser (set to false for manual overrides).",
-    ),
-    ann_description_override: str | None = Query(
-        None,
-        description="Manual ANN description override to blend into the rewrite vector.",
-    ),
-    rewrite_override: str | None = Query(
-        None,
-        description="Manual rewrite text override (skips rewrite_query when provided).",
-    ),
-    ann_weight_override: float | None = Query(
-        None,
-        ge=0.0,
-        description="Override weight for the ANN description component.",
-    ),
-    rewrite_weight_override: float | None = Query(
-        None,
-        ge=0.0,
-        description="Override weight for the rewrite text component.",
-    ),
-    ann_backend_override: str | None = Query(
-        None,
-        description="Force ANN backend ('elasticsearch' or 'pgvector') for this request.",
-    ),
-    genre_override: str | None = Query(
-        None,
-        description="Comma-separated manual genres to enforce (e.g., 'Drama, Sci-Fi').",
-    ),
-    classic_top_rated: bool | None = Query(
-        None,
-        description=(
-            "Prioritize top-rated catalog titles over trending suggestions. "
-            "When omitted, a heuristic may enable this automatically for "
-            "queries like 'best classic movies'."
-        ),
-    ),
-    mixer_ann_weight: float | None = Query(
-        None,
-        ge=0.0,
-        description="Override hybrid ANN weight (default from HYBRID_ANN_WEIGHT).",
-    ),
-    mixer_collab_weight: float | None = Query(
-        None,
-        ge=0.0,
-        description="Override collaborative weight (default MIXER_COLLAB_WEIGHT).",
-    ),
-    mixer_trending_weight: float | None = Query(
-        None,
-        ge=0.0,
-        description="Override trending weight (default HYBRID_TRENDING_WEIGHT).",
-    ),
-    mixer_popularity_weight: float | None = Query(
-        None,
-        ge=0.0,
-        description="Override popularity weight (default HYBRID_POPULARITY_WEIGHT).",
-    ),
-    mixer_vote_weight: float | None = Query(
-        None,
-        ge=0.0,
-        description="Override vote-count weight (default HYBRID_VOTE_WEIGHT).",
-    ),
-    mixer_novelty_weight: float | None = Query(
-        None,
-        ge=0.0,
-        description="Override novelty weight (default MIXER_NOVELTY_WEIGHT).",
-    ),
-    strict_filters: bool = Query(
-        False,
-        description="Require items to satisfy every inferred genre (AND semantics).",
-    ),
-    debug: bool = Query(False, description="Include debug diagnostics in response."),
-    db: Session = Depends(get_db),
-):
+    params: RecommendParams,
+    db: Session,
+) -> ComputeResult:
+    _pipeline_start = time.perf_counter()
+    user_id = params.user_id
+    limit = params.limit
+    query = params.query
+    diversify = params.diversify
+    profile = params.profile
+    use_llm_intent = params.use_llm_intent
+    ann_description_override = params.ann_description_override
+    rewrite_override = params.rewrite_override
+    ann_weight_override = params.ann_weight_override
+    rewrite_weight_override = params.rewrite_weight_override
+    ann_backend_override = params.ann_backend_override
+    genre_override = params.genre_override
+    classic_top_rated = params.classic_top_rated
+    mixer_ann_weight = params.mixer_ann_weight
+    mixer_collab_weight = params.mixer_collab_weight
+    mixer_trending_weight = params.mixer_trending_weight
+    mixer_popularity_weight = params.mixer_popularity_weight
+    mixer_vote_weight = params.mixer_vote_weight
+    mixer_novelty_weight = params.mixer_novelty_weight
+    strict_filters = params.strict_filters
+    debug = params.debug
+
     canonical_id = canonical_profile_id(user_id, profile)
     long_v, short_v, exclude, profile_meta = load_user_state(db, canonical_id)
     exclude_set: Set[int] = set(exclude or [])
     cold_start = short_v is None
+    if cold_start:
+        METRICS.counter("recommend.cold_start").inc()
 
     backend_override_normalized: str | None = None
     if ann_backend_override:
@@ -1188,7 +1307,6 @@ async def recommend(
         )
     allowlist = prefilter.allowed_ids
     boost_ids = prefilter.boost_ids or []
-    boost_is_keyword = bool(prefilter.keyword_boosted and boost_ids)
     # Carry the stricter genre requirement forward so downstream filtering
     # (ann_candidates + item_matches_intent) stays aligned with the prefilter.
     enforce_genres = prefilter.enforce_genres
@@ -1226,6 +1344,12 @@ async def recommend(
                     )
                 except ValueError as exc:
                     raise HTTPException(status_code=400, detail=str(exc)) from exc
+                except ElasticsearchSearchError as exc:
+                    logger.error("Elasticsearch retrieval error: %s", exc)
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="Search service temporarily unavailable.",
+                    ) from exc
                 if not ann_ids and has_people_filters:
                     relaxed_filters = _relax_filters_for_people(
                         structured_search_filters
@@ -1246,6 +1370,12 @@ async def recommend(
                         except ValueError as exc:
                             raise HTTPException(
                                 status_code=400, detail=str(exc)
+                            ) from exc
+                        except ElasticsearchSearchError as exc:
+                            logger.error("Elasticsearch retrieval error: %s", exc)
+                            raise HTTPException(
+                                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                                detail="Search service temporarily unavailable.",
                             ) from exc
                         if ann_ids and logger.isEnabledFor(logging.INFO):
                             logger.info(
@@ -1321,6 +1451,12 @@ async def recommend(
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except ElasticsearchSearchError as exc:
+            logger.error("Elasticsearch retrieval error: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Search service temporarily unavailable.",
+            ) from exc
         if not ids and has_people_filters:
             relaxed_filters = _relax_filters_for_people(structured_search_filters)
             if relaxed_filters:
@@ -1338,6 +1474,12 @@ async def recommend(
                     )
                 except ValueError as exc:
                     raise HTTPException(status_code=400, detail=str(exc)) from exc
+                except ElasticsearchSearchError as exc:
+                    logger.error("Elasticsearch retrieval error: %s", exc)
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="Search service temporarily unavailable.",
+                    ) from exc
                 if ids and logger.isEnabledFor(logging.INFO):
                     logger.info(
                         "Relaxed ANN filters for user %s due to people filters.",
@@ -1477,7 +1619,7 @@ async def recommend(
     if negative_items:
         ids = [i for i in ids if i not in negative_items]
     if not ids:
-        return _empty_response()
+        return ComputeResult(items=[], debug_context={})
 
     # fetch metadata and streaming links, preserve ANN order
     items_with_data = {
@@ -1597,7 +1739,7 @@ async def recommend(
         ordered.extend(fallback_candidates[:deficit])
 
     if not ordered:
-        return _empty_response()
+        return ComputeResult(items=[], debug_context={})
     if logger.isEnabledFor(logging.DEBUG):
         if skipped_intent:
             logger.debug(
@@ -1641,7 +1783,7 @@ async def recommend(
     )
     ordered = apply_business_rules(ordered, intent=intent)
     if not ordered:
-        return _empty_response()
+        return ComputeResult(items=[], debug_context={})
 
     serendipity_context = list(ordered)
 
@@ -1666,29 +1808,11 @@ async def recommend(
             "negative_items": profile_meta.get("negative_items"),
         },
     )
-    if boost_ids and boost_is_keyword:
-        pin_count = min(limit, len(boost_ids))
-        pinned_ids = boost_ids[:pin_count]
-        reranked = _prioritize_boosted_items(reranked, pinned_ids)
 
-    start_index = _decode_cursor(cursor)
-    if start_index < 0:
-        raise HTTPException(status_code=400, detail="Invalid cursor")
+    METRICS.counter("recommend.reranker_used").inc()
 
-    page = reranked[start_index : start_index + limit]
-    response: List[Dict[str, Any]] = []
-    for entry in page:
-        cleaned = dict(entry)
-        cleaned.pop("original_rank", None)
-        cleaned.pop("vector", None)
-        cleaned.pop("ann_rank", None)
-        cleaned.pop("retrieval_score", None)
-        cleaned.pop("source_scores", None)
-        response.append(cleaned)
-
-    next_cursor = None
-    if start_index + limit < len(reranked):
-        next_cursor = _encode_cursor(start_index + limit)
+    pipeline_ms = (time.perf_counter() - _pipeline_start) * 1000
+    METRICS.histogram("recommend.total_latency_ms").observe(pipeline_ms)
 
     debug_snapshot: Dict[str, Any] | None = None
     if debug:
@@ -1710,13 +1834,111 @@ async def recommend(
             "boost_tmdb_ids": [tmdb_map.get(item_id) for item_id in boost_sample],
             "classic_top_rated": prefer_top_rated,
             "strict_filters": bool(prefilter_kwargs.get("require_all_genres")),
+            "metrics": {
+                "initial_candidates": len(ids),
+                "post_filter_candidates": len(ordered),
+                "neighbors_found": len(profile_meta.get("neighbors") or []),
+                "cold_start": cold_start,
+                "pipeline_latency_ms": round(pipeline_ms, 2),
+            },
         }
+
+    return ComputeResult(items=reranked, debug_context=debug_snapshot or {})
+
+
+@router.get("")
+async def recommend(
+    request: Request,
+    params: RecommendParams = Depends(),
+    cursor: str | None = Query(
+        None,
+        description="Opaque cursor returned by a previous request for pagination.",
+    ),
+    db: Session = Depends(get_db),
+):
+    canonical_id = canonical_profile_id(params.user_id, params.profile)
+    cache_key = _get_cache_key(canonical_id, params)
+
+    cached_result = _cache_get(cache_key)
+
+    if cached_result:
+        METRICS.counter("recommend.cache_hit").inc()
+        reranked = cached_result["items"]
+        debug_context = cached_result.get("debug_context")
+        logger.debug("Served recommendation from cache (key=%s)", cache_key)
+    else:
+        loop_scoped_key = (id(asyncio.get_running_loop()), cache_key)
+        created_task = False
+        with _INFLIGHT_TASKS_LOCK:
+            task = _INFLIGHT_RECOMMEND_TASKS.get(loop_scoped_key)
+            if task is None:
+                METRICS.counter("recommend.cache_miss").inc()
+                task = asyncio.create_task(
+                    _compute_recommendations_async(request, params, db)
+                )
+                _INFLIGHT_RECOMMEND_TASKS[loop_scoped_key] = task
+                created_task = True
+            else:
+                METRICS.counter("recommend.cache_wait").inc()
+
+        try:
+            result = await task
+        finally:
+            if created_task:
+                with _INFLIGHT_TASKS_LOCK:
+                    if _INFLIGHT_RECOMMEND_TASKS.get(loop_scoped_key) is task:
+                        _INFLIGHT_RECOMMEND_TASKS.pop(loop_scoped_key, None)
+
+        reranked = result.items
+        debug_context = result.debug_context
+        if created_task and reranked:
+            _cache_set(canonical_id, cache_key, reranked, debug_context=debug_context)
+
+    start_index = _decode_cursor(cursor)
+    if start_index < 0:
+        raise HTTPException(status_code=400, detail="Invalid cursor")
+
+    page = reranked[start_index : start_index + params.limit]
+    response: List[Dict[str, Any]] = []
+    for entry in page:
+        cleaned = dict(entry)
+        cleaned.pop("original_rank", None)
+        cleaned.pop("vector", None)
+        cleaned.pop("ann_rank", None)
+        cleaned.pop("retrieval_score", None)
+        cleaned.pop("source_scores", None)
+        response.append(cleaned)
+
+    next_cursor = None
+    if start_index + params.limit < len(reranked):
+        next_cursor = _encode_cursor(start_index + params.limit)
 
     payload: Dict[str, Any] = {"items": response}
     if next_cursor:
         payload["next_cursor"] = next_cursor
-    if debug_snapshot:
-        payload["debug"] = debug_snapshot
+    if params.debug and debug_context:
+        payload["debug"] = debug_context
+    return payload
+
+
+@router.get("/debug")
+async def debug_recommend(
+    request: Request,
+    params: RecommendParams = Depends(),
+    db: Session = Depends(get_db),
+):
+    result = await _compute_recommendations_async(request, params, db)
+    response: List[Dict[str, Any]] = []
+    for entry in result.items[: params.limit]:
+        cleaned = dict(entry)
+        cleaned.pop("vector", None)
+        cleaned.pop("original_rank", None)
+        cleaned.pop("ann_rank", None)
+        cleaned.pop("retrieval_score", None)
+        cleaned.pop("source_scores", None)
+        response.append(cleaned)
+
+    payload: Dict[str, Any] = {"items": response, "debug": result.debug_context}
     return payload
 
 

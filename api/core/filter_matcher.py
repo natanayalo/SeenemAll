@@ -156,16 +156,16 @@ class QueryFilterMatcher:
                     if isinstance(entry, Mapping):
                         _ingest_genre(entry)
             if isinstance(cast, list):
-                cast_entries = [e for e in cast if isinstance(e, Mapping)]
+                cast_entries = [e for e in cast[:5] if isinstance(e, Mapping)]
                 _ingest_people(cast_entries, "cast")
             if isinstance(directors, list):
                 director_entries = [e for e in directors if isinstance(e, Mapping)]
                 _ingest_people(director_entries, "directors")
             if isinstance(producers, list):
-                producer_entries = [e for e in producers if isinstance(e, Mapping)]
+                producer_entries = [e for e in producers[:3] if isinstance(e, Mapping)]
                 _ingest_people(producer_entries, "producers")
             if isinstance(writers, list):
-                writer_entries = [e for e in writers if isinstance(e, Mapping)]
+                writer_entries = [e for e in writers[:3] if isinstance(e, Mapping)]
                 _ingest_people(writer_entries, "writers")
 
         self._language_map = language_terms
@@ -204,8 +204,6 @@ class QueryFilterMatcher:
                 return ""
             letters = [ch for ch in candidate if ch.isalpha()]
             if not letters:
-                return ""
-            if not any(ch.isupper() for ch in letters):
                 return ""
             return candidate
 

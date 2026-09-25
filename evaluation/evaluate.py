@@ -161,15 +161,21 @@ def normalise_golden_ids(entry: Dict[str, Any]) -> List[int]:
     raise KeyError("Entry must include 'golden_set' or 'golden_ids'.")
 
 
-def call_recommendation_api(query: str, params: Dict[str, Any]) -> List[int]:
+def call_recommendation_api(
+    query: str, params: Dict[str, Any], api_key: Optional[str] = None
+) -> List[int]:
     if not HAVE_HTTPX:
         raise RuntimeError(
             "httpx is not installed. Install project requirements before running evaluations."
         )
     base_url = "http://localhost:8000/recommend"
     all_params = {"user_id": "u1", "query": query, **params}
+    headers: Dict[str, str] = {}
+    key = api_key or os.environ.get("API_AUTH_KEY")
+    if key:
+        headers["X-API-Key"] = key
     try:
-        response = httpx.get(base_url, params=all_params, timeout=15.0)
+        response = httpx.get(base_url, params=all_params, headers=headers, timeout=15.0)
         response.raise_for_status()
     except (httpx.RequestError, httpx.HTTPStatusError) as exc:
         print(f"API request failed for query '{query}': {exc}")

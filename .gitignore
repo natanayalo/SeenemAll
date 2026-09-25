@@ -17,6 +17,7 @@ dist/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.pre-commit-cache/
 .coverage
 coverage.xml
 htmlcov/
@@ -32,6 +33,7 @@ htmlcov/
 .cache/
 
 # Evaluation artifacts
+evaluation/artifacts/
 evaluation/evaluation_results*.csv
 evaluation/evaluation_scores*.csv
 evaluation/report.html

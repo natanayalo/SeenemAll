@@ -6,7 +6,7 @@ import os
 from fastapi import Header, HTTPException, status
 
 
-def _env_flag(name: str, default: str = "1") -> bool:
+def _env_flag(name: str, default: str = "0") -> bool:
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
 
 
@@ -16,12 +16,12 @@ def require_api_key(
     """
     Simple API key auth for local deployments.
 
-    - Enable with API_AUTH_ENABLED=1 (default).
+    - Enable with API_AUTH_ENABLED=1.
     - Set API_AUTH_KEY to a non-empty secret value.
     - Send it via the X-API-Key header.
     """
 
-    if not _env_flag("API_AUTH_ENABLED", default="1"):
+    if not _env_flag("API_AUTH_ENABLED", default="0"):
         return
 
     expected = (os.getenv("API_AUTH_KEY") or "").strip()

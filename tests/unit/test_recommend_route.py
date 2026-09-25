@@ -2435,7 +2435,7 @@ def test_query_filter_keywords_skip_genre_synonyms(monkeypatch):
     assert filters.keywords == ("possession",)
 
 
-def test_recommend_preserves_boost_order_after_rerank(monkeypatch, _stub_llm_intent):
+def test_recommend_respects_reranker_final_ordering(monkeypatch, _stub_llm_intent):
     items = [
         SimpleNamespace(
             id=1,
@@ -2542,7 +2542,7 @@ def test_recommend_preserves_boost_order_after_rerank(monkeypatch, _stub_llm_int
     monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann_candidates)
 
     def fake_rerank(payload, *_, **__):
-        # Force reranker to prefer the non-boosted item first.
+        # Force reranker to prefer the items in reverse ID order
         sorted_payload = sorted(payload, key=lambda entry: entry["id"], reverse=True)
         return sorted_payload
 
@@ -2555,8 +2555,9 @@ def test_recommend_preserves_boost_order_after_rerank(monkeypatch, _stub_llm_int
         )
         assert resp.status_code == 200
         payload = resp.json()["items"]
+        # Reranker decision is respected over boost order
         assert [item["tmdb_id"] for item in payload] == [
-            items[0].tmdb_id,
+            items[2].tmdb_id,
             items[1].tmdb_id,
         ]
 
@@ -2568,9 +2569,9 @@ def test_recommend_preserves_boost_order_after_rerank(monkeypatch, _stub_llm_int
     assert resp_full.status_code == 200
     payload_full = resp_full.json()["items"]
     assert [item["tmdb_id"] for item in payload_full] == [
-        items[0].tmdb_id,
-        items[1].tmdb_id,
         items[2].tmdb_id,
+        items[1].tmdb_id,
+        items[0].tmdb_id,
     ]
 
 

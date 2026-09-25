@@ -13,6 +13,8 @@ const proxyPaths = [
   '/health',
 ];
 
+const apiKey = process.env.API_AUTH_KEY || process.env.REACT_APP_API_KEY || '';
+
 module.exports = function configureProxy(app) {
   proxyPaths.forEach((path) => {
     app.use(
@@ -21,6 +23,8 @@ module.exports = function configureProxy(app) {
         target,
         changeOrigin: true,
         logLevel: 'warn',
+        pathRewrite: (_, req) => req.originalUrl,
+        headers: apiKey ? { 'X-API-Key': apiKey } : {},
       })
     );
   });
