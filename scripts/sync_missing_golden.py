@@ -5,18 +5,16 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Tuple
 
 import httpx
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from api.config import TMDB_API_KEY
 from api.db.models import Item
-from api.db.session import get_engine, get_sessionmaker
+from api.db.session import get_sessionmaker
 from etl.tmdb_client import TMDBClient
 from etl.tmdb_sync import _upsert_items
 
@@ -49,13 +47,19 @@ async def sync_missing_golden_items(evaluation_set_path: Path) -> int:
         entries = json.load(f)
 
     # Collect needed golden items
-    golden_targets: Dict[int, Tuple[str, str]] = {}  # tmdb_id -> (title, preferred_media)
+    golden_targets: Dict[int, Tuple[str, str]] = (
+        {}
+    )  # tmdb_id -> (title, preferred_media)
     for entry in entries:
         preferred_media = "movie"
         constraints = entry.get("constraints") or {}
         if constraints.get("media_type") == "tv":
             preferred_media = "tv"
-        elif "series" in entry.get("query", "").lower() or "tv" in entry.get("query", "").lower() or "shows" in entry.get("query", "").lower():
+        elif (
+            "series" in entry.get("query", "").lower()
+            or "tv" in entry.get("query", "").lower()
+            or "shows" in entry.get("query", "").lower()
+        ):
             preferred_media = "tv"
 
         for item in entry.get("golden_set", []):
@@ -67,7 +71,11 @@ async def sync_missing_golden_items(evaluation_set_path: Path) -> int:
     SessionLocal = get_sessionmaker()
     with SessionLocal() as db:
         existing_ids = set(
-            db.execute(select(Item.tmdb_id).where(Item.tmdb_id.in_(list(golden_targets.keys()))))
+            db.execute(
+                select(Item.tmdb_id).where(
+                    Item.tmdb_id.in_(list(golden_targets.keys()))
+                )
+            )
             .scalars()
             .all()
         )
@@ -87,16 +95,22 @@ async def sync_missing_golden_items(evaluation_set_path: Path) -> int:
     try:
         for idx, gid in enumerate(missing_ids, start=1):
             title, pref_media = golden_targets[gid]
-            logger.info(f"[{idx}/{len(missing_ids)}] Fetching TMDB {gid} ('{title}', media={pref_media})...")
+            logger.info(
+                f"[{idx}/{len(missing_ids)}] Fetching TMDB {gid} ('{title}', media={pref_media})..."
+            )
             details = await fetch_item_details(client, gid, preferred_media=pref_media)
             if details:
                 fetched_payloads.append(details)
-                logger.info(f"  -> Found: '{details.get('title') or details.get('name')}' ({details.get('media_type')})")
+                logger.info(
+                    f"  -> Found: '{details.get('title') or details.get('name')}' ({details.get('media_type')})"
+                )
             else:
                 logger.error(f"  -> FAILED to find TMDB item {gid} ('{title}')")
 
         if fetched_payloads:
-            logger.info(f"Upserting {len(fetched_payloads)} newly fetched items into PostgreSQL...")
+            logger.info(
+                f"Upserting {len(fetched_payloads)} newly fetched items into PostgreSQL..."
+            )
             with SessionLocal() as db:
                 _upsert_items(db, fetched_payloads)
                 db.commit()
