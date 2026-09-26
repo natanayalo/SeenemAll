@@ -139,6 +139,15 @@ class UserContext:
     provider_alias_map: Dict[str, Set[str]]
     top_query_keywords: Set[str]
     preferred_services: Set[str] = field(default_factory=set)
+    taste_clusters: List[Dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def active_taste_clusters(self) -> List[Dict[str, Any]]:
+        if self.taste_clusters:
+            return self.taste_clusters
+        if self.profile_meta and self.profile_meta.get("taste_clusters"):
+            return self.profile_meta["taste_clusters"]
+        return []
 
 
 @dataclass

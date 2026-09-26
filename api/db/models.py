@@ -107,6 +107,7 @@ class User(Base):
     short_vec: Mapped[Optional[List[float]]] = mapped_column(Vector(384), nullable=True)
     genre_prefs: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     neighbors: Mapped[Optional[List[dict]]] = mapped_column(JSON, nullable=True)
+    taste_clusters: Mapped[Optional[List[dict]]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

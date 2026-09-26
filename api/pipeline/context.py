@@ -273,6 +273,7 @@ def load_user_context(db: Session, user_id: str, profile: str | None) -> UserCon
 
     provider_alias_map = get_streaming_alias_map(db)
     top_query_keywords = get_top_query_keywords(db)
+    taste_clusters = (profile_meta or {}).get("taste_clusters") or []
 
     return UserContext(
         canonical_id=canonical_id,
@@ -285,6 +286,7 @@ def load_user_context(db: Session, user_id: str, profile: str | None) -> UserCon
         cold_start=cold_start,
         provider_alias_map=provider_alias_map,
         top_query_keywords=top_query_keywords,
+        taste_clusters=taste_clusters,
     )
 
 
