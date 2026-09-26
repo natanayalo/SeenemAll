@@ -65,6 +65,7 @@ graph TD
 - **Postgres** with `pgvector` (user embeddings + metadata)
 - **Elasticsearch 8** (HNSW kNN, manual RRF hybrid)
 - **sentence-transformers MiniLM-L6-v2** embeddings
+- **OpenVINO** acceleration for Intel GPU, NPU, and CPU inference
 - **spaCy** (`en_core_web_sm`) matcher for languages/genres/people/keywords
 - **Docker Compose** (API, DB, Elasticsearch, optional frontend)
 - **Ollama** (default) for local intent parsing and reranking; **OpenAI** and **Gemini** are optional hosted providers
@@ -93,6 +94,9 @@ make embed                           # MiniLM embeddings (EMBED_VERSION, EMBED_B
 make es-sync                         # Push catalog to Elasticsearch (BATCH=250, REFRESH=1 optional)
 make etl-justwatch                   # Populate availability (optional)
 ```
+
+The API image installs `requirements-openvino.txt`. For a local accelerated
+environment, install that file instead of `requirements.txt`.
 
 Seed user history:
 
