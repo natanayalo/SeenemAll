@@ -82,6 +82,7 @@ class OpenVINOCrossEncoder:
 
         try:
             import torch
+
             no_grad_ctx = getattr(torch, "no_grad", contextlib.nullcontext)
         except Exception:
             no_grad_ctx = contextlib.nullcontext
@@ -173,9 +174,7 @@ def _load_cross_encoder(name: str, device: str) -> Any:
 def get_cross_encoder_model(model_name: str | None = None) -> CrossEncoder:
     """Thread-safe lazy-loaded singleton for the Cross-Encoder model."""
     name = (
-        model_name
-        or os.getenv("CROSS_ENCODER_MODEL")
-        or DEFAULT_CROSS_ENCODER_MODEL
+        model_name or os.getenv("CROSS_ENCODER_MODEL") or DEFAULT_CROSS_ENCODER_MODEL
     ).strip()
 
     with _model_lock:
@@ -183,7 +182,9 @@ def get_cross_encoder_model(model_name: str | None = None) -> CrossEncoder:
             return _model_cache[name]
 
         device = get_cross_encoder_device()
-        logger.info("Initializing CrossEncoder model '%s' on device '%s'...", name, device)
+        logger.info(
+            "Initializing CrossEncoder model '%s' on device '%s'...", name, device
+        )
         model = _load_cross_encoder(name, device)
         _model_cache[name] = model
         return model
@@ -273,7 +274,9 @@ def build_candidate_document(item: Dict[str, Any]) -> str:
     return doc
 
 
-def format_query_text(query: str | None, intent_genres: Sequence[str] | None = None) -> str:
+def format_query_text(
+    query: str | None, intent_genres: Sequence[str] | None = None
+) -> str:
     """Format query text and optional intent genres for cross-attention."""
     segments: List[str] = []
     if query and query.strip():
@@ -296,7 +299,7 @@ def score_query_candidates(
 ) -> List[Tuple[int, float, float]]:
     """
     Score candidates against the query using batched joint attention Cross-Encoder.
-    
+
     Returns:
         List of tuples: (item_id, blended_score, cross_encoder_score)
         sorted in descending order of blended_score.
@@ -312,11 +315,15 @@ def score_query_candidates(
             ident = item.get("id")
             if ident is None:
                 continue
-            retrieval = float(item.get("retrieval_score") or item.get("score") or (1.0 / (1.0 + idx)))
+            retrieval = float(
+                item.get("retrieval_score") or item.get("score") or (1.0 / (1.0 + idx))
+            )
             result.append((int(ident), retrieval, retrieval))
         return result
 
-    effective_alpha = _DEFAULT_ALPHA if alpha is None else max(0.0, min(1.0, float(alpha)))
+    effective_alpha = (
+        _DEFAULT_ALPHA if alpha is None else max(0.0, min(1.0, float(alpha)))
+    )
     eval_candidates = list(candidates[:max_candidates])
     pairs: List[Tuple[str, str]] = []
     valid_items: List[Dict[str, Any]] = []
@@ -368,8 +375,12 @@ def score_query_candidates(
         else:
             norm_base = max(0.0, base_score)
 
-        blended = effective_alpha * float(ce_score) + (1.0 - effective_alpha) * norm_base
-        scored_list.append((ident, round(blended, 4), round(float(ce_score), 4), base_rank))
+        blended = (
+            effective_alpha * float(ce_score) + (1.0 - effective_alpha) * norm_base
+        )
+        scored_list.append(
+            (ident, round(blended, 4), round(float(ce_score), 4), base_rank)
+        )
 
     # Sort descending by blended score, breaking ties with original base_rank
     scored_list.sort(key=lambda x: (-x[1], x[3]))

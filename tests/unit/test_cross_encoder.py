@@ -43,7 +43,9 @@ def test_get_cross_encoder_device_hardware_detection(monkeypatch):
 
     # Test XPU detection
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    monkeypatch.setattr(torch, "xpu", SimpleNamespace(is_available=lambda: True), raising=False)
+    monkeypatch.setattr(
+        torch, "xpu", SimpleNamespace(is_available=lambda: True), raising=False
+    )
     assert cross_encoder.get_cross_encoder_device() in {"cpu", "cuda", "xpu", "mps"}
 
 
@@ -59,7 +61,7 @@ def test_get_cross_encoder_model_caching(monkeypatch):
     assert mock_load.call_count == 1
 
     cross_encoder.reset_cross_encoder_cache_for_tests()
-    m3 = cross_encoder.get_cross_encoder_model("test-model")
+    _ = cross_encoder.get_cross_encoder_model("test-model")
     assert mock_load.call_count == 2
 
 
@@ -78,7 +80,9 @@ def test_extract_names():
     assert cross_encoder._extract_names(None) == []
     assert cross_encoder._extract_names([]) == []
     assert cross_encoder._extract_names("Christopher Nolan") == ["Christopher Nolan"]
-    assert cross_encoder._extract_names({"name": "Denis Villeneuve"}) == ["Denis Villeneuve"]
+    assert cross_encoder._extract_names({"name": "Denis Villeneuve"}) == [
+        "Denis Villeneuve"
+    ]
 
     items = [
         {"name": "Leonardo DiCaprio"},
@@ -114,7 +118,10 @@ def test_build_candidate_document():
 
 
 def test_format_query_text():
-    assert cross_encoder.format_query_text("space battle", ["Sci-Fi", "Action"]) == "space battle | Genres: Sci-Fi, Action"
+    assert (
+        cross_encoder.format_query_text("space battle", ["Sci-Fi", "Action"])
+        == "space battle | Genres: Sci-Fi, Action"
+    )
     assert cross_encoder.format_query_text("space battle", None) == "space battle"
     assert cross_encoder.format_query_text("", ["Drama"]) == "Genres: Drama"
     assert cross_encoder.format_query_text(None, None) == ""
@@ -157,7 +164,9 @@ def test_score_query_candidates_scoring_and_blending(monkeypatch):
     mock_model = MagicMock()
     # Candidate 1 gets high raw logit (2.0), Candidate 2 gets low logit (-2.0)
     mock_model.predict.return_value = np.array([2.0, -2.0], dtype=np.float32)
-    monkeypatch.setattr(cross_encoder, "get_cross_encoder_model", lambda name=None: mock_model)
+    monkeypatch.setattr(
+        cross_encoder, "get_cross_encoder_model", lambda name=None: mock_model
+    )
 
     scored = cross_encoder.score_query_candidates(
         query="star wars jedi space battle",
@@ -180,7 +189,9 @@ def test_score_query_candidates_handles_inference_exception(monkeypatch):
 
     mock_model = MagicMock()
     mock_model.predict.side_effect = RuntimeError("GPU out of memory")
-    monkeypatch.setattr(cross_encoder, "get_cross_encoder_model", lambda name=None: mock_model)
+    monkeypatch.setattr(
+        cross_encoder, "get_cross_encoder_model", lambda name=None: mock_model
+    )
 
     scored = cross_encoder.score_query_candidates("query", candidates)
     assert len(scored) == 1
@@ -223,11 +234,12 @@ def test_load_cross_encoder_openvino_and_fallback(monkeypatch):
         MagicMock(side_effect=RuntimeError("OpenVINO init failed")),
     )
     import sentence_transformers
-    from sentence_transformers import CrossEncoder as STCrossEncoder
+
     mock_st_ce = MagicMock()
     monkeypatch.setattr(sentence_transformers, "CrossEncoder", mock_st_ce)
 
     fallback_loaded = cross_encoder._load_cross_encoder("test-model", "GPU")
+    assert fallback_loaded is not None
     assert mock_st_ce.called
 
 
@@ -241,7 +253,9 @@ def test_openvino_cross_encoder_predict():
         def __call__(self, pairs, **kwargs):
             return {"input_ids": np.zeros((len(pairs), 10), dtype=np.int64)}
 
-    ov_ce = cross_encoder.OpenVINOCrossEncoder.__new__(cross_encoder.OpenVINOCrossEncoder)
+    ov_ce = cross_encoder.OpenVINOCrossEncoder.__new__(
+        cross_encoder.OpenVINOCrossEncoder
+    )
     ov_ce.model = FakeOVModel()
     ov_ce.tokenizer = FakeTokenizer()
     ov_ce.device = "GPU"
@@ -254,4 +268,3 @@ def test_openvino_cross_encoder_predict():
     # Empty pairs
     empty_preds = ov_ce.predict([])
     assert len(empty_preds) == 0
-
