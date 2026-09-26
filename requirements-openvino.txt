@@ -1,0 +1,8 @@
+-r requirements.txt
+
+# optimum-intel 2.2.0 supports Transformers >=4.51,<5.6. Transformers 5.5.4
+# contains all available RCE fixes; PYSEC-2026-3929 is mitigated in
+# api/core/model_security.py until optimum-intel supports Transformers >=5.10.
+transformers==5.5.4
+huggingface-hub==1.10.2
+optimum-intel[openvino]==2.2.0

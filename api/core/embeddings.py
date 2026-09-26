@@ -7,6 +7,8 @@ from typing import Iterable, Any
 
 import numpy as np
 
+from api.core.model_security import save_tokenizer_safely
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = os.getenv("EMBED_MODEL", "all-MiniLM-L6-v2")
@@ -64,7 +66,7 @@ class OpenVINOEmbeddingModel:
             try:
                 cache_dir.mkdir(parents=True, exist_ok=True)
                 self.model.save_pretrained(cache_dir)
-                self.tokenizer.save_pretrained(cache_dir)
+                save_tokenizer_safely(self.tokenizer, cache_dir)
             except Exception as exc:
                 logger.debug("Could not cache OpenVINO model to %s: %s", cache_dir, exc)
 

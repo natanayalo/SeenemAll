@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Sequence, Tuple, overload
 
 import numpy as np
 
+from api.core.model_security import save_tokenizer_safely
+
 if TYPE_CHECKING:
     from sentence_transformers import CrossEncoder  # pragma: no cover
 else:
@@ -64,7 +66,7 @@ class OpenVINOCrossEncoder:
             try:
                 cache_dir.mkdir(parents=True, exist_ok=True)
                 self.model.save_pretrained(cache_dir)
-                self.tokenizer.save_pretrained(cache_dir)
+                save_tokenizer_safely(self.tokenizer, cache_dir)
             except Exception as exc:
                 logger.debug("Could not cache OpenVINO model to %s: %s", cache_dir, exc)
 

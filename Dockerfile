@@ -14,9 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
-COPY requirements.txt ./
+COPY requirements.txt requirements-openvino.txt ./
 RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip,sharing=locked \
-    pip wheel --no-deps --wheel-dir /app/wheels -r requirements.txt
+    pip wheel --wheel-dir /app/wheels -r requirements-openvino.txt
 
 # Final stage
 FROM python:3.11-slim
@@ -29,11 +29,11 @@ WORKDIR /app
 
 # Copy wheels from builder stage
 COPY --from=builder /app/wheels /wheels
-COPY --from=builder /app/requirements.txt .
+COPY --from=builder /app/requirements.txt /app/requirements-openvino.txt ./
 
 # Install dependencies
 RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip,sharing=locked \
-    pip install /wheels/*
+    pip install --no-index --find-links=/wheels -r requirements-openvino.txt
 
 # Pre-download default sentence-transformers model and cross-encoder to eliminate first-request cold start
 RUN python -c "from sentence_transformers import SentenceTransformer, CrossEncoder; SentenceTransformer('all-MiniLM-L6-v2'); CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')"
