@@ -23,6 +23,7 @@ services:
       - elasticsearch
     volumes:
       - ./:/app
+      - hf-cache:/root/.cache
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
     container_name: seenemall_elasticsearch
@@ -69,3 +70,4 @@ services:
 volumes:
   db-data:
   es-data:
+  hf-cache:

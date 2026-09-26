@@ -30,6 +30,8 @@ logging.getLogger("api.db.sql").setLevel(logging.INFO)
 logging.getLogger("urllib3").setLevel(logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.INFO)
+logging.getLogger("filelock").setLevel(logging.WARNING)
+logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
 
 
 @asynccontextmanager
@@ -38,6 +40,18 @@ async def app_lifespan(app: FastAPI):
     tmdb_client = TMDBClient(TMDB_API_KEY) if TMDB_API_KEY else None
     app.state.tmdb_client = tmdb_client
     app.state.entity_linker = EntityLinker(tmdb_client) if tmdb_client else None
+
+    # Pre-warm default embedding model to eliminate first-request latency
+    if get_db not in app.dependency_overrides and not os.getenv("TESTING"):
+        try:
+            from api.core.embeddings import get_model
+
+            get_model()
+        except Exception as exc:  # pragma: no cover - defensive warmup
+            logging.getLogger("api.main").warning(
+                "Could not pre-warm embedding model: %s", exc
+            )
+
     yield
     client = getattr(app.state, "tmdb_client", None)
     if client is not None:
