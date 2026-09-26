@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from api.core import candidate_gen
+from api.core.elasticsearch_search import SearchFilters
 
 
 def test_ann_candidates_returns_empty_when_vector_missing(
@@ -149,3 +150,94 @@ def test_backend_override_invalid_raises(monkeypatch: pytest.MonkeyPatch) -> Non
             allowed_ids=None,
             backend_override="invalid",
         )
+
+
+def test_pgvector_ann_candidates_with_search_filters() -> None:
+    db = DummySession(rows=[(101,), (102,)])
+    vec = np.array([0.1, 0.2, 0.3], dtype="float32")
+    sf = SearchFilters(
+        media_types=("movie",),
+        release_year_gte=2000,
+        release_year_lte=2020,
+        runtime_gte=90,
+        runtime_lte=150,
+        directors=("Christopher Nolan",),
+        cast=("Christian Bale",),
+        producers=("Emma Thomas",),
+        writers=("Jonathan Nolan",),
+        genres=("Action",),
+        languages=("en",),
+        include_item_ids=("101", "102"),
+        exclude_item_ids=("999",),
+    )
+
+    result = candidate_gen.ann_candidates(
+        db,
+        vec,
+        exclude_ids=[55],
+        limit=10,
+        allowed_ids=[101],
+        backend_override="pgvector",
+        search_filters=sf,
+    )
+
+    assert result == [101, 102]
+    assert len(db.calls) == 1
+    stmt, params = db.calls[0]
+    sql_text = str(stmt)
+    assert "JOIN items i ON i.id = e.item_id" in sql_text
+    assert "<=>" in sql_text
+    assert params["media_types"] == ["movie"]
+    assert params["year_gte"] == 2000
+    assert params["year_lte"] == 2020
+    assert params["runtime_gte"] == 90
+    assert params["runtime_lte"] == 150
+    assert params["dir_1"] == "%christopher nolan%"
+    assert params["cast_1"] == "%christian bale%"
+    assert params["prod_1"] == "%emma thomas%"
+    assert params["writ_1"] == "%jonathan nolan%"
+    assert params["genre_1"] == "%action%"
+    assert params["lang_1"] == "en"
+    assert set(params["exclude"]) == {55, 999}
+    assert set(params["allowed"]) == {101, 102}
+
+
+def test_pgvector_ann_candidates_with_providers() -> None:
+    db = DummySession(rows=[(10,)])
+    vec = np.array([0.5, 0.5], dtype="float32")
+    sf = SearchFilters(providers=("netflix", "prime"))
+
+    result = candidate_gen.ann_candidates(
+        db,
+        vec,
+        exclude_ids=[],
+        limit=5,
+        backend_override="pgvector",
+        search_filters=sf,
+    )
+
+    assert result == [10]
+    assert len(db.calls) == 1
+    stmt, params = db.calls[0]
+    sql_text = str(stmt)
+    assert "JOIN availability a ON a.item_id = e.item_id" in sql_text
+    assert params["providers"] == ["netflix", "prime"]
+    assert params["country"] == "US"
+
+
+def test_pgvector_ann_candidates_empty_include_short_circuits() -> None:
+    db = DummySession()
+    vec = np.array([0.1, 0.2], dtype="float32")
+    sf = SearchFilters(include_item_ids=("invalid",))
+
+    result = candidate_gen.ann_candidates(
+        db,
+        vec,
+        exclude_ids=[],
+        limit=5,
+        backend_override="pgvector",
+        search_filters=sf,
+    )
+
+    assert result == []
+    assert len(db.calls) == 0

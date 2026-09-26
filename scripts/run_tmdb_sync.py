@@ -1,8 +1,9 @@
 from etl.tmdb_sync import run
 import os
 
-# Override TMDB_PAGE_LIMIT to fetch many more pages
-os.environ["TMDB_PAGE_LIMIT"] = "200"  # 200 pages = ~4000 titles per list type
+# Allow TMDB_PAGE_LIMIT override, default to 50
+if "TMDB_PAGE_LIMIT" not in os.environ:
+    os.environ["TMDB_PAGE_LIMIT"] = "50"
 
 if __name__ == "__main__":
     run()
