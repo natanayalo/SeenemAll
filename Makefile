@@ -1,4 +1,4 @@
-.PHONY: up down logs sh migrate rev head alembic-init etl-tmdb embed etl-justwatch eval eval-report es-setup es-sync
+.PHONY: up down logs sh migrate rev head alembic-init etl-tmdb embed etl-justwatch eval eval-baseline eval-benchmark eval-ab eval-report es-setup es-sync
 
 EVAL_PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,python)
 
@@ -37,6 +37,15 @@ etl-justwatch:
 
 eval:
 	$(EVAL_PYTHON) -m evaluation.evaluate --k=10 --set evaluation/evaluation_set.json
+
+eval-baseline:
+	$(EVAL_PYTHON) -m evaluation.evaluate --config ann_only --backend elasticsearch --k=10 --save-baseline evaluation/baseline.json --set evaluation/evaluation_set.json
+
+eval-benchmark:
+	$(EVAL_PYTHON) -m evaluation.evaluate --benchmark --k=10 --min-ndcg=0.72 --min-ild=0.45 --set evaluation/evaluation_set.json
+
+eval-ab:
+	$(EVAL_PYTHON) -m evaluation.evaluate --ab-compare --baseline-file evaluation/baseline.json --candidate default --backend elasticsearch --k=10 --set evaluation/evaluation_set.json
 
 eval-report:
 	@if [ -f evaluation/evaluation_set.titles.json ]; then \

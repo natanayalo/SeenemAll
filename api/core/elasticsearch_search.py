@@ -141,14 +141,17 @@ def _extract_item_id(hit: Mapping[str, Any]) -> Optional[str]:
 def _fuse_hits_rrf(
     hit_lists: Sequence[Sequence[Mapping[str, Any]]],
     *,
+    weights: Optional[Sequence[float]] = None,
     max_size: int,
     rrf_k: int = 60,
 ) -> List[Dict[str, Any]]:
     """
-    Combine multiple ranked hit lists using Reciprocal Rank Fusion.
+    Combine multiple ranked hit lists using Reciprocal Rank Fusion with optional weights.
     """
     fused: Dict[str, Dict[str, Any]] = {}
-    for hits in hit_lists:
+    effective_weights = list(weights) if weights is not None else [1.0] * len(hit_lists)
+    for list_idx, hits in enumerate(hit_lists):
+        w = effective_weights[list_idx] if list_idx < len(effective_weights) else 1.0
         for rank, hit in enumerate(hits, start=1):
             item_id = _extract_item_id(hit)
             if not item_id:
@@ -161,7 +164,7 @@ def _fuse_hits_rrf(
                     "score": 0.0,
                 },
             )
-            entry["score"] += 1.0 / (rrf_k + rank)
+            entry["score"] += w / (rrf_k + rank)
             # Preserve a representative _source for downstream consumers.
             if not entry["_source"] and hit.get("_source"):
                 entry["_source"] = hit["_source"]
@@ -256,15 +259,17 @@ def knn_search(
             {
                 "multi_match": {
                     "query": text_query,
+                    "type": "cross_fields",
                     "fields": [
                         "title^3",
+                        "directors.text^8",
+                        "cast.text^4",
+                        "keywords.text^2",
                         "overview",
-                        "keywords^2",
-                        "cast",
-                        "directors",
-                        "producers",
-                        "writers",
+                        "producers.text",
+                        "writers.text",
                     ],
+                    "operator": "or",
                 }
             }
         )
@@ -300,7 +305,9 @@ def knn_search(
                 )
 
     if text_hits:
-        hits = _fuse_hits_rrf([hits, text_hits], max_size=effective_k)
+        hits = _fuse_hits_rrf(
+            [hits, text_hits], weights=[1.0, 1.5], max_size=effective_k
+        )
 
     results: List[Dict[str, Any]] = []
     for hit in hits:

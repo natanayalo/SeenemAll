@@ -36,8 +36,13 @@ htmlcov/
 evaluation/artifacts/
 evaluation/evaluation_results*.csv
 evaluation/evaluation_scores*.csv
+evaluation/ab_comparison_report*.json
 evaluation/report.html
 evaluation/sweep_*.csv
 evaluation/*.md
 *.csv
 tmp_report.html
+
+# Temp test directories
+.tmp/
+pytest-temp*/

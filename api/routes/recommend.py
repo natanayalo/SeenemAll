@@ -145,6 +145,7 @@ class RecommendParams:
         False,
         description="Require items to satisfy every inferred genre (AND semantics).",
     )
+    rerank: bool = Query(True, description="Enable reranker pass.")
     debug: bool = Query(False, description="Include debug diagnostics in response.")
 
 
@@ -1795,21 +1796,23 @@ async def _compute_recommendations_async(
     if boost_ids:
         ordered = _prioritize_boosted_items(ordered, boost_ids)
 
-    reranked = rerank_with_explanations(
-        ordered,
-        intent=intent,
-        query=query,
-        user={
-            "user_id": canonical_id,
-            "base_user_id": user_id,
-            "profile": profile,
-            "genre_prefs": profile_meta.get("genre_prefs"),
-            "neighbors": profile_meta.get("neighbors"),
-            "negative_items": profile_meta.get("negative_items"),
-        },
-    )
-
-    METRICS.counter("recommend.reranker_used").inc()
+    if getattr(params, "rerank", True):
+        reranked = rerank_with_explanations(
+            ordered,
+            intent=intent,
+            query=query,
+            user={
+                "user_id": canonical_id,
+                "base_user_id": user_id,
+                "profile": profile,
+                "genre_prefs": profile_meta.get("genre_prefs"),
+                "neighbors": profile_meta.get("neighbors"),
+                "negative_items": profile_meta.get("negative_items"),
+            },
+        )
+        METRICS.counter("recommend.reranker_used").inc()
+    else:
+        reranked = ordered
 
     pipeline_ms = (time.perf_counter() - _pipeline_start) * 1000
     METRICS.histogram("recommend.total_latency_ms").observe(pipeline_ms)

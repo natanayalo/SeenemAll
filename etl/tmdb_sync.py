@@ -436,14 +436,18 @@ def _upsert_items(db: Session, items: List[Dict[str, Any]]):
     existing = {(row.tmdb_id, row.media_type) for row in result}
     to_insert = []
     to_update = []
+    seen_insert = set()
 
     for d in items:
         mapped = map_item_payload(d)
         key = (mapped["tmdb_id"], mapped["media_type"])
         if key in existing:
             to_update.append(mapped)
-        else:
+        elif key not in seen_insert:
             to_insert.append(mapped)
+            seen_insert.add(key)
+        else:
+            to_update.append(mapped)
 
     if to_insert:
         db.bulk_insert_mappings(Item, to_insert)

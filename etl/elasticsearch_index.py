@@ -24,11 +24,29 @@ def build_items_index_body() -> Dict[str, Any]:
                 "analyzer": {
                     "english_with_stop": {
                         "tokenizer": "standard",
-                        "filter": ["lowercase", "porter_stem", "english_stop"],
+                        "filter": [
+                            "lowercase",
+                            "porter_stem",
+                            "english_stop",
+                            "domain_stop",
+                        ],
                     }
                 },
                 "filter": {
                     "english_stop": {"type": "stop", "stopwords": "_english_"},
+                    "domain_stop": {
+                        "type": "stop",
+                        "stopwords": [
+                            "movie",
+                            "movies",
+                            "film",
+                            "films",
+                            "show",
+                            "shows",
+                            "series",
+                            "tv",
+                        ],
+                    },
                 },
             },
         },
@@ -52,11 +70,26 @@ def build_items_index_body() -> Dict[str, Any]:
                 "maturity": {"type": "keyword"},
                 "streaming_providers": {"type": "keyword"},
                 "popularity": {"type": "float"},
-                "cast": {"type": "keyword"},
-                "directors": {"type": "keyword"},
-                "producers": {"type": "keyword"},
-                "writers": {"type": "keyword"},
-                "keywords": {"type": "keyword"},
+                "cast": {
+                    "type": "keyword",
+                    "fields": {"text": {"type": "text", "analyzer": "standard"}},
+                },
+                "directors": {
+                    "type": "keyword",
+                    "fields": {"text": {"type": "text", "analyzer": "standard"}},
+                },
+                "producers": {
+                    "type": "keyword",
+                    "fields": {"text": {"type": "text", "analyzer": "standard"}},
+                },
+                "writers": {
+                    "type": "keyword",
+                    "fields": {"text": {"type": "text", "analyzer": "standard"}},
+                },
+                "keywords": {
+                    "type": "keyword",
+                    "fields": {"text": {"type": "text", "analyzer": "standard"}},
+                },
                 "spoken_languages": {"type": "keyword"},
                 "embedding": {
                     "type": "dense_vector",

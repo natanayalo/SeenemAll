@@ -131,6 +131,59 @@ def fetch_titles_for_tmdb_ids(tmdb_ids: Iterable[int], dsn: str) -> Dict[int, st
     return titles
 
 
+def fetch_embeddings_for_tmdb_ids(
+    tmdb_ids: Iterable[int], dsn: str
+) -> Dict[int, List[float]]:
+    """Return mapping of tmdb_id -> embedding vector for the provided ids."""
+    if not HAVE_SQLALCHEMY:
+        return {}
+
+    unique_ids = {int(tid) for tid in tmdb_ids if tid is not None}
+    if not unique_ids:
+        return {}
+
+    try:
+        engine = _get_engine(dsn)
+    except Exception as exc:  # pragma: no cover
+        print(f"Failed to connect for embedding lookup using DSN {dsn!r}: {exc}")
+        return {}
+
+    query = text(
+        """
+        SELECT items.tmdb_id, item_embeddings.vector
+        FROM items
+        JOIN item_embeddings ON items.id = item_embeddings.item_id
+        WHERE items.tmdb_id IN :ids
+        """
+    ).bindparams(bindparam("ids", expanding=True))
+
+    embeddings: Dict[int, List[float]] = {}
+    with engine.connect() as conn:
+        try:
+            result = conn.execute(query, {"ids": list(unique_ids)})
+        except Exception as exc:  # pragma: no cover
+            print(f"Embedding lookup query failed: {exc}")
+            return {}
+        for row in result:
+            tmdb_id, vec = row
+            if tmdb_id is not None and vec is not None:
+                if isinstance(vec, str):
+                    try:
+                        parsed = [
+                            float(x.strip())
+                            for x in vec.strip("[]()").split(",")
+                            if x.strip()
+                        ]
+                        embeddings[int(tmdb_id)] = parsed
+                    except Exception:
+                        continue
+                elif hasattr(vec, "tolist"):
+                    embeddings[int(tmdb_id)] = vec.tolist()
+                elif isinstance(vec, (list, tuple)):
+                    embeddings[int(tmdb_id)] = [float(x) for x in vec]
+    return embeddings
+
+
 def _execute_scalar(conn: Any, query: str, params: Dict[str, Any]) -> Optional[int]:
     result = conn.execute(text(query), params)
     row = result.first()
