@@ -31,6 +31,25 @@ interface Recommendation {
   popularity?: number | null;
 }
 
+const apiBaseUrl = (process.env.REACT_APP_API_URL ?? '').trim().replace(/\/$/, '');
+const apiKey = (process.env.REACT_APP_API_KEY ?? '').trim();
+
+const getApiHeaders = (extraHeaders?: Record<string, string>): HeadersInit => {
+  const headers: Record<string, string> = { ...extraHeaders };
+  if (apiKey) {
+    headers['X-API-Key'] = apiKey;
+  }
+  return headers;
+};
+
+const buildApiUrl = (path: string, params?: URLSearchParams) => {
+  const query = params && params.toString() ? `?${params.toString()}` : '';
+  if (apiBaseUrl) {
+    return `${apiBaseUrl}${path}${query}`;
+  }
+  return `${path}${query}`;
+};
+
 function App() {
   const defaultMixerAnn = 0.5;
   const defaultMixerCollab = 0.3;
@@ -62,11 +81,11 @@ function App() {
 
   const initializeUserHistory = async () => {
     try {
-      await fetch(`${process.env.REACT_APP_API_URL}/user/history`, {
+      await fetch(buildApiUrl('/user/history'), {
         method: 'POST',
-        headers: {
+        headers: getApiHeaders({
           'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({
           user_id: userId,
           items: []  // Start with empty history
@@ -123,28 +142,46 @@ function App() {
         params.append('mixer_novelty_weight', mixerNoveltyWeight.toString());
         params.append('mixer_vote_weight', mixerVoteWeight.toString());
       }
+      if (process.env.NODE_ENV !== 'production' && !apiBaseUrl) {
+        params.append('_ts', Date.now().toString());
+      }
 
-      const url = `${process.env.REACT_APP_API_URL}/recommend?${params.toString()}`;
+      const url = buildApiUrl('/recommend', params);
       console.log('Fetching recommendations from:', url);
 
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+        headers: getApiHeaders({
+          'Accept': 'application/json',
+        }),
+        cache: 'no-store',
       });
+      console.log('Recommendations response status:', response.status);
       if (!response.ok) {
         const errorData = await response.json();
         console.error('API Error:', errorData);
         throw new Error(`Failed to fetch recommendations: ${JSON.stringify(errorData)}`);
       }
-      const data = await response.json();
-      console.log('API Response:', data);
+      const responseText = await response.text();
+      console.log('API raw response:', responseText.slice(0, 500));
+      let data;
+      if (!responseText.trim()) {
+        console.warn('Recommendations API returned an empty body; treating as empty list.');
+        data = [];
+      } else {
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Failed to parse recommendations JSON:', parseError, responseText);
+          throw new Error(`Received invalid JSON from recommendations API: ${responseText.slice(0, 120)}`);
+        }
+      }
+      console.log('API Response (parsed):', data);
       // The API might return the recommendations directly, not in an 'items' property
       setRecommendations(Array.isArray(data) ? data : data.items || []);
     } catch (error) {
       console.error('Error fetching recommendations:', error);
-      setError('Failed to load recommendations. Please try again.');
+      setError(error instanceof Error ? error.message : 'Failed to load recommendations. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -152,11 +189,11 @@ function App() {
 
   const handleWatch = async (recommendationId: number) => {
     try {
-      await fetch(`${process.env.REACT_APP_API_URL}/user/history`, {
+      await fetch(buildApiUrl('/user/history'), {
         method: 'POST',
-        headers: {
+        headers: getApiHeaders({
           'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({
           user_id: userId,
           items: [recommendationId],

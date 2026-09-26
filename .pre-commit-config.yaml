@@ -59,7 +59,7 @@ repos:
         # args: [--strict, --pretty]
 
         additional_dependencies:
-          - types-cachetools
+          - types-cachetools==6.2.0.20251022
           - types-requests
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v3.13.0

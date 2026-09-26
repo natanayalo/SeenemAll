@@ -123,7 +123,7 @@
 | **10.1** Offline metrics | ⏳ | Add NDCG, diversity scores |
 | **10.2** Synthetic profiles | ⏳ | Generate test users |
 | **10.3** Quality monitoring | ⏳ | Track metrics over time |
-| **10.4** Test dataset | ⏳ | Build from user feedback |
+| **10.4** Test dataset | ⏳ | `evaluation/build_golden.py` outputs candidate sets (review + merge manually); feedback-driven expansion pending |
 | **10.5** A/B framework | ⏳ | Test recommendation variants |
 | **10.6** Performance suite | ⏳ | Measure latency/throughput |
 
@@ -131,9 +131,19 @@
 
 | Task | Status | Notes |
 |---|---|---|
-| **11.1** Provision local Elasticsearch | ⏳ | Add a Docker service (v8.x LTS with kNN/HNSW support) alongside the API/db stacks; configure JVM heap, persistence, and auth suitable for local dev |
-| **11.2** Define rec index mapping | ⏳ | Create `items` index with structured fields (`genres`, `media_type`, `runtime`, `release_year`, `maturity`, `streaming_providers`) plus `dense_vector` for embeddings and full-text fields for title/overview |
-| **11.3** Nightly data sync ETL | ⏳ | New ETL command to export items from Postgres, push into Elasticsearch (bulk API), and schedule nightly refresh; document reindex flow |
-| **11.4** ANN/Hybrid query prototype | ⏳ | Implement ES kNN (HNSW) query, optionally blended with keyword filters; benchmark recall vs. pgvector for evaluation queries |
-| **11.5** API integration | ⏳ | Add ES client config, replace `ann_candidates` with ES-based retrieval, keep collaborative/popularity blending, ensure filters (genres/year/runtime/provider) apply in ES |
+| **11.1** Provision local Elasticsearch | ✅ | Docker Compose adds 8.13 single-node service with healthcheck, persistent volume, and tuned JVM heap |
+| **11.2** Define rec index mapping | ✅ | `scripts/setup_elasticsearch.py` creates the `items` index with strict mappings + 384-dim dense vector |
+| **11.3** Nightly data sync ETL | ✅ | `scripts/run_elasticsearch_sync.py` bulk indexes catalog embeddings + availability; documented cron usage |
+| **11.4** ANN/Hybrid query prototype | ✅ | `api/core/elasticsearch_search.py` wraps ES kNN + filters with tests for exclusions and keyword blending |
+| **11.5** API integration | ✅ | `ann_candidates` now queries Elasticsearch via kNN (allowlists/exclusions preserved) and feeds the existing mixer |
 | **11.6** Evaluation & rollout | ⏳ | Re-run `make eval`, capture metrics vs. current pipeline, monitor latency; update docs/env vars for staging/production deployment
+
+### 12. Query Filter Unification (Priority: Medium)
+
+| Task | Status | Notes |
+|---|---|---|
+| **12.1** Feed spaCy matcher signals into intent pipeline | ✅ | QueryFilterMatcher media types/genres/keywords now merge into the catalog-aware IntentFilters before Elasticsearch filters are built |
+| **12.2** Catalog-normalize matcher outputs | ✅ | Matcher-derived hints reuse `_normalize_genre_names` / `_strict_required_genres`, honoring per-media-type genre lists |
+| **12.3** Derive SearchFilters from normalized intent | ✅ | Elasticsearch filters/text queries now consume the normalized intent fields instead of raw matcher output |
+| **12.4** Extend legacy parser for titles/keywords | ✅ | IntentFilters track matcher-provided titles/keywords so strict filtering and ANN allowlists can enforce them |
+| **12.5** Tests & eval | ✅ | Added regression test covering anime query normalization and reran `evaluation/sweep_query` for anime sci-fi scenario |

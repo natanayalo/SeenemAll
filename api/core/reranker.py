@@ -426,13 +426,13 @@ def _item_identity(item: Dict[str, Any]) -> tuple[Any, int]:
 
 @lru_cache(maxsize=1)
 def _get_settings() -> RerankerSettings:
-    raw_provider = os.getenv("RERANK_PROVIDER", "openai").strip().lower()
-    supported = {"openai", "gemini", "small"}
+    raw_provider = os.getenv("RERANK_PROVIDER", "ollama").strip().lower()
+    supported = {"openai", "gemini", "small", "ollama"}
     if raw_provider not in supported:
         logger.warning(
-            "Unsupported RERANK_PROVIDER '%s'; falling back to 'openai'.", raw_provider
+            "Unsupported RERANK_PROVIDER '%s'; falling back to 'ollama'.", raw_provider
         )
-        provider = "openai"
+        provider = "ollama"
     else:
         provider = raw_provider
 
@@ -446,6 +446,9 @@ def _get_settings() -> RerankerSettings:
     elif provider == "small":
         default_model = os.getenv("SMALL_RERANK_MODEL", "all-MiniLM-L6-v2")
         default_endpoint = "local://small-rerank"
+    elif provider == "ollama":
+        default_model = "gemma4:12b"
+        default_endpoint = "http://localhost:11434/v1/chat/completions"
     else:
         default_model = "gpt-4o-mini"
         default_endpoint = "https://api.openai.com/v1/chat/completions"
@@ -455,13 +458,16 @@ def _get_settings() -> RerankerSettings:
     enabled_value = os.getenv("RERANK_ENABLED", "1").strip().lower()
     if provider == "small":
         enabled = enabled_value not in {"0", "false", "no"}
+    elif provider == "ollama":
+        enabled = enabled_value not in {"0", "false", "no"}
     else:
         enabled = bool(api_key) and enabled_value not in {"0", "false", "no"}
-    timeout = (
-        _SMALL_RERANK_TIMEOUT_SECONDS
-        if provider == "small"
-        else _DEFAULT_TIMEOUT_SECONDS
-    )
+    if provider == "small":
+        timeout = _SMALL_RERANK_TIMEOUT_SECONDS
+    elif provider == "ollama":
+        timeout = 120.0
+    else:
+        timeout = _DEFAULT_TIMEOUT_SECONDS
     raw_timeout = os.getenv("RERANK_TIMEOUT")
     if raw_timeout:
         try:
@@ -888,6 +894,37 @@ def _execute_small_rerank(
         return []
 
     scored.sort(key=lambda entry: (-entry[1], entry[2]))
+    if logger.isEnabledFor(logging.DEBUG):
+        id_to_title: Dict[int, str] = {}
+        for item in items:
+            ident = item.get("id")
+            if isinstance(ident, int):
+                title = str(item.get("title") or item.get("name") or "")
+                id_to_title[ident] = title
+        debug_sample = [
+            {
+                "id": item_id,
+                "title": id_to_title.get(item_id, ""),
+                "score": round(score, 4),
+                "base_rank": base_rank,
+            }
+            for item_id, score, base_rank in scored[: min(20, len(scored))]
+        ]
+        highlights = [
+            {
+                "id": item_id,
+                "title": id_to_title.get(item_id, ""),
+                "score": round(score, 4),
+                "base_rank": base_rank,
+            }
+            for item_id, score, base_rank in scored
+            if base_rank < 10
+        ]
+        logger.debug(
+            "Small reranker scored candidates | sample=%s | base_top=%s",
+            debug_sample,
+            highlights,
+        )
     trimmed = scored[:limit]
     return [(item_id, score) for item_id, score, _ in trimmed]
 
@@ -957,7 +994,7 @@ def _call_reranker(
     query: str | None,
     user: Dict[str, Any] | None,
 ) -> List[LLMDecision]:
-    if settings.provider == "openai":
+    if settings.provider in {"openai", "ollama"}:
         decisions = _call_openai_reranker(settings, items, intent, query, user)
     elif settings.provider == "gemini":
         decisions = _call_gemini_reranker(settings, items, intent, query, user)
@@ -1007,21 +1044,22 @@ def _call_openai_reranker(
     query: str | None,
     user: Dict[str, Any] | None,
 ) -> List[LLMDecision]:
-    if not settings.api_key:
+    if settings.provider == "openai" and not settings.api_key:
         raise RerankerError("Missing API key for reranker provider.")
 
     payload = _build_llm_payload(settings, items, intent, query, user)
-    headers = {
-        "Authorization": f"Bearer {settings.api_key}",
-        "Content-Type": "application/json",
-    }
-    project = os.getenv("OPENAI_PROJECT")
+    headers = {"Content-Type": "application/json"}
+    if settings.api_key:
+        headers["Authorization"] = f"Bearer {settings.api_key}"
+    project = os.getenv("OPENAI_PROJECT") if settings.provider == "openai" else None
     if project:
         headers["OpenAI-Project"] = project
 
     endpoint = settings.endpoint
     body = payload
-    using_responses_api = bool(project) or endpoint.endswith("/responses")
+    using_responses_api = settings.provider == "openai" and (
+        bool(project) or endpoint.endswith("/responses")
+    )
     if using_responses_api:
         endpoint = endpoint.rstrip("/")
         if not endpoint.endswith("/responses"):

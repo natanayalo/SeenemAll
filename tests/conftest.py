@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import os
 import sys
 import types
-
-import numpy as np
 from pathlib import Path
 
+import numpy as np
+
+os.environ["API_AUTH_ENABLED"] = "0"
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:

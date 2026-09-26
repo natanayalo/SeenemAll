@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List
 from types import SimpleNamespace
 
@@ -27,12 +27,14 @@ def _reset_settings() -> None:
         "RERANK_ENABLED",
     ]:
         os.environ.pop(key, None)
+    os.environ["RERANK_PROVIDER"] = "openai"
 
 
 def test_rerank_with_explanations_without_api_key(monkeypatch):
     _reset_settings()
     monkeypatch.delenv("RERANK_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("RERANK_ENABLED", "0")
 
     items = [
         {
@@ -95,6 +97,7 @@ def test_rerank_with_explanations_handles_exception(monkeypatch):
 def test_get_settings_invalid_timeout_warns(monkeypatch, capfd):
     _reset_settings()
     monkeypatch.setenv("RERANK_API_KEY", "fake")
+    monkeypatch.setenv("RERANK_PROVIDER", "openai")
     monkeypatch.setenv("RERANK_TIMEOUT", "not-a-number")
 
     settings = reranker._get_settings()
@@ -108,12 +111,27 @@ def test_get_settings_fallback_provider(monkeypatch):
     monkeypatch.setenv("RERANK_API_KEY", "fake")
     monkeypatch.setenv("RERANK_PROVIDER", "unsupported")
     settings = reranker._get_settings()
-    assert settings.provider == "openai"
+    assert settings.provider == "ollama"
     _reset_settings()
+
+
+def test_get_settings_defaults_to_ollama_without_api_key(monkeypatch):
+    _reset_settings()
+    monkeypatch.delenv("RERANK_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("RERANK_PROVIDER", raising=False)
+
+    settings = reranker._get_settings()
+
+    assert settings.provider == "ollama"
+    assert settings.model == "gemma4:12b"
+    assert settings.endpoint == "http://localhost:11434/v1/chat/completions"
+    assert settings.enabled is True
 
 
 def test_call_openai_reranker_parses_payload(monkeypatch):
     _reset_settings()
+    monkeypatch.setenv("RERANK_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_PROJECT", "proj-test")
     monkeypatch.setenv("RERANK_API_KEY", "fake")
     settings = reranker._get_settings()
@@ -506,6 +524,7 @@ def test_call_openai_reranker_requires_api_key():
 def test_call_openai_reranker_handles_unexpected_response(monkeypatch):
     _reset_settings()
     monkeypatch.setenv("RERANK_API_KEY", "fake")
+    monkeypatch.setenv("RERANK_PROVIDER", "openai")
     settings = reranker._get_settings()
 
     class DummyResponse:
@@ -920,7 +939,7 @@ def test_heuristic_ranker_highlights_trending(monkeypatch):
     monkeypatch.setenv("RERANK_ENABLED", "0")
     reranker._get_settings.cache_clear()
 
-    current_year = datetime.utcnow().year
+    current_year = datetime.now(UTC).year
     items = [
         {
             "id": 1,
@@ -977,7 +996,7 @@ def test_explanation_templates_override(monkeypatch):
         max_runtime=None,
     )
 
-    current_year = datetime.utcnow().year
+    current_year = datetime.now(UTC).year
     items = [
         {
             "id": 1,

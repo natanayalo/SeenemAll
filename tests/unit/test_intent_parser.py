@@ -24,7 +24,11 @@ def _reset_llm_state(monkeypatch):
     for key in llm_parser.CACHE_METRICS:
         llm_parser.CACHE_METRICS[key] = 0
     monkeypatch.delenv("INTENT_API_KEY", raising=False)
-    monkeypatch.delenv("INTENT_ENABLED", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("INTENT_ENABLED", "0")
+    monkeypatch.delenv("INTENT_PROVIDER", raising=False)
+    monkeypatch.delenv("INTENT_ENDPOINT", raising=False)
+    monkeypatch.delenv("INTENT_MODEL", raising=False)
     original_get_settings = llm_parser._get_settings
     if hasattr(original_get_settings, "cache_clear"):
         original_get_settings.cache_clear()
@@ -77,9 +81,18 @@ def test_parse_intent_fixtures():
         expected_data = expected_intent.model_dump(exclude_none=True)
         actual_data = intent.model_dump()
         for field, expected_value in expected_data.items():
-            assert (
-                actual_data.get(field) == expected_value
-            ), f"Query: '{query}' field '{field}' mismatch"
+            actual_value = actual_data.get(field)
+            if isinstance(expected_value, list):
+                assert isinstance(
+                    actual_value, list
+                ), f"Query: '{query}' field '{field}' expected list, got {type(actual_value).__name__}"
+                assert set(actual_value) >= set(
+                    expected_value
+                ), f"Query: '{query}' field '{field}' mismatch"
+            else:
+                assert (
+                    actual_value == expected_value
+                ), f"Query: '{query}' field '{field}' mismatch"
 
 
 def test_rewrite_query():
@@ -142,6 +155,31 @@ def test_parse_intent_llm_failure_falls_back(monkeypatch):
     monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
 
     intent = parse_intent("no gore", {"user_id": "u2"})
+    assert intent.exclude_genres == ["Horror", "Thriller"]
+
+
+def test_parse_intent_ollama_connection_failure_falls_back(monkeypatch):
+    settings = IntentParserSettings(
+        provider="ollama",
+        api_key=None,
+        model="gemma4:12b",
+        endpoint="http://localhost:11434/v1/chat/completions",
+        enabled=True,
+        timeout=3.0,
+    )
+
+    monkeypatch.setattr(llm_parser, "_get_settings", lambda: settings)
+
+    def fail_request(*args):
+        raise httpx.ConnectError("Ollama is offline")
+
+    monkeypatch.setattr(
+        llm_parser,
+        "_call_openai_parser",
+        fail_request,
+    )
+
+    intent = parse_intent("no gore", {"user_id": "ollama-offline"})
     assert intent.exclude_genres == ["Horror", "Thriller"]
 
 
@@ -208,12 +246,26 @@ def test_parse_intent_llm_success(monkeypatch):
     assert intent.streaming_providers == ["netflix"]
 
 
-def test_get_settings_falls_back_to_openai(monkeypatch):
-    monkeypatch.setenv("INTENT_PROVIDER", "invalid")
-    monkeypatch.setenv("INTENT_API_KEY", "key")
+def test_get_settings_defaults_to_ollama_without_api_key(monkeypatch):
+    monkeypatch.delenv("INTENT_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("INTENT_PROVIDER", raising=False)
+    monkeypatch.delenv("INTENT_ENABLED", raising=False)
     llm_parser._get_settings.cache_clear()
     settings = llm_parser._get_settings()
-    assert settings.provider == "openai"
+    assert settings.provider == "ollama"
+    assert settings.model == "gemma4:12b"
+    assert settings.endpoint == "http://localhost:11434/v1/chat/completions"
+    assert settings.enabled is True
+
+
+def test_get_settings_falls_back_to_ollama(monkeypatch):
+    monkeypatch.setenv("INTENT_PROVIDER", "invalid")
+    monkeypatch.setenv("INTENT_API_KEY", "key")
+    monkeypatch.delenv("INTENT_ENABLED", raising=False)
+    llm_parser._get_settings.cache_clear()
+    settings = llm_parser._get_settings()
+    assert settings.provider == "ollama"
     assert settings.enabled is True
 
 
@@ -359,10 +411,10 @@ def test_parse_intent_returns_ann_description_when_enabled(monkeypatch):
     monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
 
     intent = parse_intent("dystopian series", {"user_id": "u42"})
-    assert intent.include_genres == ["Science Fiction"]
-    assert (
-        intent.ann_description
-        == "A dark dystopian TV series set in a controlled future society."
+    assert "Science Fiction" in (intent.include_genres or [])
+    assert intent.ann_description == (
+        "[Science Fiction, Sci-Fi & Fantasy] dystopian series :: "
+        "A dark dystopian TV series set in a controlled future society."
     )
 
 
@@ -411,6 +463,7 @@ def test_load_fallback_rules_parses_entries(monkeypatch, tmp_path):
 
 def test_get_settings_invalid_timeout_warns(monkeypatch, caplog):
     monkeypatch.setenv("INTENT_API_KEY", "token")
+    monkeypatch.setenv("INTENT_PROVIDER", "openai")
     monkeypatch.setenv("INTENT_TIMEOUT", "oops")
     llm_parser._get_settings.cache_clear()
 

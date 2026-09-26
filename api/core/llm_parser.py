@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache
 from threading import Lock
-from typing import Any, Dict, Tuple, List, Optional
+from typing import Any, Dict, Tuple, List, Optional, Sequence
 
 import httpx
 from cachetools import TTLCache
@@ -18,7 +18,9 @@ from .legacy_intent_parser import (
     canonical_genres,
 )
 from .rewrite import Rewrite
+from .persistent_cache import PersistentCache, get_persistent_cache
 from api.core.prompt_eval import load_prompt_template
+from etl.embedding_templates import format_with_template, format_basic
 
 DEFAULT_INTENT = Intent()
 DEFAULT_REWRITE = Rewrite(rewritten_text="")
@@ -50,6 +52,11 @@ def _env_flag(name: str, *, default: bool) -> bool:
 
 _ENABLE_MEDIA_TYPE_SCOPING = _env_flag("INTENT_SCOPE_GENRES_BY_MEDIA", default=True)
 _ENABLE_ANN_DESCRIPTION = _env_flag("INTENT_ENABLE_ANN_DESCRIPTION", default=False)
+_DEFAULT_CACHE_PATH = os.getenv(
+    "INTENT_CACHE_PATH",
+    os.path.join(os.getcwd(), ".cache", "intent_cache.sqlite"),
+)
+_PERSISTENT_CACHE_ENABLED = _env_flag("INTENT_CACHE_PERSIST", default=True)
 
 
 class IntentParserError(RuntimeError):
@@ -136,20 +143,58 @@ def _load_fallback_rules() -> Tuple[IntentFallbackRule, ...]:
 
 
 @lru_cache(maxsize=1)
-def _get_settings() -> IntentParserSettings:
-    api_key = os.getenv("INTENT_API_KEY") or os.getenv("OPENAI_API_KEY")
-    raw_provider = os.getenv("INTENT_PROVIDER", "openai").strip().lower()
-    if raw_provider not in {"openai", "gemini"}:
+def _persistent_intent_store() -> Optional[PersistentCache]:
+    return _persistent_cache_for_namespace("intent")
+
+
+@lru_cache(maxsize=1)
+def _persistent_rewrite_store() -> Optional[PersistentCache]:
+    return _persistent_cache_for_namespace("rewrite")
+
+
+@lru_cache(maxsize=2)
+def _persistent_cache_for_namespace(namespace: str) -> Optional[PersistentCache]:
+    if not _PERSISTENT_CACHE_ENABLED:
+        return None
+
+    path = os.getenv("INTENT_CACHE_PATH", _DEFAULT_CACHE_PATH)
+    if not path or path.strip().lower() in {"", "0", "false", "none", "off"}:
+        return None
+
+    try:
+        return get_persistent_cache(path, namespace)
+    except Exception as exc:  # pragma: no cover - defensive
         logger.warning(
-            "Unsupported INTENT_PROVIDER '%s'; falling back to 'openai'.", raw_provider
+            "Failed to initialise persistent %s cache at %s (%s). Falling back to in-memory cache only.",
+            namespace,
+            path,
+            exc,
         )
-        provider = "openai"
+        return None
+
+
+@lru_cache(maxsize=1)
+def _get_settings() -> IntentParserSettings:
+    raw_provider = os.getenv("INTENT_PROVIDER", "ollama").strip().lower()
+    if raw_provider not in {"ollama", "openai", "gemini"}:
+        logger.warning(
+            "Unsupported INTENT_PROVIDER '%s'; falling back to 'ollama'.", raw_provider
+        )
+        provider = "ollama"
     else:
         provider = raw_provider
 
+    api_key = (
+        os.getenv("INTENT_API_KEY") or os.getenv("OPENAI_API_KEY")
+        if provider in {"openai", "gemini"}
+        else None
+    )
     if provider == "gemini":
         default_model = "gemini-2.0-flash-lite"
         default_endpoint = "https://generativelanguage.googleapis.com/v1beta/models"
+    elif provider == "ollama":
+        default_model = "gemma4:12b"
+        default_endpoint = "http://localhost:11434/v1/chat/completions"
     else:
         default_model = "gpt-4o-mini"
         default_endpoint = "https://api.openai.com/v1/chat/completions"
@@ -157,8 +202,12 @@ def _get_settings() -> IntentParserSettings:
     model = os.getenv("INTENT_MODEL", default_model)
     endpoint = os.getenv("INTENT_ENDPOINT", default_endpoint)
     enabled_value = os.getenv("INTENT_ENABLED", "1").strip().lower()
-    enabled = bool(api_key) and enabled_value not in {"0", "false", "no"}
-    timeout = 12.0
+    enabled = (provider == "ollama" or bool(api_key)) and enabled_value not in {
+        "0",
+        "false",
+        "no",
+    }
+    timeout = 120.0 if provider == "ollama" else 12.0
     raw_timeout = os.getenv("INTENT_TIMEOUT")
     if raw_timeout:
         try:
@@ -364,17 +413,35 @@ def parse_intent(
         _log_metrics(_increment_metric("hits"), cache="intent")
         return _clone_intent(cached_intent)
 
+    persistent_store = _persistent_intent_store()
+    if persistent_store:
+        stored_payload = persistent_store.get(cache_key)
+        if stored_payload:
+            try:
+                persistent_intent = Intent.model_validate(stored_payload)
+            except ValidationError:
+                persistent_store.delete(cache_key)
+            else:
+                INTENT_CACHE[cache_key] = _clone_intent(persistent_intent)
+                _log_metrics(_increment_metric("hits"), cache="intent")
+                logger.debug(
+                    "Loaded intent for query '%s' from persistent cache.",
+                    normalized_query,
+                )
+                return persistent_intent
+
     settings = _get_settings()
 
     _log_metrics(_increment_metric("misses"), cache="intent")
 
     llm_output: Dict[str, Any] | None = None
+    used_stub = False
     if settings.enabled:
         logger.info(
             "Intent parser(%s) parsing query '%s'.", settings.provider, normalized_query
         )
         try:
-            if settings.provider == "openai":
+            if settings.provider in {"openai", "ollama"}:
                 llm_output = _call_openai_parser(
                     settings, normalized_query, user_context, linked_entities
                 )
@@ -384,7 +451,7 @@ def parse_intent(
                 )
             else:  # pragma: no cover - defensive guardrail
                 raise IntentParserError(f"Unsupported provider '{settings.provider}'")
-        except IntentParserError:
+        except (IntentParserError, httpx.RequestError):
             logger.exception("LLM intent parser failed; falling back to offline stub.")
     else:
         logger.info(
@@ -398,6 +465,7 @@ def parse_intent(
         llm_output = _offline_intent_stub(normalized_query)
         if llm_output:
             logger.debug("Offline intent stub produced intent: %s", llm_output)
+            used_stub = True
         else:
             logger.debug("Offline intent stub returned empty intent payload.")
 
@@ -420,12 +488,13 @@ def parse_intent(
         return default_intent()
 
     intent = _augment_intent(intent, normalized_query)
-    if not intent.ann_description:
-        truncated = " ".join(normalized_query.split()[:32]).strip()
-        if truncated:
-            intent.ann_description = truncated
+    intent.include_genres = _normalize_genre_names(intent.include_genres)
+    intent.exclude_genres = _normalize_genre_names(intent.exclude_genres)
+    intent.ann_description = _format_ann_description(intent, normalized_query)
     logger.debug("Returning intent: %s", intent)
     INTENT_CACHE[cache_key] = _clone_intent(intent)
+    if persistent_store and not used_stub:
+        persistent_store.set(cache_key, intent.model_dump())
     _log_metrics(_snapshot_metrics(), cache="intent", event="store")
     return intent
 
@@ -436,22 +505,23 @@ def _call_openai_parser(
     user_context: Dict[str, Any],
     linked_entities: Dict[str, Any] | None,
 ) -> Dict[str, Any]:
-    if not settings.api_key:
+    if settings.provider == "openai" and not settings.api_key:
         raise IntentParserError("Missing API key for intent parser provider.")
 
     payload = _build_llm_payload(settings, query, user_context, linked_entities)
-    headers = {
-        "Authorization": f"Bearer {settings.api_key}",
-        "Content-Type": "application/json",
-    }
-    project = os.getenv("OPENAI_PROJECT")
+    headers = {"Content-Type": "application/json"}
+    if settings.api_key:
+        headers["Authorization"] = f"Bearer {settings.api_key}"
+    project = os.getenv("OPENAI_PROJECT") if settings.provider == "openai" else None
     if project:
         headers["OpenAI-Project"] = project
 
     # Use Responses API when a project id is provided.
     endpoint = settings.endpoint
     body = payload
-    using_responses_api = bool(project) or endpoint.endswith("/responses")
+    using_responses_api = settings.provider == "openai" and (
+        bool(project) or endpoint.endswith("/responses")
+    )
     if using_responses_api:
         endpoint = endpoint.rstrip("/")
         if not endpoint.endswith("/responses"):
@@ -782,6 +852,19 @@ _LANGUAGE_KEYWORDS = {
     "portuguese": "pt",
 }
 
+_GENRE_CANONICAL_TO_CATALOG = {
+    "science fiction": ["Science Fiction", "Sci-Fi & Fantasy"],
+    "sci fi": ["Science Fiction", "Sci-Fi & Fantasy"],
+    "sci-fi": ["Science Fiction", "Sci-Fi & Fantasy"],
+    "sci-fi & fantasy": ["Science Fiction", "Sci-Fi & Fantasy"],
+    "fantasy": ["Fantasy", "Sci-Fi & Fantasy"],
+    "action": ["Action", "Action & Adventure"],
+    "adventure": ["Adventure", "Action & Adventure"],
+    "children": ["Kids"],
+    "kids": ["Kids"],
+    "family": ["Family"],
+}
+
 
 def _infer_year_range(text: str) -> Optional[Tuple[int, int]]:
     match = _DECADE_PATTERN.search(text)
@@ -811,6 +894,56 @@ def _detect_languages(text: str) -> List[str]:
         if keyword in text and code not in detected:
             detected.append(code)
     return detected
+
+
+def _normalize_genre_names(genres: Sequence[str] | None) -> List[str]:
+    if not genres:
+        return []
+    normalized: List[str] = []
+    seen: set[str] = set()
+    for genre in genres:
+        if not genre:
+            continue
+        key = genre.lower().strip()
+        mapped_values = _GENRE_CANONICAL_TO_CATALOG.get(key)
+        candidates = mapped_values if mapped_values is not None else [genre]
+        for candidate in candidates:
+            if candidate not in seen:
+                normalized.append(candidate)
+                seen.add(candidate)
+    return normalized
+
+
+def _format_ann_description(intent: Intent, query: str) -> str:
+    overview = (intent.ann_description or "").strip()
+    if not overview:
+        overview = query.strip()
+    title = query.strip()
+    if not title:
+        # fallback to first sentence of overview or generic label
+        base = overview.split(".")[0].strip() if overview else ""
+        title = base or "Recommendation"
+    genres = _normalize_genre_names(intent.include_genres)
+    year = None
+    if intent.year_min is not None and intent.year_max is not None:
+        if intent.year_min == intent.year_max:
+            year = intent.year_min
+    template_name = os.getenv("EMBED_TEMPLATE", "basic")
+    item_payload = {
+        "title": title,
+        "overview": overview,
+        "genres": genres,
+        "release_year": year,
+    }
+    try:
+        return format_with_template(template_name, item_payload)
+    except ValueError:
+        return format_basic(
+            title=title,
+            overview=overview,
+            genres=genres,
+            year=year,
+        )
 
 
 def _rewrite_from_intent(intent: Intent) -> Optional[str]:
@@ -865,6 +998,23 @@ def rewrite_query(query: str, intent: Intent) -> Rewrite:
         _log_metrics(_increment_metric("rewrite_hits"), cache="rewrite")
         return _clone_rewrite(cached_rewrite)
 
+    persistent_store = _persistent_rewrite_store()
+    if persistent_store:
+        stored_payload = persistent_store.get(cache_key)
+        if stored_payload:
+            try:
+                persistent_rewrite = Rewrite.model_validate(stored_payload)
+            except ValidationError:
+                persistent_store.delete(cache_key)
+            else:
+                REWRITE_CACHE[cache_key] = _clone_rewrite(persistent_rewrite)
+                _log_metrics(_increment_metric("rewrite_hits"), cache="rewrite")
+                logger.debug(
+                    "Loaded rewrite for query '%s' from persistent cache.",
+                    normalized_query,
+                )
+                return persistent_rewrite
+
     _log_metrics(_increment_metric("rewrite_misses"), cache="rewrite")
 
     description = (getattr(intent, "ann_description", "") or "").strip()
@@ -896,6 +1046,8 @@ def rewrite_query(query: str, intent: Intent) -> Rewrite:
     rewrite = Rewrite(rewritten_text=rewritten_text)
 
     REWRITE_CACHE[cache_key] = _clone_rewrite(rewrite)
+    if persistent_store:
+        persistent_store.set(cache_key, rewrite.model_dump())
     _log_metrics(_snapshot_metrics(), cache="rewrite", event="store")
     return rewrite
 
