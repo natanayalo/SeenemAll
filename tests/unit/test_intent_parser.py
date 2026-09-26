@@ -24,7 +24,11 @@ def _reset_llm_state(monkeypatch):
     for key in llm_parser.CACHE_METRICS:
         llm_parser.CACHE_METRICS[key] = 0
     monkeypatch.delenv("INTENT_API_KEY", raising=False)
-    monkeypatch.delenv("INTENT_ENABLED", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("INTENT_ENABLED", "0")
+    monkeypatch.delenv("INTENT_PROVIDER", raising=False)
+    monkeypatch.delenv("INTENT_ENDPOINT", raising=False)
+    monkeypatch.delenv("INTENT_MODEL", raising=False)
     original_get_settings = llm_parser._get_settings
     if hasattr(original_get_settings, "cache_clear"):
         original_get_settings.cache_clear()
@@ -154,6 +158,31 @@ def test_parse_intent_llm_failure_falls_back(monkeypatch):
     assert intent.exclude_genres == ["Horror", "Thriller"]
 
 
+def test_parse_intent_ollama_connection_failure_falls_back(monkeypatch):
+    settings = IntentParserSettings(
+        provider="ollama",
+        api_key=None,
+        model="gemma4:12b",
+        endpoint="http://localhost:11434/v1/chat/completions",
+        enabled=True,
+        timeout=3.0,
+    )
+
+    monkeypatch.setattr(llm_parser, "_get_settings", lambda: settings)
+
+    def fail_request(*args):
+        raise httpx.ConnectError("Ollama is offline")
+
+    monkeypatch.setattr(
+        llm_parser,
+        "_call_openai_parser",
+        fail_request,
+    )
+
+    intent = parse_intent("no gore", {"user_id": "ollama-offline"})
+    assert intent.exclude_genres == ["Horror", "Thriller"]
+
+
 def test_parse_intent_merges_list_payload(monkeypatch):
     llm_parser.INTENT_CACHE.clear()
     settings = IntentParserSettings(
@@ -217,12 +246,26 @@ def test_parse_intent_llm_success(monkeypatch):
     assert intent.streaming_providers == ["netflix"]
 
 
-def test_get_settings_falls_back_to_openai(monkeypatch):
-    monkeypatch.setenv("INTENT_PROVIDER", "invalid")
-    monkeypatch.setenv("INTENT_API_KEY", "key")
+def test_get_settings_defaults_to_ollama_without_api_key(monkeypatch):
+    monkeypatch.delenv("INTENT_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("INTENT_PROVIDER", raising=False)
+    monkeypatch.delenv("INTENT_ENABLED", raising=False)
     llm_parser._get_settings.cache_clear()
     settings = llm_parser._get_settings()
-    assert settings.provider == "openai"
+    assert settings.provider == "ollama"
+    assert settings.model == "gemma4:12b"
+    assert settings.endpoint == "http://localhost:11434/v1/chat/completions"
+    assert settings.enabled is True
+
+
+def test_get_settings_falls_back_to_ollama(monkeypatch):
+    monkeypatch.setenv("INTENT_PROVIDER", "invalid")
+    monkeypatch.setenv("INTENT_API_KEY", "key")
+    monkeypatch.delenv("INTENT_ENABLED", raising=False)
+    llm_parser._get_settings.cache_clear()
+    settings = llm_parser._get_settings()
+    assert settings.provider == "ollama"
     assert settings.enabled is True
 
 
@@ -420,6 +463,7 @@ def test_load_fallback_rules_parses_entries(monkeypatch, tmp_path):
 
 def test_get_settings_invalid_timeout_warns(monkeypatch, caplog):
     monkeypatch.setenv("INTENT_API_KEY", "token")
+    monkeypatch.setenv("INTENT_PROVIDER", "openai")
     monkeypatch.setenv("INTENT_TIMEOUT", "oops")
     llm_parser._get_settings.cache_clear()
 

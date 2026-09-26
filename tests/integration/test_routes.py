@@ -26,6 +26,17 @@ def _clear_recommend_cache():
 
 
 @pytest.fixture(autouse=True)
+def _disable_external_llms(monkeypatch):
+    monkeypatch.setenv("INTENT_ENABLED", "0")
+    monkeypatch.setenv("RERANK_ENABLED", "0")
+    recommend_routes.llm_parser._get_settings.cache_clear()
+    reranker._get_settings.cache_clear()
+    yield
+    recommend_routes.llm_parser._get_settings.cache_clear()
+    reranker._get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def _disable_db_startup(monkeypatch):
     monkeypatch.setattr("api.main.init_engine", lambda: None)
     monkeypatch.setattr("api.main.get_sessionmaker", lambda: None)

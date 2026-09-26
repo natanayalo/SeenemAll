@@ -1,4 +1,5 @@
-FROM python:3.11-slim as builder
+# syntax=docker/dockerfile:1.7
+FROM python:3.11-slim AS builder
 
 ENV PYTHONPATH=/app
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -14,7 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install dependencies
 COPY requirements.txt ./
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip,sharing=locked \
+    pip wheel --no-deps --wheel-dir /app/wheels -r requirements.txt
 
 # Final stage
 FROM python:3.11-slim
@@ -30,7 +32,8 @@ COPY --from=builder /app/wheels /wheels
 COPY --from=builder /app/requirements.txt .
 
 # Install dependencies
-RUN pip install --no-cache /wheels/*
+RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip,sharing=locked \
+    pip install /wheels/*
 
 # Copy application code
 COPY . .

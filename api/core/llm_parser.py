@@ -175,19 +175,26 @@ def _persistent_cache_for_namespace(namespace: str) -> Optional[PersistentCache]
 
 @lru_cache(maxsize=1)
 def _get_settings() -> IntentParserSettings:
-    api_key = os.getenv("INTENT_API_KEY") or os.getenv("OPENAI_API_KEY")
-    raw_provider = os.getenv("INTENT_PROVIDER", "openai").strip().lower()
-    if raw_provider not in {"openai", "gemini"}:
+    raw_provider = os.getenv("INTENT_PROVIDER", "ollama").strip().lower()
+    if raw_provider not in {"ollama", "openai", "gemini"}:
         logger.warning(
-            "Unsupported INTENT_PROVIDER '%s'; falling back to 'openai'.", raw_provider
+            "Unsupported INTENT_PROVIDER '%s'; falling back to 'ollama'.", raw_provider
         )
-        provider = "openai"
+        provider = "ollama"
     else:
         provider = raw_provider
 
+    api_key = (
+        os.getenv("INTENT_API_KEY") or os.getenv("OPENAI_API_KEY")
+        if provider in {"openai", "gemini"}
+        else None
+    )
     if provider == "gemini":
         default_model = "gemini-2.0-flash-lite"
         default_endpoint = "https://generativelanguage.googleapis.com/v1beta/models"
+    elif provider == "ollama":
+        default_model = "gemma4:12b"
+        default_endpoint = "http://localhost:11434/v1/chat/completions"
     else:
         default_model = "gpt-4o-mini"
         default_endpoint = "https://api.openai.com/v1/chat/completions"
@@ -195,8 +202,12 @@ def _get_settings() -> IntentParserSettings:
     model = os.getenv("INTENT_MODEL", default_model)
     endpoint = os.getenv("INTENT_ENDPOINT", default_endpoint)
     enabled_value = os.getenv("INTENT_ENABLED", "1").strip().lower()
-    enabled = bool(api_key) and enabled_value not in {"0", "false", "no"}
-    timeout = 12.0
+    enabled = (provider == "ollama" or bool(api_key)) and enabled_value not in {
+        "0",
+        "false",
+        "no",
+    }
+    timeout = 120.0 if provider == "ollama" else 12.0
     raw_timeout = os.getenv("INTENT_TIMEOUT")
     if raw_timeout:
         try:
@@ -430,7 +441,7 @@ def parse_intent(
             "Intent parser(%s) parsing query '%s'.", settings.provider, normalized_query
         )
         try:
-            if settings.provider == "openai":
+            if settings.provider in {"openai", "ollama"}:
                 llm_output = _call_openai_parser(
                     settings, normalized_query, user_context, linked_entities
                 )
@@ -440,7 +451,7 @@ def parse_intent(
                 )
             else:  # pragma: no cover - defensive guardrail
                 raise IntentParserError(f"Unsupported provider '{settings.provider}'")
-        except IntentParserError:
+        except (IntentParserError, httpx.RequestError):
             logger.exception("LLM intent parser failed; falling back to offline stub.")
     else:
         logger.info(
@@ -494,22 +505,23 @@ def _call_openai_parser(
     user_context: Dict[str, Any],
     linked_entities: Dict[str, Any] | None,
 ) -> Dict[str, Any]:
-    if not settings.api_key:
+    if settings.provider == "openai" and not settings.api_key:
         raise IntentParserError("Missing API key for intent parser provider.")
 
     payload = _build_llm_payload(settings, query, user_context, linked_entities)
-    headers = {
-        "Authorization": f"Bearer {settings.api_key}",
-        "Content-Type": "application/json",
-    }
-    project = os.getenv("OPENAI_PROJECT")
+    headers = {"Content-Type": "application/json"}
+    if settings.api_key:
+        headers["Authorization"] = f"Bearer {settings.api_key}"
+    project = os.getenv("OPENAI_PROJECT") if settings.provider == "openai" else None
     if project:
         headers["OpenAI-Project"] = project
 
     # Use Responses API when a project id is provided.
     endpoint = settings.endpoint
     body = payload
-    using_responses_api = bool(project) or endpoint.endswith("/responses")
+    using_responses_api = settings.provider == "openai" and (
+        bool(project) or endpoint.endswith("/responses")
+    )
     if using_responses_api:
         endpoint = endpoint.rstrip("/")
         if not endpoint.endswith("/responses"):

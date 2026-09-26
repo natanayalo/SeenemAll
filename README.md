@@ -67,7 +67,7 @@ graph TD
 - **sentence-transformers MiniLM-L6-v2** embeddings
 - **spaCy** (`en_core_web_sm`) matcher for languages/genres/people/keywords
 - **Docker Compose** (API, DB, Elasticsearch, optional frontend)
-- Optional: **OpenAI** or **Gemini** for LLM reranking
+- **Ollama** (default) for local intent parsing and reranking; **OpenAI** and **Gemini** are optional hosted providers
 - **Evidently** for evaluation reporting (optional install)
 
 ---
@@ -79,7 +79,10 @@ git clone <repo>
 cd SeenemAll
 
 cp .env.example .env
-# Set TMDB_API_KEY, optional RERANK_PROVIDER/API keys, tweak ANN/Rerank knobs.
+# Set TMDB_API_KEY. Ollama must be running and have the configured model; hosted LLM providers are optional.
+# For Docker Compose, make Ollama reachable from the host gateway; protect its listener from untrusted networks.
+
+ollama show gemma4:12b
 
 docker compose up -d --build         # API, Postgres, Elasticsearch (and frontend if enabled)
 
@@ -158,7 +161,7 @@ sequenceDiagram
 7. **Collaborative & Trending** – Neighbor scores, business-rule boosts, and trending priors merge with the ANN results up to `candidate_limit`.
 8. **Post-filtering** – We hydrate metadata, enforce media type/genre/runtime/maturity, and strictly reapply cast/crew filters even if we relaxed them earlier. Provider filtering trims watch options unless we need fallback options to fill `limit`.
 9. **Diversification & Scoring** – Optional `diversify=true` runs franchise cap/MMR. Mixer weights are controlled via env vars or query overrides (`mixer_ann_weight`, etc.).
-10. **Reranker** – `RERANK_ENABLED=1` uses the configured LLM provider for explanations; `RERANK_PROVIDER=small` runs a local MiniLM reranker; `RERANK_ENABLED=0` falls back to heuristic explanations.
+10. **Reranker** – Ollama (`gemma4:12b`) is the default for explanations and reranking; `RERANK_PROVIDER=openai|gemini` selects a hosted provider, `RERANK_PROVIDER=small` runs the local MiniLM reranker, and `RERANK_ENABLED=0` falls back to heuristic explanations.
 11. **Response** – JSON payload with ranked `items`, each including metadata, watch options, source scores, and explanations (`explanation`, `reason` fields), plus optional cursor for pagination.
 
 Logging highlights important fallback decisions (e.g., classic-top-rated heuristics, allowlist relaxation for people filters).
