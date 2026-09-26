@@ -31,8 +31,8 @@ interface Recommendation {
   popularity?: number | null;
 }
 
-const apiBaseUrl = (process.env.REACT_APP_API_URL ?? '').trim().replace(/\/$/, '');
-const apiKey = (process.env.REACT_APP_API_KEY ?? '').trim();
+const apiBaseUrl = (import.meta.env.VITE_API_URL ?? '').trim().replace(/\/$/, '');
+const apiKey = (import.meta.env.VITE_API_KEY ?? '').trim();
 
 const getApiHeaders = (extraHeaders?: Record<string, string>): HeadersInit => {
   const headers: Record<string, string> = { ...extraHeaders };
@@ -142,7 +142,7 @@ function App() {
         params.append('mixer_novelty_weight', mixerNoveltyWeight.toString());
         params.append('mixer_vote_weight', mixerVoteWeight.toString());
       }
-      if (process.env.NODE_ENV !== 'production' && !apiBaseUrl) {
+      if (import.meta.env.DEV && !apiBaseUrl) {
         params.append('_ts', Date.now().toString());
       }
 
