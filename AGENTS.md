@@ -101,6 +101,40 @@
 
 ---
 
+## 🔄 Feature Development Flow & Quality Gates
+
+Every feature, model upgrade, or ranking pipeline adjustment must follow this verification sequence before PR merge:
+
+1. **Implementation & Test Coverage Gate:**
+   - Maintain automated pytest coverage $\ge 85\%$ across all modified modules.
+   - Run: `pytest --cov=api --cov-report=term-missing`
+
+2. **Quality Evaluation & Counterfactual A/B Testing:**
+   - Benchmark candidate configuration against stored baseline across the 62 golden queries.
+   - Run A/B evaluation: `python -m evaluation.evaluate --ab-compare --baseline-file evaluation/baseline.json --candidate <your_config> --backend elasticsearch` (or `make eval-ab`)
+   - Verify automated regression gate: `python -m evaluation.evaluate --benchmark --k 10 --candidate <your_config>`
+
+3. **Store New Baseline Snapshot (When Establishing New Standards):**
+   - When a feature improves recommendation metrics and sets a new production baseline (e.g., Cross-Encoder reranking), record the new baseline snapshot:
+     ```bash
+     # Save new baseline snapshot
+     python -m evaluation.evaluate --config <new_standard> --backend elasticsearch --k 10 --save-baseline evaluation/baseline.json
+     # Or via Makefile:
+     make eval-baseline CONFIG=<new_standard>
+     ```
+   - Commit the updated `evaluation/baseline.json` alongside the feature code.
+
+4. **Pre-commit Formatting & Linting:**
+   - Run all pre-commit hooks to verify formatting and typing:
+     ```bash
+     pre-commit run --all-files
+     ```
+
+5. **Pull Request Submission:**
+   - Include before/after metric deltas (nDCG@10, MAP, Precision@10, Latency percentiles) and coverage stats in the PR description.
+
+---
+
 ### (Coming Soon)
 | Agent | Description |
 |-------|-------------|

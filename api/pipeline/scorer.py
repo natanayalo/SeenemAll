@@ -282,6 +282,9 @@ def score_candidates(
             "popular_rank": getattr(it, "popular_rank", None),
             "trending_rank": getattr(it, "trending_rank", None),
             "top_rated_rank": getattr(it, "top_rated_rank", None),
+            "directors": getattr(it, "directors", None),
+            "cast": getattr(it, "cast", None),
+            "keywords": getattr(it, "keywords", None),
             "retrieval_score": None,
             "source_scores": sources,
         }

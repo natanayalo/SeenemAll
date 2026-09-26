@@ -376,6 +376,59 @@ def test_save_and_load_baseline_snapshot(tmp_path):
     assert len(loaded["per_query_scores"]) == 1
 
 
+def test_save_baseline_snapshot_regression_guard(tmp_path):
+    path = tmp_path / "test_baseline.json"
+    initial_agg = {
+        ("elasticsearch", "base"): {
+            "ndcg": 0.1500,
+            "ild": 0.5000,
+        }
+    }
+    # Initial save succeeds
+    assert (
+        save_baseline_snapshot(
+            initial_agg, [], path, k=10, backend="elasticsearch", config="base"
+        )
+        is True
+    )
+
+    # Regressed run (0.1200 < 0.1500) without allow_regression is blocked
+    regressed_agg = {
+        ("elasticsearch", "cand"): {
+            "ndcg": 0.1200,
+            "ild": 0.5000,
+        }
+    }
+    assert (
+        save_baseline_snapshot(
+            regressed_agg,
+            [],
+            path,
+            k=10,
+            backend="elasticsearch",
+            config="cand",
+            allow_regression=False,
+        )
+        is False
+    )
+    assert load_baseline_snapshot(path)["config"] == "base"
+
+    # Regressed run with allow_regression=True succeeds
+    assert (
+        save_baseline_snapshot(
+            regressed_agg,
+            [],
+            path,
+            k=10,
+            backend="elasticsearch",
+            config="cand",
+            allow_regression=True,
+        )
+        is True
+    )
+    assert load_baseline_snapshot(path)["config"] == "cand"
+
+
 def test_ab_comparison_with_stored_baseline(tmp_path):
     b_path = tmp_path / "baseline.json"
     rep_path = tmp_path / "report.json"
@@ -423,3 +476,24 @@ def test_ab_comparison_with_stored_baseline(tmp_path):
     assert "comparisons" in report
     assert report["baseline_param"] == "ann_only"
     assert rep_path.exists()
+
+
+def test_parse_args_ab_test_alias():
+    from evaluation.evaluate import parse_args
+
+    args = parse_args(["--ab-test", "--candidate", "default"])
+    assert args.ab_compare is True
+    assert args.candidate == "default"
+
+
+def test_default_param_grid_cross_encoder():
+    from evaluation.evaluate import default_param_grid
+
+    grid = default_param_grid()
+    assert "cross_encoder" in grid
+    assert "baseline_no_rerank" in grid
+    ce_params = grid["cross_encoder"]({})
+    assert ce_params["rerank"] is True
+    assert ce_params["rerank_provider"] == "cross_encoder"
+    base_params = grid["baseline_no_rerank"]({})
+    assert base_params["rerank"] is False

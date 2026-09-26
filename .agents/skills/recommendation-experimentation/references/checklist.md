@@ -1,4 +1,4 @@
-﻿# Recommendation Experimentation Checklist
+# Recommendation Experimentation Checklist
 
 ## Experiment Setup
 - Hypothesis: <one sentence>
@@ -12,6 +12,14 @@
 
 ## Validation Commands
 ```bash
+# Verify against baseline & regression gate
+python -m evaluation.evaluate --benchmark --k 10 --candidate <your_config>
+python -m evaluation.evaluate --ab-compare --baseline-file evaluation/baseline.json --candidate <your_config>
+
+# Store new baseline snapshot (when establishing a new standard)
+make eval-baseline CONFIG=<your_config>
+
+# Formatting, typing, and tests
 pre-commit run --all-files
 pytest tests/unit/test_recommend_route.py tests/unit/test_metrics.py
 pytest tests/integration/test_routes.py

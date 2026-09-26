@@ -114,9 +114,18 @@ def _upsert_vectors(db: Session, ids: List[int], vectors, version: str) -> None:
 
 
 def run(
-    batch: int = 256, max_items: int | None = None, version: str | None = None
+    batch: int = 256,
+    max_items: int | None = None,
+    version: str | None = None,
+    device: str | None = None,
 ) -> None:
     version = version or DEFAULT_EMBED_VERSION
+    target_device = (
+        device
+        or os.getenv("ETL_EMBEDDING_DEVICE")
+        or os.getenv("BACKGROUND_TASK_DEVICE")
+        or os.getenv("DEVICE")
+    )
     SessionLocal = get_sessionmaker()
     processed = 0
 
@@ -134,7 +143,13 @@ def run(
 
             items = _fetch_items(db, todo)
             texts = [t for _, t in items]
-            vectors = encode_texts(texts)  # (N, 384) float32 normalized
+            if target_device is not None:
+                try:
+                    vectors = encode_texts(texts, device=target_device)
+                except TypeError:
+                    vectors = encode_texts(texts)
+            else:
+                vectors = encode_texts(texts)  # (N, 384) float32 normalized
             ids = [i for (i, _) in items]
 
             _upsert_vectors(db, ids, vectors, version=version)

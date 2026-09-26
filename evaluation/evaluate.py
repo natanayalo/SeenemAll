@@ -492,7 +492,11 @@ def default_param_grid() -> (
     Dict[str, Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]]
 ):
     return {
-        "default": lambda entry: {"use_llm_intent": True},
+        "default": lambda entry: {
+            "use_llm_intent": True,
+            "rerank": True,
+            "rerank_provider": "cross_encoder",
+        },
         "ann_only": lambda entry: {
             "mixer_ann_weight": 1.2,
             "mixer_collab_weight": 0.0,
@@ -502,6 +506,27 @@ def default_param_grid() -> (
             "mixer_novelty_weight": 0.0,
             "diversify": False,
             "use_llm_intent": False,
+            "rerank": False,
+        },
+        "ann_cross_encoder": lambda entry: {
+            "mixer_ann_weight": 1.2,
+            "mixer_collab_weight": 0.0,
+            "mixer_trending_weight": 0.0,
+            "mixer_popularity_weight": 0.0,
+            "mixer_vote_weight": 0.0,
+            "mixer_novelty_weight": 0.0,
+            "diversify": False,
+            "use_llm_intent": False,
+            "rerank": True,
+            "rerank_provider": "cross_encoder",
+        },
+        "cross_encoder": lambda entry: {
+            "use_llm_intent": True,
+            "rerank": True,
+            "rerank_provider": "cross_encoder",
+        },
+        "baseline_no_rerank": lambda entry: {
+            "use_llm_intent": True,
             "rerank": False,
         },
         "collab_boost": lambda entry: {
@@ -770,20 +795,53 @@ def save_baseline_snapshot(
     k: int,
     backend: str,
     config: str,
-) -> None:
-    """Save an evaluation run as a persistent baseline for future A/B comparisons."""
+    allow_regression: bool = False,
+) -> bool:
+    """Save an evaluation run as a persistent baseline for future A/B comparisons.
+
+    Ensures that the baseline is only updated if candidate metrics have not
+    regressed on nDCG@K compared to the existing baseline, or if allow_regression is True.
+    """
+    new_agg = aggregated.get((backend, config), {})
+    if not new_agg:
+        print(
+            f"Warning: no aggregates found for ({backend}, {config}). Baseline not saved."
+        )
+        return False
+
+    if path.exists() and not allow_regression:
+        try:
+            existing = load_baseline_snapshot(path)
+            old_agg = existing.get("aggregates", {})
+            old_ndcg = float(old_agg.get("ndcg", 0.0))
+            new_ndcg = float(new_agg.get("ndcg", 0.0))
+            if new_ndcg < old_ndcg:
+                print(
+                    f"\n[BLOCKED] Refusing to overwrite baseline at {path}:\n"
+                    f"Candidate regressed on nDCG@{k}: {new_ndcg:.4f} < {old_ndcg:.4f}.\n"
+                    f"Baseline should only be stored if it has not regressed or is explicitly accepted.\n"
+                    f"Pass --accept-baseline to force update if this regression is intentional.\n"
+                )
+                return False
+        except Exception as exc:
+            print(
+                f"Note: Could not compare against existing baseline at {path} ({exc}); proceeding."
+            )
+
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "backend": backend,
         "config": config,
         "k": k,
-        "aggregates": aggregated.get((backend, config), {}),
+        "aggregates": new_agg,
         "per_query_scores": list(per_query_summary),
     }
     with path.open("w", encoding="utf-8") as fp:
         json.dump(payload, fp, indent=2)
+        fp.write("\n")
     print(f"Baseline snapshot saved to {path}")
+    return True
 
 
 def load_baseline_snapshot(path: Path) -> Dict[str, Any]:
@@ -1253,6 +1311,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--ab-compare",
+        "--ab-test",
+        dest="ab_compare",
         action="store_true",
         help="Run counterfactual A/B evaluation comparing baseline vs candidate.",
     )
@@ -1306,6 +1366,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         type=Path,
         default=None,
         help="Path to stored baseline JSON file to use for A/B comparison (avoids re-running baseline queries).",
+    )
+    parser.add_argument(
+        "--accept-baseline",
+        "--force-baseline",
+        action="store_true",
+        help="Allow saving baseline even if candidate metrics regressed against the existing baseline.",
     )
     return parser.parse_args(argv)
 
@@ -1421,6 +1487,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             k=args.k,
             backend=target_backend,
             config=target_cfg,
+            allow_regression=args.accept_baseline,
         )
     print_summary(aggregated, args.k)
 
