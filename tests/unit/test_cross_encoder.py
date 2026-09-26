@@ -200,12 +200,16 @@ def test_score_query_candidates_handles_inference_exception(monkeypatch):
 
 
 def test_get_cross_encoder_device_openvino(monkeypatch):
+    import sys
+    import types
+
     monkeypatch.setenv("CROSS_ENCODER_BACKEND", "openvino")
     monkeypatch.delenv("CROSS_ENCODER_DEVICE", raising=False)
 
     mock_core = MagicMock()
     mock_core.return_value.available_devices = ["CPU", "GPU", "NPU"]
-    monkeypatch.setattr("openvino.Core", mock_core, raising=False)
+    dummy_ov = types.SimpleNamespace(Core=mock_core)
+    monkeypatch.setitem(sys.modules, "openvino", dummy_ov)
 
     dev = cross_encoder.get_cross_encoder_device()
     assert dev == "GPU"

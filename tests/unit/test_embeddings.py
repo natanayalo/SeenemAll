@@ -96,11 +96,14 @@ def test_get_embedding_device_resolution(monkeypatch):
     monkeypatch.delenv("DEVICE", raising=False)
     monkeypatch.setenv("EMBEDDING_BACKEND", "openvino")
 
+    import sys
+    import types
     from unittest.mock import MagicMock
 
     mock_core = MagicMock()
     mock_core.return_value.available_devices = ["CPU", "GPU", "NPU"]
-    monkeypatch.setattr("openvino.Core", mock_core, raising=False)
+    dummy_ov = types.SimpleNamespace(Core=mock_core)
+    monkeypatch.setitem(sys.modules, "openvino", dummy_ov)
 
     assert embeddings.get_embedding_device() == "GPU"
 
