@@ -163,9 +163,7 @@ class TrendingPriorRetriever(BaseRetriever):
         intent: QueryUnderstanding,
         allowlist: List[int] | None,
     ) -> List[Tuple[int, float]]:
-        trending_fn = get_hook(
-            "_trending_prior_candidates", trending_prior_candidates
-        )
+        trending_fn = get_hook("_trending_prior_candidates", trending_prior_candidates)
         return trending_fn(
             db,
             intent.intent_filters,

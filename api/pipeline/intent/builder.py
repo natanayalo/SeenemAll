@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from api.core.elasticsearch_search import SearchFilters
 from api.core.filter_matcher import get_query_filters
-from api.core.intent_parser import Intent
 from api.core.legacy_intent_parser import parse_intent as legacy_parse_intent
 from api.core.llm_parser import default_intent, linked_media_types, rewrite_query
 from api.core.rewrite import Rewrite
@@ -121,7 +120,11 @@ async def resolve_query_intent(
     heuristic_applied = False
     has_top_keyword = matches_keywords(query, user_context.top_query_keywords)
     fallback_keywords_used = bool(getattr(intent, "_fallback_keywords_used", False))
-    if params.classic_top_rated is None and has_top_keyword and not fallback_keywords_used:
+    if (
+        params.classic_top_rated is None
+        and has_top_keyword
+        and not fallback_keywords_used
+    ):
         prefer_top_rated = True
         heuristic_applied = True
 

@@ -9,7 +9,7 @@ import time
 from collections import defaultdict
 from dataclasses import asdict
 from threading import Lock
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, List, Mapping, Sequence, Set, Tuple
 
 from cachetools import TTLCache
 from sqlalchemy import select

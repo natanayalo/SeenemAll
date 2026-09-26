@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
+from typing import Any, Dict, List, Mapping, Sequence, Set
 
 from api.core.business_rules import apply_business_rules
 from api.core.elasticsearch_search import SearchFilters
@@ -9,7 +9,13 @@ from api.core.legacy_intent_parser import item_matches_intent
 from api.db.models import Item
 from api.pipeline.hooks import get_hook
 from api.pipeline.intent import _has_people_filters, float_from_env
-from api.pipeline.models import CandidatePool, QueryUnderstanding, RecommendParams, ScoredCandidates, UserContext
+from api.pipeline.models import (
+    CandidatePool,
+    QueryUnderstanding,
+    RecommendParams,
+    ScoredCandidates,
+    UserContext,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -293,7 +299,11 @@ def score_candidates(
         if provider_allowed and len(ordered) >= max_candidates:
             break
 
-    if intent.preferred_services and len(ordered) < params.limit and fallback_candidates:
+    if (
+        intent.preferred_services
+        and len(ordered) < params.limit
+        and fallback_candidates
+    ):
         deficit = params.limit - len(ordered)
         ordered.extend(fallback_candidates[:deficit])
 

@@ -86,8 +86,12 @@ def test_context_load_and_caching(monkeypatch):
         {"genre_prefs": {"Action": 1.0}},
     )
     monkeypatch.setattr(recommend_routes, "load_user_state", lambda db, uid: mock_state)
-    monkeypatch.setattr("api.pipeline.context.get_streaming_alias_map", lambda db: {"nfx": {"netflix"}})
-    monkeypatch.setattr("api.pipeline.context.get_top_query_keywords", lambda db: {"epic"})
+    monkeypatch.setattr(
+        "api.pipeline.context.get_streaming_alias_map", lambda db: {"nfx": {"netflix"}}
+    )
+    monkeypatch.setattr(
+        "api.pipeline.context.get_top_query_keywords", lambda db: {"epic"}
+    )
 
     ctx = load_user_context(mock_db, "user_1", "profile_a")
     assert ctx.canonical_id == "user_1::profile_a"
@@ -166,7 +170,9 @@ async def test_resolve_query_intent(monkeypatch):
         provider_alias_map={},
         top_query_keywords={"best"},
     )
-    params = RecommendParams(user_id="u1", query="best sci-fi", limit=10, classic_top_rated=True)
+    params = RecommendParams(
+        user_id="u1", query="best sci-fi", limit=10, classic_top_rated=True
+    )
     intent = await resolve_query_intent(mock_request, params, ctx, mock_db)
     assert intent.query == "best sci-fi"
     assert intent.prefer_top_rated is True
@@ -180,8 +186,20 @@ def test_retriever_helpers():
 
 def test_scorer_and_mixer():
     candidates = [
-        {"id": 1, "popularity": 10.0, "vote_count": 100, "ann_rank": 0, "source_scores": {}},
-        {"id": 2, "popularity": 50.0, "vote_count": 500, "ann_rank": 1, "source_scores": {}},
+        {
+            "id": 1,
+            "popularity": 10.0,
+            "vote_count": 100,
+            "ann_rank": 0,
+            "source_scores": {},
+        },
+        {
+            "id": 2,
+            "popularity": 50.0,
+            "vote_count": 500,
+            "ann_rank": 1,
+            "source_scores": {},
+        },
     ]
     apply_mixer_scores(candidates)
     assert "retrieval_score" in candidates[0]
@@ -208,14 +226,18 @@ def test_diversity_and_presentation():
     assert is_long_tail({"original_rank": 15}, limit=10) is True
     assert is_long_tail({"original_rank": 2}, limit=10) is False
 
-    diversified = apply_diversity_policies(items, items, limit=4, diversify=True, boost_ids=[])
+    diversified = apply_diversity_policies(
+        items, items, limit=4, diversify=True, boost_ids=[]
+    )
     assert len(diversified) <= 4
 
     cursor = encode_cursor(20)
     assert decode_cursor(cursor) == 20
     assert decode_cursor(None) == 0
 
-    formatted = format_presentation_items([{"id": 1, "vector": np.zeros(5), "original_rank": 0}])
+    formatted = format_presentation_items(
+        [{"id": 1, "vector": np.zeros(5), "original_rank": 0}]
+    )
     assert "vector" not in formatted[0]
     assert "original_rank" not in formatted[0]
 
@@ -262,6 +284,7 @@ def test_retriever_classes_adapter_interface(monkeypatch):
     )
     from api.pipeline.models import QueryUnderstanding
     from api.core.legacy_intent_parser import IntentFilters
+
     intent = QueryUnderstanding(
         query=None,
         llm_intent=MagicMock(),
@@ -285,22 +308,36 @@ def test_retriever_classes_adapter_interface(monkeypatch):
     assert issubclass(ANNRetriever, BaseRetriever)
 
     # ColdStartRetriever
-    monkeypatch.setattr(recommend_routes, "_cold_start_candidates", lambda db, it, lim, al, **kw: [1, 2, 3])
+    monkeypatch.setattr(
+        recommend_routes,
+        "_cold_start_candidates",
+        lambda db, it, lim, al, **kw: [1, 2, 3],
+    )
     cold_retriever = ColdStartRetriever()
     assert cold_retriever.retrieve(mock_db, ctx, intent, [1, 2]) == [1, 2, 3]
 
     # CollaborativeGraphRetriever
-    monkeypatch.setattr(recommend_routes, "_collaborative_candidates", lambda db, neigh, exc, lim, allowed_ids=None, **kw: [(10, 0.9)])
+    monkeypatch.setattr(
+        recommend_routes,
+        "_collaborative_candidates",
+        lambda db, neigh, exc, lim, allowed_ids=None, **kw: [(10, 0.9)],
+    )
     collab_retriever = CollaborativeGraphRetriever()
     assert collab_retriever.retrieve(mock_db, ctx, intent, None) == [(10, 0.9)]
 
     # TrendingPriorRetriever
-    monkeypatch.setattr(recommend_routes, "_trending_prior_candidates", lambda db, it, exc, lim, allowed_ids=None, **kw: [(20, 0.8)])
+    monkeypatch.setattr(
+        recommend_routes,
+        "_trending_prior_candidates",
+        lambda db, it, exc, lim, allowed_ids=None, **kw: [(20, 0.8)],
+    )
     trending_retriever = TrendingPriorRetriever()
     assert trending_retriever.retrieve(mock_db, ctx, intent, None) == [(20, 0.8)]
 
     # ANNRetriever
-    monkeypatch.setattr(recommend_routes, "ann_candidates", lambda *args, **kw: [100, 200])
+    monkeypatch.setattr(
+        recommend_routes, "ann_candidates", lambda *args, **kw: [100, 200]
+    )
     ann_retriever = ANNRetriever()
     ids, rewrite_used = ann_retriever.retrieve(mock_db, ctx, intent, None)
     assert ids == [100, 200]
@@ -332,6 +369,7 @@ def test_intent_parser_and_filters():
 
 def test_prefilter_relaxation_and_helpers():
     from api.core.elasticsearch_search import SearchFilters
+
     filters = SearchFilters(
         include_item_ids=(1, 2),
         genres=("Action",),
@@ -342,4 +380,3 @@ def test_prefilter_relaxation_and_helpers():
     assert relaxed is not None
     assert relaxed.cast == ("Tom Cruise",)
     assert relaxed.genres == ()  # genres relaxed
-

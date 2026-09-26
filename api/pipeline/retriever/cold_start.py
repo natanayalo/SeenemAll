@@ -35,9 +35,7 @@ def cold_start_candidates(
         genres = intent.effective_genres()
         if genres:
             clause_fn = get_hook("_genre_contains_clause", genre_contains_clause)
-            genre_filters = [
-                clause_fn(db, genre) for genre in genres if genre
-            ]
+            genre_filters = [clause_fn(db, genre) for genre in genres if genre]
             if genre_filters:
                 stmt = stmt.where(or_(*genre_filters))
 
@@ -79,9 +77,7 @@ class ColdStartRetriever(BaseRetriever):
         intent: QueryUnderstanding,
         allowlist: List[int] | None,
     ) -> List[int]:
-        cold_start_fn = get_hook(
-            "_cold_start_candidates", cold_start_candidates
-        )
+        cold_start_fn = get_hook("_cold_start_candidates", cold_start_candidates)
         return cold_start_fn(
             db,
             intent.intent_filters,

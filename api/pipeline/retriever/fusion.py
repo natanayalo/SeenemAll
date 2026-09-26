@@ -88,9 +88,7 @@ def retrieve_candidates(
             if trending_scores:
                 max_trending = max(trending_scores.values()) or 1.0
                 for iid, score in trending_scores.items():
-                    merged_scores.setdefault(iid, {})["trending"] = (
-                        score / max_trending
-                    )
+                    merged_scores.setdefault(iid, {})["trending"] = score / max_trending
 
     collab_ids = [iid for iid, _ in collab_results]
     trending_ids = [iid for iid, _ in trending_results]

@@ -52,7 +52,6 @@ class ANNRetriever(BaseRetriever):
         exclude = list(context.exclude_set)
 
         if context.cold_start:
-            rewrite_used = False
             rewrite_vec = intent.rewrite_vec
             if rewrite_vec is not None:
                 vec_norm = float(np.linalg.norm(rewrite_vec))
@@ -137,9 +136,7 @@ class ANNRetriever(BaseRetriever):
                                 )
                             return filtered_fallback, True
 
-            cold_start_fn = get_hook(
-                "_cold_start_candidates", cold_start_candidates
-            )
+            cold_start_fn = get_hook("_cold_start_candidates", cold_start_candidates)
             logger.info("Using cold-start candidates for user %s", canonical_id)
             ids = cold_start_fn(
                 db,
@@ -156,9 +153,7 @@ class ANNRetriever(BaseRetriever):
             rewrite_vec = intent.rewrite_vec
             if rewrite_vec is not None:
                 alpha = (
-                    _REWRITE_BLEND_ALPHA_QUERY
-                    if intent.query
-                    else _REWRITE_BLEND_ALPHA
+                    _REWRITE_BLEND_ALPHA_QUERY if intent.query else _REWRITE_BLEND_ALPHA
                 )
                 alpha = max(0.0, min(1.0, alpha))
                 q_vec = (alpha * short_v) + ((1 - alpha) * rewrite_vec)
@@ -222,9 +217,7 @@ class ANNRetriever(BaseRetriever):
                     structured_search_filters,
                     limit=candidate_limit,
                 )
-                filtered_fallback = filter_exclude_fn(
-                    fallback_ids, context.exclude_set
-                )
+                filtered_fallback = filter_exclude_fn(fallback_ids, context.exclude_set)
                 if filtered_fallback:
                     ids = filtered_fallback
                     if logger.isEnabledFor(logging.INFO):

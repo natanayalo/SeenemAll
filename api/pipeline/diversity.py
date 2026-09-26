@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List
 
 from api.core.reranker import diversify_with_mmr
 from api.pipeline.hooks import get_hook

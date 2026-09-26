@@ -223,9 +223,7 @@ def run_prefilter_query(
         keyword_values = [kw for kw in keywords_source if kw]
         keyword_filters = []
         if keyword_values:
-            kw_clause_fn = get_hook(
-                "_keyword_contains_clause", keyword_contains_clause
-            )
+            kw_clause_fn = get_hook("_keyword_contains_clause", keyword_contains_clause)
             keyword_filters = [
                 kw_clause_fn(db, keyword)
                 for keyword in dict.fromkeys(keyword_values)
