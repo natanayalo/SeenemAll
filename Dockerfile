@@ -35,6 +35,9 @@ COPY --from=builder /app/requirements.txt .
 RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip,sharing=locked \
     pip install /wheels/*
 
+# Pre-download default sentence-transformers model to eliminate first-request cold start
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+
 # Copy application code
 COPY . .
 
