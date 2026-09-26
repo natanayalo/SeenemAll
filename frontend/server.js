@@ -7,10 +7,11 @@ const app = express();
 const port = process.env.PORT || 3000;
 const proxyTarget =
   process.env.API_PROXY_TARGET ||
+  process.env.VITE_API_URL ||
   process.env.REACT_APP_API_URL ||
   'http://localhost:8000';
 
-const staticDir = path.join(__dirname, 'build');
+const staticDir = path.join(__dirname, 'dist');
 
 app.use((req, res, next) => {
   console.log(`[frontend] ${req.method} ${req.originalUrl}`);
@@ -27,7 +28,11 @@ const proxyConfigs = [
   '/health',
 ];
 
-const apiKey = process.env.API_AUTH_KEY || process.env.REACT_APP_API_KEY || '';
+const apiKey =
+  process.env.API_AUTH_KEY ||
+  process.env.VITE_API_KEY ||
+  process.env.REACT_APP_API_KEY ||
+  '';
 
 proxyConfigs.forEach((basePath) => {
   app.use(
@@ -42,7 +47,7 @@ proxyConfigs.forEach((basePath) => {
   );
 });
 
-app.get('*', (req, res) => {
+app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(staticDir, 'index.html'));
 });
 

@@ -1,9 +1,9 @@
-FROM node:18-alpine as builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-ARG REACT_APP_API_URL
-ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 
 # Copy package files first for better cache utilization
 COPY package*.json ./
@@ -16,14 +16,14 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine
+FROM node:22-alpine
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --omit=dev --prefer-offline
+RUN npm ci --omit=dev --prefer-offline
 
 # Copy built assets and server
-COPY --from=builder /app/build ./build
+COPY --from=builder /app/dist ./dist
 COPY server.js ./server.js
 
 EXPOSE 3000
