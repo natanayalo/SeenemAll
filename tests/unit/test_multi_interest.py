@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
 import numpy as np
-import pytest
 
 from api.core.user_profile import (
     TasteCluster,
@@ -17,7 +15,6 @@ from api.db.models import User
 from api.pipeline.models import QueryUnderstanding, UserContext
 from api.pipeline.retriever.ann import (
     ANNRetriever,
-    _extract_centroid,
     _fuse_candidate_rankings_rrf,
 )
 from tests.helpers import FakeSession
@@ -43,12 +40,18 @@ def test_user_vector_result_tuple_behavior():
     assert len(res) == 5
     assert isinstance(res, tuple)
 
-    l, s, p, n, neg = res
-    assert np.array_equal(l, long_v)
-    assert np.array_equal(s, short_v)
-    assert p == prefs
-    assert n == []
-    assert neg == negs
+    (
+        unpacked_long,
+        unpacked_short,
+        unpacked_prefs,
+        unpacked_neighbors,
+        unpacked_negs,
+    ) = res
+    assert np.array_equal(unpacked_long, long_v)
+    assert np.array_equal(unpacked_short, short_v)
+    assert unpacked_prefs == prefs
+    assert unpacked_neighbors == []
+    assert unpacked_negs == negs
 
     assert res.taste_clusters == clusters
     assert np.array_equal(res.long_vec, long_v)
@@ -264,8 +267,11 @@ def test_ann_retriever_multi_cluster_browse_mode(monkeypatch):
             return [21, 22, 11]
 
     import api.routes.recommend as recommend_routes
+
     monkeypatch.setattr(recommend_routes, "ann_candidates", mock_ann_candidates)
-    monkeypatch.setattr("api.pipeline.retriever.ann.ann_candidates", mock_ann_candidates)
+    monkeypatch.setattr(
+        "api.pipeline.retriever.ann.ann_candidates", mock_ann_candidates
+    )
     retriever = ANNRetriever()
     ids, rewrite_used = retriever.retrieve(FakeSession(), context, intent, None)
     assert len(queries_run) == 2  # Ran for both clusters
@@ -321,8 +327,11 @@ def test_ann_retriever_multi_cluster_query_selection(monkeypatch):
         return [201, 202]
 
     import api.routes.recommend as recommend_routes
+
     monkeypatch.setattr(recommend_routes, "ann_candidates", mock_ann_candidates)
-    monkeypatch.setattr("api.pipeline.retriever.ann.ann_candidates", mock_ann_candidates)
+    monkeypatch.setattr(
+        "api.pipeline.retriever.ann.ann_candidates", mock_ann_candidates
+    )
     retriever = ANNRetriever()
     ids, rewrite_used = retriever.retrieve(FakeSession(), context, intent, None)
     assert len(query_vectors_used) == 1
@@ -362,8 +371,14 @@ def test_ann_retriever_cold_start_fallback(monkeypatch):
     )
 
     import api.routes.recommend as recommend_routes
-    monkeypatch.setattr(recommend_routes, "_cold_start_candidates", lambda *args, **kwargs: [999])
-    monkeypatch.setattr("api.pipeline.retriever.ann.cold_start_candidates", lambda *args, **kwargs: [999])
+
+    monkeypatch.setattr(
+        recommend_routes, "_cold_start_candidates", lambda *args, **kwargs: [999]
+    )
+    monkeypatch.setattr(
+        "api.pipeline.retriever.ann.cold_start_candidates",
+        lambda *args, **kwargs: [999],
+    )
     retriever = ANNRetriever()
     ids, rewrite_used = retriever.retrieve(FakeSession(), context, intent, None)
     assert ids == [999]
