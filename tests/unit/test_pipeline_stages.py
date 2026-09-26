@@ -268,6 +268,75 @@ async def test_pipeline_runner(monkeypatch):
     assert res.items == []
 
 
+@pytest.mark.asyncio
+async def test_pipeline_runner_with_rerank_params(monkeypatch):
+    pipeline = get_pipeline()
+    mock_request = MagicMock(spec=Request)
+    mock_request.app.state.entity_linker = None
+    mock_db = MagicMock()
+    mock_db.execute.return_value.all.return_value = []
+    mock_db.execute.return_value.scalars.return_value.all.return_value = []
+
+    captured = {}
+
+    def fake_rerank(
+        ordered, intent, query, context, *, rerank=None, rerank_provider=None
+    ):
+        captured["rerank"] = rerank
+        captured["rerank_provider"] = rerank_provider
+        return [{"id": 1, "title": "Reranked"}]
+
+    monkeypatch.setattr("api.pipeline.runner.rerank_candidates", fake_rerank)
+    monkeypatch.setattr(recommend_routes, "ann_candidates", lambda *args, **kwargs: [1])
+    mock_item = MagicMock()
+    mock_item.id = 1
+    mock_item.tmdb_id = 101
+    mock_item.media_type = "movie"
+    mock_item.title = "Item 1"
+    mock_item.overview = "Overview"
+    mock_item.genres = []
+    mock_item.release_year = 2024
+    mock_item.runtime = 100
+    mock_item.original_language = "en"
+    mock_item.collection_id = None
+    mock_item.collection_name = None
+    mock_item.poster_url = None
+    mock_item.popularity = 10.0
+    mock_item.vote_average = 8.0
+    mock_item.vote_count = 100
+    mock_item.popular_rank = None
+    mock_item.trending_rank = None
+    mock_item.top_rated_rank = None
+    mock_item.directors = []
+    mock_item.cast = []
+    mock_item.keywords = []
+
+    from api.pipeline.models import CandidatePool, PrefilterDecision
+
+    def fake_retrieve(db, ctx, intent):
+        return CandidatePool(
+            ids=[1],
+            merged_scores={1: {"ann": 0.9}},
+            prefilter=PrefilterDecision(
+                allowed_ids=None, boost_ids=[], enforce_genres=False
+            ),
+            items_with_data={1: (mock_item, np.ones(384, dtype=np.float32), [])},
+            boost_ids=[],
+            enforce_genres=False,
+            structured_search_filters=None,
+        )
+
+    monkeypatch.setattr("api.pipeline.runner.retrieve_candidates", fake_retrieve)
+
+    params = RecommendParams(
+        user_id="u_test", limit=5, rerank=False, rerank_provider="cross_encoder"
+    )
+    res = await pipeline.run(mock_request, params, mock_db)
+    assert captured.get("rerank") is False
+    assert captured.get("rerank_provider") == "cross_encoder"
+    assert len(res.items) == 1
+
+
 def test_retriever_classes_adapter_interface(monkeypatch):
     mock_db = MagicMock()
     ctx = UserContext(

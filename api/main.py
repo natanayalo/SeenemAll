@@ -52,6 +52,16 @@ async def app_lifespan(app: FastAPI):
                 "Could not pre-warm embedding model: %s", exc
             )
 
+        # Pre-warm local cross-encoder model to eliminate first-rerank cold start
+        try:
+            from api.core.cross_encoder import get_cross_encoder_model
+
+            get_cross_encoder_model()
+        except Exception as exc:  # pragma: no cover - defensive warmup
+            logging.getLogger("api.main").warning(
+                "Could not pre-warm cross-encoder model: %s", exc
+            )
+
     yield
     client = getattr(app.state, "tmdb_client", None)
     if client is not None:

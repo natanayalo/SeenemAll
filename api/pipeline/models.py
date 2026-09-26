@@ -93,6 +93,14 @@ class RecommendParams:
         False,
         description="Require items to satisfy every inferred genre (AND semantics).",
     )
+    rerank: bool | None = Query(
+        None,
+        description="Override reranking stage enablement (default True when model configured).",
+    )
+    rerank_provider: str | None = Query(
+        None,
+        description="Override reranker provider ('cross_encoder', 'small', 'ollama', 'gemini', 'openai').",
+    )
     debug: bool = Query(False, description="Include debug diagnostics in response.")
 
     def __post_init__(self):

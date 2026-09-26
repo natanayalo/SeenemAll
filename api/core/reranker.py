@@ -129,6 +129,20 @@ _SMALL_RERANK_EXECUTOR = ThreadPoolExecutor(max_workers=1)
 # Ensure we clean the worker thread across reloads/tests.
 atexit.register(_SMALL_RERANK_EXECUTOR.shutdown, wait=False)
 
+_CROSS_ENCODER_TIMEOUT_SECONDS = max(0.1, _float_from_env("CROSS_ENCODER_TIMEOUT", 5.0))
+_CROSS_ENCODER_INPUT_WINDOW = max(1, _int_from_env("CROSS_ENCODER_INPUT_WINDOW", 25))
+_CROSS_ENCODER_CACHE_TTL_SECONDS = max(5, _int_from_env("CROSS_ENCODER_CACHE_TTL", 120))
+_CROSS_ENCODER_CACHE_MAXSIZE = max(
+    16, _int_from_env("CROSS_ENCODER_CACHE_MAXSIZE", 512)
+)
+
+_CROSS_ENCODER_CACHE: TTLCache[str, List[Tuple[int, float]]] = TTLCache(
+    maxsize=_CROSS_ENCODER_CACHE_MAXSIZE, ttl=_CROSS_ENCODER_CACHE_TTL_SECONDS
+)
+_CROSS_ENCODER_CACHE_LOCK = Lock()
+_CROSS_ENCODER_EXECUTOR = ThreadPoolExecutor(max_workers=1)
+atexit.register(_CROSS_ENCODER_EXECUTOR.shutdown, wait=False)
+
 
 def _get_templates_path() -> str:
     env_path = os.getenv("EXPLANATION_TEMPLATES_PATH")
@@ -207,11 +221,44 @@ def rerank_with_explanations(
     intent: IntentFilters | None,
     query: str | None = None,
     user: Dict[str, Any] | None = None,
+    *,
+    enabled_override: bool | None = None,
+    provider_override: str | None = None,
 ) -> List[Dict[str, Any]]:
     if not items:
         return []
 
     settings = _get_settings()
+    is_enabled = (
+        settings.enabled if enabled_override is None else bool(enabled_override)
+    )
+    effective_provider = (provider_override or settings.provider).strip().lower()
+
+    if effective_provider != settings.provider or is_enabled != settings.enabled:
+        if effective_provider == "cross_encoder":
+            override_model = os.getenv(
+                "CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+            )
+            override_endpoint = "local://cross-encoder"
+            override_timeout = _CROSS_ENCODER_TIMEOUT_SECONDS
+        elif effective_provider == "small":
+            override_model = os.getenv("SMALL_RERANK_MODEL", "all-MiniLM-L6-v2")
+            override_endpoint = "local://small-rerank"
+            override_timeout = _SMALL_RERANK_TIMEOUT_SECONDS
+        else:
+            override_model = settings.model
+            override_endpoint = settings.endpoint
+            override_timeout = settings.timeout
+
+        settings = RerankerSettings(
+            provider=effective_provider,
+            api_key=settings.api_key,
+            model=override_model,
+            endpoint=override_endpoint,
+            enabled=is_enabled,
+            timeout=override_timeout,
+        )
+
     if not settings.enabled:
         logger.warning(
             "Reranker(%s) disabled (missing credentials or RERANK_ENABLED=0); returning ANN order.",
@@ -222,7 +269,9 @@ def rerank_with_explanations(
     base = _with_default_explanations(items, intent, query)
 
     try:
-        if settings.provider == "small":
+        if settings.provider == "cross_encoder":
+            window = min(len(base), _CROSS_ENCODER_INPUT_WINDOW)
+        elif settings.provider == "small":
             window = min(len(base), _SMALL_RERANK_INPUT_WINDOW)
         else:
             window = min(len(base), _DEFAULT_MAX_ITEMS_FOR_LLM)
@@ -426,13 +475,14 @@ def _item_identity(item: Dict[str, Any]) -> tuple[Any, int]:
 
 @lru_cache(maxsize=1)
 def _get_settings() -> RerankerSettings:
-    raw_provider = os.getenv("RERANK_PROVIDER", "ollama").strip().lower()
-    supported = {"openai", "gemini", "small", "ollama"}
+    raw_provider = os.getenv("RERANK_PROVIDER", "cross_encoder").strip().lower()
+    supported = {"openai", "gemini", "small", "ollama", "cross_encoder"}
     if raw_provider not in supported:
         logger.warning(
-            "Unsupported RERANK_PROVIDER '%s'; falling back to 'ollama'.", raw_provider
+            "Unsupported RERANK_PROVIDER '%s'; falling back to 'cross_encoder'.",
+            raw_provider,
         )
-        provider = "ollama"
+        provider = "cross_encoder"
     else:
         provider = raw_provider
 
@@ -443,6 +493,11 @@ def _get_settings() -> RerankerSettings:
     if provider == "gemini":
         default_model = "gemini-2.0-flash-lite"
         default_endpoint = "https://generativelanguage.googleapis.com/v1beta/models"
+    elif provider == "cross_encoder":
+        default_model = os.getenv(
+            "CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+        )
+        default_endpoint = "local://cross-encoder"
     elif provider == "small":
         default_model = os.getenv("SMALL_RERANK_MODEL", "all-MiniLM-L6-v2")
         default_endpoint = "local://small-rerank"
@@ -453,16 +508,21 @@ def _get_settings() -> RerankerSettings:
         default_model = "gpt-4o-mini"
         default_endpoint = "https://api.openai.com/v1/chat/completions"
 
-    model = os.getenv("RERANK_MODEL", default_model)
+    if provider == "cross_encoder":
+        model = os.getenv("CROSS_ENCODER_MODEL", default_model)
+    elif provider == "small":
+        model = os.getenv("SMALL_RERANK_MODEL", default_model)
+    else:
+        model = os.getenv("RERANK_MODEL", default_model)
     endpoint = os.getenv("RERANK_ENDPOINT", default_endpoint)
     enabled_value = os.getenv("RERANK_ENABLED", "1").strip().lower()
-    if provider == "small":
-        enabled = enabled_value not in {"0", "false", "no"}
-    elif provider == "ollama":
+    if provider in {"cross_encoder", "small", "ollama"}:
         enabled = enabled_value not in {"0", "false", "no"}
     else:
         enabled = bool(api_key) and enabled_value not in {"0", "false", "no"}
-    if provider == "small":
+    if provider == "cross_encoder":
+        timeout = _CROSS_ENCODER_TIMEOUT_SECONDS
+    elif provider == "small":
         timeout = _SMALL_RERANK_TIMEOUT_SECONDS
     elif provider == "ollama":
         timeout = 120.0
@@ -982,9 +1042,89 @@ def _call_small_reranker(
     ]
 
 
+def _execute_cross_encoder_rerank(
+    query_text: str,
+    items: Sequence[Dict[str, Any]],
+    model_name: str | None = None,
+) -> List[Tuple[int, float]]:
+    from api.core.cross_encoder import score_query_candidates
+
+    scored = score_query_candidates(
+        query=query_text,
+        candidates=items,
+        model_name=model_name,
+        max_candidates=_CROSS_ENCODER_INPUT_WINDOW,
+    )
+    return [(item_id, blended) for item_id, blended, _ in scored]
+
+
+def _call_cross_encoder_reranker(
+    settings: RerankerSettings,
+    items: Sequence[Dict[str, Any]],
+    intent: IntentFilters | None,
+    query: str | None,
+    user: Dict[str, Any] | None,
+) -> List[LLMDecision]:
+    if not items:
+        return []
+
+    window = min(len(items), _CROSS_ENCODER_INPUT_WINDOW)
+    subset = list(items[:window])
+    query_text = _build_small_rerank_query(intent, query)
+    if not query_text:
+        return []
+
+    cache_key = _small_rerank_cache_key(f"ce::{query_text}", subset, user)
+    with _CROSS_ENCODER_CACHE_LOCK:
+        cached = _CROSS_ENCODER_CACHE.get(cache_key)
+    if cached is not None:
+        return [
+            LLMDecision(item_id=item_id, score=score, explanation=None)
+            for item_id, score in cached
+        ]
+
+    future = _CROSS_ENCODER_EXECUTOR.submit(
+        _execute_cross_encoder_rerank, query_text, subset, settings.model
+    )
+    try:
+        scored = future.result(timeout=settings.timeout)
+    except FuturesTimeout:
+        future.cancel()
+        logger.warning(
+            "Cross-Encoder reranker timed out after %.2fs; using baseline ordering.",
+            settings.timeout,
+        )
+        return []
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.warning(
+            "Cross-Encoder reranker failed with error: %s; using baseline ordering.",
+            exc,
+        )
+        return []
+
+    if not scored:
+        return []
+
+    with _CROSS_ENCODER_CACHE_LOCK:
+        _CROSS_ENCODER_CACHE[cache_key] = list(scored)
+
+    return [
+        LLMDecision(item_id=item_id, score=score, explanation=None)
+        for item_id, score in scored
+    ]
+
+
 def _reset_small_rerank_cache_for_tests() -> None:
     with _SMALL_RERANK_CACHE_LOCK:
         _SMALL_RERANK_CACHE.clear()
+    with _CROSS_ENCODER_CACHE_LOCK:
+        _CROSS_ENCODER_CACHE.clear()
+    try:
+        from api.core.cross_encoder import reset_cross_encoder_cache_for_tests
+
+        reset_cross_encoder_cache_for_tests()
+    except Exception:
+        pass
 
 
 def _call_reranker(
@@ -998,13 +1138,18 @@ def _call_reranker(
         decisions = _call_openai_reranker(settings, items, intent, query, user)
     elif settings.provider == "gemini":
         decisions = _call_gemini_reranker(settings, items, intent, query, user)
+    elif settings.provider == "cross_encoder":
+        decisions = _call_cross_encoder_reranker(settings, items, intent, query, user)
     elif settings.provider == "small":
         decisions = _call_small_reranker(settings, items, intent, query, user)
     else:
         raise RerankerError(f"Unsupported reranker provider '{settings.provider}'")
 
     # Validate reranker output in debug/test environments
-    if logger.isEnabledFor(logging.DEBUG) and settings.provider != "small":
+    if logger.isEnabledFor(logging.DEBUG) and settings.provider not in {
+        "small",
+        "cross_encoder",
+    }:
         config = _get_prompt_config()
         for example in config.get("examples", []):
             if (
@@ -1387,6 +1532,18 @@ def _default_explanation(
             or _DEFAULT_EXPLANATION_TEMPLATES["narrative"]["runtime_match"]
         )
         parts.append(_safe_template(template, runtime=runtime))
+
+    if query:
+        query_lower = query.lower()
+        directors = _extract_genre_names(item.get("directors"))
+        matched_directors = [d for d in directors if d.lower() in query_lower]
+        if matched_directors:
+            parts.append(f"Directed by {', '.join(matched_directors[:2])}.")
+
+        cast = _extract_genre_names(item.get("cast"))
+        matched_cast = [c for c in cast if c.lower() in query_lower]
+        if matched_cast:
+            parts.append(f"Starring {', '.join(matched_cast[:2])}.")
 
     summary = _short_overview(item.get("overview"))
     if summary:
