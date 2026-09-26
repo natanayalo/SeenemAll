@@ -27,13 +27,23 @@ def rerank_candidates(
     intent: IntentFilters,
     query: str | None,
     context: UserContext,
+    *,
+    rerank: bool | None = None,
+    rerank_provider: str | None = None,
 ) -> List[Dict[str, Any]]:
+    # Early bypass if rerank is explicitly disabled
+    if rerank is False:
+        from api.core.reranker import _with_default_explanations
+
+        return _with_default_explanations(
+            ordered, intent, query, apply_low_signal=False
+        )
+
     rerank_fn = get_hook("rerank_with_explanations", rerank_with_explanations)
-    reranked = rerank_fn(
-        ordered,
-        intent=intent,
-        query=query,
-        user={
+    kwargs: Dict[str, Any] = {
+        "intent": intent,
+        "query": query,
+        "user": {
             "user_id": context.canonical_id,
             "base_user_id": context.user_id,
             "profile": context.profile,
@@ -41,7 +51,22 @@ def rerank_candidates(
             "neighbors": context.profile_meta.get("neighbors"),
             "negative_items": context.profile_meta.get("negative_items"),
         },
+    }
+    if rerank is not None:
+        kwargs["enabled_override"] = rerank
+    if rerank_provider is not None:
+        kwargs["provider_override"] = rerank_provider
+
+    import inspect
+
+    sig = inspect.signature(rerank_fn)
+    has_var_kw = any(
+        p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
     )
+    if not has_var_kw:
+        kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
+
+    reranked = rerank_fn(ordered, **kwargs)
     METRICS.counter("recommend.reranker_used").inc()
     return reranked
 
@@ -116,6 +141,9 @@ def format_presentation_items(page: Sequence[Dict[str, Any]]) -> List[Dict[str, 
         cleaned.pop("ann_rank", None)
         cleaned.pop("retrieval_score", None)
         cleaned.pop("source_scores", None)
+        cleaned.pop("directors", None)
+        cleaned.pop("cast", None)
+        cleaned.pop("keywords", None)
         response.append(cleaned)
     return response
 

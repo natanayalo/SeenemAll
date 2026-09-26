@@ -492,7 +492,11 @@ def default_param_grid() -> (
     Dict[str, Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]]
 ):
     return {
-        "default": lambda entry: {"use_llm_intent": True},
+        "default": lambda entry: {
+            "use_llm_intent": True,
+            "rerank": True,
+            "rerank_provider": "cross_encoder",
+        },
         "ann_only": lambda entry: {
             "mixer_ann_weight": 1.2,
             "mixer_collab_weight": 0.0,
@@ -502,6 +506,27 @@ def default_param_grid() -> (
             "mixer_novelty_weight": 0.0,
             "diversify": False,
             "use_llm_intent": False,
+            "rerank": False,
+        },
+        "ann_cross_encoder": lambda entry: {
+            "mixer_ann_weight": 1.2,
+            "mixer_collab_weight": 0.0,
+            "mixer_trending_weight": 0.0,
+            "mixer_popularity_weight": 0.0,
+            "mixer_vote_weight": 0.0,
+            "mixer_novelty_weight": 0.0,
+            "diversify": False,
+            "use_llm_intent": False,
+            "rerank": True,
+            "rerank_provider": "cross_encoder",
+        },
+        "cross_encoder": lambda entry: {
+            "use_llm_intent": True,
+            "rerank": True,
+            "rerank_provider": "cross_encoder",
+        },
+        "baseline_no_rerank": lambda entry: {
+            "use_llm_intent": True,
             "rerank": False,
         },
         "collab_boost": lambda entry: {
@@ -1253,6 +1278,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--ab-compare",
+        "--ab-test",
+        dest="ab_compare",
         action="store_true",
         help="Run counterfactual A/B evaluation comparing baseline vs candidate.",
     )

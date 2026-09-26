@@ -423,3 +423,24 @@ def test_ab_comparison_with_stored_baseline(tmp_path):
     assert "comparisons" in report
     assert report["baseline_param"] == "ann_only"
     assert rep_path.exists()
+
+
+def test_parse_args_ab_test_alias():
+    from evaluation.evaluate import parse_args
+
+    args = parse_args(["--ab-test", "--candidate", "default"])
+    assert args.ab_compare is True
+    assert args.candidate == "default"
+
+
+def test_default_param_grid_cross_encoder():
+    from evaluation.evaluate import default_param_grid
+
+    grid = default_param_grid()
+    assert "cross_encoder" in grid
+    assert "baseline_no_rerank" in grid
+    ce_params = grid["cross_encoder"]({})
+    assert ce_params["rerank"] is True
+    assert ce_params["rerank_provider"] == "cross_encoder"
+    base_params = grid["baseline_no_rerank"]({})
+    assert base_params["rerank"] is False

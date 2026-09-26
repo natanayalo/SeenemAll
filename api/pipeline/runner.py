@@ -59,6 +59,8 @@ class RecommendationPipeline:
             intent=intent.intent_filters,
             query=params.query,
             context=context,
+            rerank=params.rerank,
+            rerank_provider=params.rerank_provider,
         )
 
         pipeline_ms = (time.perf_counter() - _pipeline_start) * 1000

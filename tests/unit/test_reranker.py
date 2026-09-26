@@ -6,6 +6,7 @@ import os
 from datetime import datetime, UTC
 from typing import List
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import httpx
 import pytest
@@ -111,11 +112,11 @@ def test_get_settings_fallback_provider(monkeypatch):
     monkeypatch.setenv("RERANK_API_KEY", "fake")
     monkeypatch.setenv("RERANK_PROVIDER", "unsupported")
     settings = reranker._get_settings()
-    assert settings.provider == "ollama"
+    assert settings.provider == "cross_encoder"
     _reset_settings()
 
 
-def test_get_settings_defaults_to_ollama_without_api_key(monkeypatch):
+def test_get_settings_defaults_to_cross_encoder_without_api_key(monkeypatch):
     _reset_settings()
     monkeypatch.delenv("RERANK_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -123,10 +124,21 @@ def test_get_settings_defaults_to_ollama_without_api_key(monkeypatch):
 
     settings = reranker._get_settings()
 
+    assert settings.provider == "cross_encoder"
+    assert settings.model == "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    assert settings.endpoint == "local://cross-encoder"
+    assert settings.enabled is True
+
+
+def test_get_settings_explicit_ollama(monkeypatch):
+    _reset_settings()
+    monkeypatch.setenv("RERANK_PROVIDER", "ollama")
+    settings = reranker._get_settings()
     assert settings.provider == "ollama"
     assert settings.model == "gemma4:12b"
     assert settings.endpoint == "http://localhost:11434/v1/chat/completions"
     assert settings.enabled is True
+    _reset_settings()
 
 
 def test_call_openai_reranker_parses_payload(monkeypatch):
@@ -1207,3 +1219,161 @@ def test_rerank_with_explanations_handles_reranker_error(monkeypatch):
 
     result = reranker.rerank_with_explanations(items, intent=None, query="needle")
     assert result == reranker._with_default_explanations(items, None, "needle")
+
+
+def test_cross_encoder_reranker_orders_items(monkeypatch):
+    _reset_settings()
+    monkeypatch.setenv("RERANK_PROVIDER", "cross_encoder")
+    filters = IntentFilters(
+        raw_query="interstellar journey",
+        genres=["Science Fiction"],
+        moods=[],
+        media_types=["movie"],
+    )
+
+    items = [
+        {
+            "id": 1,
+            "title": "Alpha Drama",
+            "genres": [{"name": "Drama"}],
+            "overview": "Everyday city life.",
+            "original_rank": 0,
+            "retrieval_score": 0.8,
+        },
+        {
+            "id": 2,
+            "title": "Interstellar Odyssey",
+            "genres": [{"name": "Science Fiction"}],
+            "directors": [{"name": "Christopher Nolan"}],
+            "cast": [{"name": "Matthew McConaughey"}],
+            "overview": "Astronauts travel through a wormhole near Saturn.",
+            "original_rank": 1,
+            "retrieval_score": 0.5,
+        },
+    ]
+
+    mock_model = MagicMock()
+    # Candidate 2 (Interstellar) gets high score, Candidate 1 gets low score
+    mock_model.predict.return_value = np.array([-1.5, 3.0], dtype=np.float32)
+    monkeypatch.setattr(
+        "api.core.cross_encoder.get_cross_encoder_model", lambda name=None: mock_model
+    )
+
+    result = reranker.rerank_with_explanations(
+        items, intent=filters, query="interstellar journey", user={"user_id": "u1"}
+    )
+    # Candidate 2 should be promoted to rank 0
+    assert result[0]["id"] == 2
+    assert result[1]["id"] == 1
+    _reset_settings()
+
+
+def test_cross_encoder_reranker_uses_cache(monkeypatch):
+    _reset_settings()
+    monkeypatch.setenv("RERANK_PROVIDER", "cross_encoder")
+
+    items = [
+        {"id": 1, "title": "Alpha", "genres": [{"name": "Sci-Fi"}]},
+        {"id": 2, "title": "Beta", "genres": [{"name": "Drama"}]},
+    ]
+
+    calls = {"count": 0}
+
+    def fake_score(query, candidates, **kwargs):
+        calls["count"] += 1
+        return [(2, 0.9, 0.9), (1, 0.4, 0.4)]
+
+    monkeypatch.setattr("api.core.cross_encoder.score_query_candidates", fake_score)
+
+    first = reranker.rerank_with_explanations(
+        items, intent=None, query="adventure", user={"user_id": "u-ce-cache"}
+    )
+    second = reranker.rerank_with_explanations(
+        items, intent=None, query="adventure", user={"user_id": "u-ce-cache"}
+    )
+
+    assert calls["count"] == 1
+    assert [item["id"] for item in first] == [2, 1]
+    assert [item["id"] for item in second] == [2, 1]
+    _reset_settings()
+
+
+def test_cross_encoder_reranker_handles_timeout(monkeypatch):
+    _reset_settings()
+    monkeypatch.setenv("RERANK_PROVIDER", "cross_encoder")
+
+    items = [
+        {"id": 1, "title": "Alpha"},
+        {"id": 2, "title": "Beta"},
+    ]
+
+    cancelled = {"flag": False}
+
+    class DummyFuture:
+        def result(self, timeout=None):
+            raise reranker.FuturesTimeout()
+
+        def cancel(self):
+            cancelled["flag"] = True
+
+    class DummyExecutor:
+        def submit(self, *args, **kwargs):
+            return DummyFuture()
+
+    monkeypatch.setattr(reranker, "_CROSS_ENCODER_EXECUTOR", DummyExecutor())
+
+    result = reranker.rerank_with_explanations(
+        items, intent=None, query="test query", user={"user_id": "timeout"}
+    )
+
+    assert cancelled["flag"] is True
+    assert [item["id"] for item in result] == [1, 2]
+    _reset_settings()
+
+
+def test_grounded_explanations_director_and_cast():
+    items = [
+        {
+            "id": 1,
+            "title": "Oppenheimer",
+            "directors": [{"name": "Christopher Nolan"}],
+            "cast": [{"name": "Cillian Murphy"}, {"name": "Emily Blunt"}],
+            "genres": [{"name": "Drama"}, {"name": "History"}],
+            "release_year": 2023,
+            "runtime": 180,
+            "overview": "The story of American scientist J. Robert Oppenheimer.",
+        }
+    ]
+
+    res = reranker.rerank_with_explanations(
+        items,
+        intent=None,
+        query="Christopher Nolan movie with Cillian Murphy",
+        enabled_override=False,
+    )
+
+    explanation = res[0]["explanation"]
+    assert "Directed by Christopher Nolan" in explanation
+    assert "Starring Cillian Murphy" in explanation
+
+
+def test_rerank_with_explanations_enabled_override():
+    _reset_settings()
+    items = [{"id": 1, "title": "A"}, {"id": 2, "title": "B"}]
+
+    # Disabled via override
+    res = reranker.rerank_with_explanations(
+        items, intent=None, query="test", enabled_override=False
+    )
+    assert [i["id"] for i in res] == [1, 2]
+
+    # Provider override to small
+    res_small = reranker.rerank_with_explanations(
+        items,
+        intent=None,
+        query="test",
+        enabled_override=True,
+        provider_override="small",
+    )
+    assert len(res_small) == 2
+    _reset_settings()
