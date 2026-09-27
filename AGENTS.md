@@ -73,9 +73,10 @@
 **Goal:** Reorder candidates and generate explanations
 **Implements:** `api/core/reranker.py`
 
-- Supports OpenAI / Gemini providers for natural-language rationales
-- Local “small” reranker (MiniLM-L6-v2) for offline or keyless deployments
-- Gracefully falls back to heuristic ordering when disabled or failing
+- Uses the local `ms-marco-MiniLM-L-6-v2` Cross-Encoder for request-time ordering
+- Produces deterministic, feature-grounded explanations from parsed filters and item metadata
+- Keeps the local “small” MiniLM reranker available for controlled experiments
+- Falls back to baseline ordering if the Cross-Encoder is disabled or unavailable
 
 ---
 

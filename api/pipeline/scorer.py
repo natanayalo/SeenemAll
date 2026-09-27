@@ -629,7 +629,7 @@ def score_candidates(
         vote_weight_override=vote_weight_override,
         novelty_weight_override=novelty_weight_override,
         intent_weight_override=intent_weight_override,
-        query_vector=intent.rewrite_vec,
+        query_vector=intent.query_vec,
         taste_clusters=context.active_taste_clusters,
         user_vector=context.short_v,
         intent_filters=intent.intent_filters,

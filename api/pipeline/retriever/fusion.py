@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from api.config import COUNTRY_DEFAULT
+from api.core.metrics import timer
 from api.db.models import Availability, Item, ItemEmbedding
 from api.pipeline.hooks import get_hook
 from api.pipeline.models import (
@@ -168,31 +169,34 @@ def retrieve_candidates(
 
     items_with_data: Dict[int, Tuple[Any, np.ndarray, Any]] = {}
     if ids:
-        items_with_data = {
-            row.id: (row, vec, watch_options)
-            for row, vec, watch_options in db.execute(
-                select(
-                    Item,
-                    ItemEmbedding.vector,
-                    func.json_agg(
-                        func.json_build_object(
-                            "service",
-                            Availability.service,
-                            "url",
-                            func.coalesce(Availability.web_url, Availability.deeplink),
-                        )
-                    ).label("watch_options"),
-                )
-                .join(ItemEmbedding, Item.id == ItemEmbedding.item_id)
-                .outerjoin(
-                    Availability,
-                    (Item.id == Availability.item_id)
-                    & (Availability.country == COUNTRY_DEFAULT),
-                )
-                .where(Item.id.in_(ids))
-                .group_by(Item.id, ItemEmbedding.vector)
-            ).all()
-        }
+        with timer("recommend.sql_hydration_latency_ms"):
+            items_with_data = {
+                row.id: (row, vec, watch_options)
+                for row, vec, watch_options in db.execute(
+                    select(
+                        Item,
+                        ItemEmbedding.vector,
+                        func.json_agg(
+                            func.json_build_object(
+                                "service",
+                                Availability.service,
+                                "url",
+                                func.coalesce(
+                                    Availability.web_url, Availability.deeplink
+                                ),
+                            )
+                        ).label("watch_options"),
+                    )
+                    .join(ItemEmbedding, Item.id == ItemEmbedding.item_id)
+                    .outerjoin(
+                        Availability,
+                        (Item.id == Availability.item_id)
+                        & (Availability.country == COUNTRY_DEFAULT),
+                    )
+                    .where(Item.id.in_(ids))
+                    .group_by(Item.id, ItemEmbedding.vector)
+                ).all()
+            }
 
     return CandidatePool(
         ids=ids,

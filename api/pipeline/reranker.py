@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 _DEBUG_ALLOWLIST_LIMIT = 250
 _DEBUG_BOOST_LIMIT = 50
+_REQUEST_RERANKERS = {"cross_encoder", "small"}
 
 
 def rerank_candidates(
@@ -54,8 +55,14 @@ def rerank_candidates(
     }
     if rerank is not None:
         kwargs["enabled_override"] = rerank
-    if rerank_provider is not None:
-        kwargs["provider_override"] = rerank_provider
+    requested_provider = (rerank_provider or "cross_encoder").strip().lower()
+    if requested_provider not in _REQUEST_RERANKERS:
+        logger.warning(
+            "Ignoring non-local reranker '%s' on the recommendation request path; using Cross-Encoder.",
+            requested_provider,
+        )
+        requested_provider = "cross_encoder"
+    kwargs["provider_override"] = requested_provider
 
     import inspect
 

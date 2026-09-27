@@ -229,10 +229,17 @@ def rerank_with_explanations(
         return []
 
     settings = _get_settings()
-    is_enabled = (
-        settings.enabled if enabled_override is None else bool(enabled_override)
-    )
     effective_provider = (provider_override or settings.provider).strip().lower()
+    if enabled_override is not None:
+        is_enabled = bool(enabled_override)
+    elif provider_override and effective_provider in {"cross_encoder", "small"}:
+        is_enabled = os.getenv("RERANK_ENABLED", "1").strip().lower() not in {
+            "0",
+            "false",
+            "no",
+        }
+    else:
+        is_enabled = settings.enabled
 
     if effective_provider != settings.provider or is_enabled != settings.enabled:
         if effective_provider == "cross_encoder":
@@ -246,9 +253,16 @@ def rerank_with_explanations(
             override_endpoint = "local://small-rerank"
             override_timeout = _SMALL_RERANK_TIMEOUT_SECONDS
         else:
-            override_model = settings.model
-            override_endpoint = settings.endpoint
-            override_timeout = settings.timeout
+            logger.warning(
+                "Ignoring non-local reranker '%s' on the synchronous request path; using Cross-Encoder.",
+                effective_provider,
+            )
+            effective_provider = "cross_encoder"
+            override_model = os.getenv(
+                "CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+            )
+            override_endpoint = "local://cross-encoder"
+            override_timeout = _CROSS_ENCODER_TIMEOUT_SECONDS
 
         settings = RerankerSettings(
             provider=effective_provider,

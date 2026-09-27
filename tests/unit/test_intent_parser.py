@@ -246,26 +246,26 @@ def test_parse_intent_llm_success(monkeypatch):
     assert intent.streaming_providers == ["netflix"]
 
 
-def test_get_settings_defaults_to_ollama_without_api_key(monkeypatch):
+def test_get_settings_defaults_to_hybrid_fast_without_api_key(monkeypatch):
     monkeypatch.delenv("INTENT_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("INTENT_PROVIDER", raising=False)
     monkeypatch.delenv("INTENT_ENABLED", raising=False)
     llm_parser._get_settings.cache_clear()
     settings = llm_parser._get_settings()
-    assert settings.provider == "ollama"
-    assert settings.model == "gemma4:12b"
-    assert settings.endpoint == "http://localhost:11434/v1/chat/completions"
+    assert settings.provider == "hybrid_fast"
+    assert settings.model == "urchade/gliner_small-v2.1"
+    assert settings.endpoint == "local"
     assert settings.enabled is True
 
 
-def test_get_settings_falls_back_to_ollama(monkeypatch):
+def test_get_settings_falls_back_to_hybrid_fast(monkeypatch):
     monkeypatch.setenv("INTENT_PROVIDER", "invalid")
     monkeypatch.setenv("INTENT_API_KEY", "key")
     monkeypatch.delenv("INTENT_ENABLED", raising=False)
     llm_parser._get_settings.cache_clear()
     settings = llm_parser._get_settings()
-    assert settings.provider == "ollama"
+    assert settings.provider == "hybrid_fast"
     assert settings.enabled is True
 
 
@@ -462,14 +462,13 @@ def test_load_fallback_rules_parses_entries(monkeypatch, tmp_path):
 
 
 def test_get_settings_invalid_timeout_warns(monkeypatch, caplog):
-    monkeypatch.setenv("INTENT_API_KEY", "token")
-    monkeypatch.setenv("INTENT_PROVIDER", "openai")
+    monkeypatch.setenv("INTENT_PROVIDER", "hybrid_fast")
     monkeypatch.setenv("INTENT_TIMEOUT", "oops")
     llm_parser._get_settings.cache_clear()
 
     caplog.set_level(logging.WARNING, logger=llm_parser.__name__)
     settings = llm_parser._get_settings()
-    assert settings.timeout == 12.0
+    assert settings.timeout == 1.0
     assert "Invalid INTENT_TIMEOUT" in caplog.text
 
     llm_parser._get_settings.cache_clear()

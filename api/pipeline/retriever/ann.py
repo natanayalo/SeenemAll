@@ -132,14 +132,14 @@ class ANNRetriever(BaseRetriever):
         exclude = list(context.exclude_set)
 
         if context.cold_start:
-            rewrite_vec = intent.rewrite_vec
-            if rewrite_vec is not None:
-                vec_norm = float(np.linalg.norm(rewrite_vec))
+            query_vec = intent.query_vec
+            if query_vec is not None:
+                vec_norm = float(np.linalg.norm(query_vec))
                 if vec_norm > 0 and np.isfinite(vec_norm):
                     try:
                         ann_ids = ann_candidates_fn(
                             db,
-                            rewrite_vec,
+                            query_vec,
                             exclude,
                             limit=candidate_limit,
                             allowed_ids=allowlist,
@@ -164,7 +164,7 @@ class ANNRetriever(BaseRetriever):
                             try:
                                 ann_ids = ann_candidates_fn(
                                     db,
-                                    rewrite_vec,
+                                    query_vec,
                                     exclude,
                                     limit=candidate_limit,
                                     allowed_ids=None,
@@ -190,7 +190,7 @@ class ANNRetriever(BaseRetriever):
 
                     if ann_ids:
                         logger.info(
-                            "Using rewrite ANN candidates for cold-start user %s",
+                            "Using query ANN candidates for cold-start user %s",
                             canonical_id,
                         )
                         logger.debug(
@@ -229,20 +229,20 @@ class ANNRetriever(BaseRetriever):
         else:
             logger.info("Using ANN candidates for user %s", canonical_id)
             clusters = context.active_taste_clusters
-            rewrite_vec = intent.rewrite_vec
+            query_vec = intent.query_vec
 
             # Multi-interest retrieval when user has >= 2 active taste clusters
             if clusters and len(clusters) > 1:
-                if rewrite_vec is not None:
+                if query_vec is not None:
                     # 1. Query mode: select the cluster closest to query intent
                     best_sim = -2.0
                     best_cluster = clusters[0]
-                    r_norm = float(np.linalg.norm(rewrite_vec))
-                    r_unit = rewrite_vec / r_norm if r_norm > 0 else rewrite_vec
+                    q_norm = float(np.linalg.norm(query_vec))
+                    q_unit = query_vec / q_norm if q_norm > 0 else query_vec
 
                     for cl in clusters:
                         c_vec = _extract_centroid(cl)
-                        sim = float(np.dot(c_vec, r_unit))
+                        sim = float(np.dot(c_vec, q_unit))
                         if sim > best_sim:
                             best_sim = sim
                             best_cluster = cl
@@ -254,7 +254,7 @@ class ANNRetriever(BaseRetriever):
                         else _REWRITE_BLEND_ALPHA
                     )
                     alpha = max(0.0, min(1.0, alpha))
-                    q_vec = (alpha * best_c_vec) + ((1 - alpha) * rewrite_vec)
+                    q_vec = (alpha * best_c_vec) + ((1 - alpha) * query_vec)
                     q_norm = float(np.linalg.norm(q_vec))
                     q_vec = q_vec / q_norm if q_norm > 0 else q_vec
 
@@ -324,14 +324,14 @@ class ANNRetriever(BaseRetriever):
                 # Baseline single-vector retrieval
                 short_v = context.short_v
                 assert short_v is not None
-                if rewrite_vec is not None:
+                if query_vec is not None:
                     alpha = (
                         _REWRITE_BLEND_ALPHA_QUERY
                         if intent.query
                         else _REWRITE_BLEND_ALPHA
                     )
                     alpha = max(0.0, min(1.0, alpha))
-                    q_vec = (alpha * short_v) + ((1 - alpha) * rewrite_vec)
+                    q_vec = (alpha * short_v) + ((1 - alpha) * query_vec)
                     q_norm = float(np.linalg.norm(q_vec))
                     q_vec = q_vec / q_norm if q_norm > 0 else q_vec
                 else:

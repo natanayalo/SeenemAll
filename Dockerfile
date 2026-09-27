@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7
 ARG OPENVINO_RUNTIME_IMAGE=openvino/model_server:2026.4.0-gpu
+ARG FAST_INTENT_MODEL_REVISION=4e091416cf7c3481db542c2a3d26156916f3a47f
 
 FROM python:3.12-slim AS builder
 
@@ -23,6 +24,7 @@ RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip,sharing=locked \
 # Final stage includes the Intel GPU runtime and OpenVINO version used by the
 # WSL2 GPU path. The API runs in this image instead of the model server binary.
 FROM ${OPENVINO_RUNTIME_IMAGE} AS runtime
+ARG FAST_INTENT_MODEL_REVISION
 
 USER root
 
@@ -42,6 +44,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+ENV FAST_INTENT_MODEL=urchade/gliner_small-v2.1 \
+    FAST_INTENT_MODEL_REVISION=${FAST_INTENT_MODEL_REVISION} \
+    FAST_INTENT_RUNTIME=openvino \
+    FAST_INTENT_OPENVINO_DEVICE=CPU \
+    FAST_INTENT_OPENVINO_DIR=/opt/models/gliner_small_ov
+
 # Copy wheels from builder stage
 COPY --from=builder /app/wheels /wheels
 COPY --from=builder /app/requirements.txt /app/requirements-openvino.txt /app/requirements-docker.txt ./
@@ -55,6 +63,11 @@ RUN python -c "from sentence_transformers import SentenceTransformer, CrossEncod
 
 # Copy application code
 COPY . .
+
+# Export the pinned GLiNER checkpoint into the OpenVINO IR used by the request path.
+# Keep the source checkpoint cache out of the final image layer.
+RUN HF_HOME=/tmp/gliner-hf-cache python scripts/export_gliner_openvino.py \
+    && rm -rf /tmp/gliner-hf-cache
 
 EXPOSE 8000
 ENTRYPOINT ["/opt/venv/bin/uvicorn"]

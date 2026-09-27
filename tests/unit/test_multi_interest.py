@@ -250,7 +250,7 @@ def test_ann_retriever_multi_cluster_browse_mode(monkeypatch):
         intent_filters=None,  # type: ignore
         structured_search_filters=None,
         es_text_query=None,
-        rewrite_vec=None,
+        query_vec=None,
         prefer_top_rated=False,
         custom_genres=[],
         has_people_filters=False,
@@ -313,7 +313,7 @@ def test_ann_retriever_multi_cluster_query_selection(monkeypatch):
         intent_filters=None,  # type: ignore
         structured_search_filters=None,
         es_text_query=None,
-        rewrite_vec=query_vec,
+        query_vec=query_vec,
         prefer_top_rated=False,
         custom_genres=[],
         has_people_filters=False,
@@ -363,7 +363,7 @@ def test_ann_retriever_cold_start_fallback(monkeypatch):
         intent_filters=None,  # type: ignore
         structured_search_filters=None,
         es_text_query=None,
-        rewrite_vec=None,
+        query_vec=None,
         prefer_top_rated=False,
         custom_genres=[],
         has_people_filters=False,

@@ -153,12 +153,12 @@ class OpenVINOEmbeddingModel:
 
 
 def get_embedding_device() -> str:
-    """Resolve compute device, prioritizing explicit env override, OpenVINO (GPU/NPU), CUDA, XPU, and CPU."""
+    """Resolve the embedding device, preferring OpenVINO acceleration."""
     env_device = os.getenv("EMBEDDING_DEVICE") or os.getenv("DEVICE")
     if env_device and env_device.strip():
         return env_device.strip()
 
-    backend = os.getenv("EMBEDDING_BACKEND", "").strip().lower()
+    backend = os.getenv("EMBEDDING_BACKEND", "openvino").strip().lower()
     if backend == "openvino":
         try:
             import openvino as ov
@@ -190,18 +190,23 @@ def get_model(device: str | None = None) -> Any:
     global _model
     target_device = device or get_embedding_device()
     dev_key = target_device.upper()
-    backend = os.getenv("EMBEDDING_BACKEND", "").strip().lower()
+    backend = os.getenv("EMBEDDING_BACKEND", "openvino").strip().lower()
+    cache_key = f"{DEFAULT_MODEL}|{backend}|{dev_key}"
 
     with _model_lock:
-        if dev_key in _model_cache:
-            return _model_cache[dev_key]
+        if cache_key in _model_cache:
+            return _model_cache[cache_key]
 
         if backend == "openvino" or dev_key in {"GPU", "NPU"}:
             try:
                 model = OpenVINOEmbeddingModel(DEFAULT_MODEL, device=dev_key)
-                _model_cache[dev_key] = model
-                if _model is None:
-                    _model = model
+                _model_cache[cache_key] = model
+                _model = model
+                logger.info(
+                    "Embedding runtime resolved | model=%s backend=openvino device=%s",
+                    DEFAULT_MODEL,
+                    getattr(model, "device", dev_key),
+                )
                 return model
             except Exception as exc:
                 logger.warning(
@@ -210,18 +215,20 @@ def get_model(device: str | None = None) -> Any:
                     exc,
                 )
 
-        if _model is None:
-            from sentence_transformers import (
-                SentenceTransformer as _SentenceTransformer,
-            )
+        from sentence_transformers import SentenceTransformer
 
-            dev = target_device.lower()
-            if dev in {"gpu", "npu"}:
-                dev = "cpu"
-            _model = _SentenceTransformer(DEFAULT_MODEL, device=dev)
-
-        _model_cache[dev_key] = _model
-        return _model
+        dev = target_device.lower()
+        if dev in {"gpu", "npu"}:
+            dev = "cpu"
+        model = SentenceTransformer(DEFAULT_MODEL, device=dev)
+        _model_cache[cache_key] = model
+        _model = model
+        logger.info(
+            "Embedding runtime resolved | model=%s backend=pytorch device=%s",
+            DEFAULT_MODEL,
+            dev,
+        )
+        return model
 
 
 def reset_embedding_cache_for_tests() -> None:

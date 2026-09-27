@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import time
 from dataclasses import dataclass
 from functools import lru_cache
 from threading import Lock
@@ -20,6 +21,7 @@ from .legacy_intent_parser import (
 from .rewrite import Rewrite
 from .persistent_cache import PersistentCache, get_persistent_cache
 from api.core.prompt_eval import load_prompt_template
+from api.core.metrics import METRICS
 from etl.embedding_templates import format_with_template, format_basic
 
 DEFAULT_INTENT = Intent()
@@ -175,12 +177,14 @@ def _persistent_cache_for_namespace(namespace: str) -> Optional[PersistentCache]
 
 @lru_cache(maxsize=1)
 def _get_settings() -> IntentParserSettings:
-    raw_provider = os.getenv("INTENT_PROVIDER", "ollama").strip().lower()
-    if raw_provider not in {"ollama", "openai", "gemini"}:
+    raw_provider = os.getenv("INTENT_PROVIDER", "hybrid_fast").strip().lower()
+    valid_providers = {"hybrid_fast", "fast", "gliner"}
+    if raw_provider not in valid_providers:
         logger.warning(
-            "Unsupported INTENT_PROVIDER '%s'; falling back to 'ollama'.", raw_provider
+            "Intent provider '%s' is not supported on the synchronous request path; using 'hybrid_fast'.",
+            raw_provider,
         )
-        provider = "ollama"
+        provider = "hybrid_fast"
     else:
         provider = raw_provider
 
@@ -195,6 +199,9 @@ def _get_settings() -> IntentParserSettings:
     elif provider == "ollama":
         default_model = "gemma4:12b"
         default_endpoint = "http://localhost:11434/v1/chat/completions"
+    elif provider in {"hybrid_fast", "fast", "gliner"}:
+        default_model = os.getenv("FAST_INTENT_MODEL", "urchade/gliner_small-v2.1")
+        default_endpoint = "local"
     else:
         default_model = "gpt-4o-mini"
         default_endpoint = "https://api.openai.com/v1/chat/completions"
@@ -202,12 +209,18 @@ def _get_settings() -> IntentParserSettings:
     model = os.getenv("INTENT_MODEL", default_model)
     endpoint = os.getenv("INTENT_ENDPOINT", default_endpoint)
     enabled_value = os.getenv("INTENT_ENABLED", "1").strip().lower()
-    enabled = (provider == "ollama" or bool(api_key)) and enabled_value not in {
+    enabled = (
+        provider in {"ollama", "hybrid_fast", "fast", "gliner"} or bool(api_key)
+    ) and enabled_value not in {
         "0",
         "false",
         "no",
     }
-    timeout = 120.0 if provider == "ollama" else 12.0
+    timeout = (
+        120.0
+        if provider == "ollama"
+        else (1.0 if provider in {"hybrid_fast", "fast", "gliner"} else 12.0)
+    )
     raw_timeout = os.getenv("INTENT_TIMEOUT")
     if raw_timeout:
         try:
@@ -400,6 +413,21 @@ def parse_intent(
     user_context: Dict[str, Any],
     linked_entities: Dict[str, Any] | None = None,
 ) -> Intent:
+    """Measure complete intent parsing, including normalization and cache hits."""
+    started = time.perf_counter()
+    try:
+        return _parse_intent_impl(query, user_context, linked_entities)
+    finally:
+        METRICS.histogram("intent.parse_intent_latency_ms").observe(
+            (time.perf_counter() - started) * 1000.0
+        )
+
+
+def _parse_intent_impl(
+    query: str,
+    user_context: Dict[str, Any],
+    linked_entities: Dict[str, Any] | None = None,
+) -> Intent:
     """
     Parses the user's query and returns an Intent object.
     Includes guardrails to handle validation errors and provide a fallback.
@@ -449,6 +477,10 @@ def parse_intent(
                 llm_output = _call_gemini_parser(
                     settings, normalized_query, user_context, linked_entities
                 )
+            elif settings.provider in {"hybrid_fast", "fast", "gliner"}:
+                from api.core.fast_intent_parser import parse_fast_intent
+
+                llm_output = parse_fast_intent(normalized_query)
             else:  # pragma: no cover - defensive guardrail
                 raise IntentParserError(f"Unsupported provider '{settings.provider}'")
         except (IntentParserError, httpx.RequestError):
@@ -490,7 +522,6 @@ def parse_intent(
     intent = _augment_intent(intent, normalized_query)
     intent.include_genres = _normalize_genre_names(intent.include_genres)
     intent.exclude_genres = _normalize_genre_names(intent.exclude_genres)
-    intent.ann_description = _format_ann_description(intent, normalized_query)
     logger.debug("Returning intent: %s", intent)
     INTENT_CACHE[cache_key] = _clone_intent(intent)
     if persistent_store and not used_stub:

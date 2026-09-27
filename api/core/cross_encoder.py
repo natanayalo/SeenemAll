@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Sequence, Tuple, overload
 import numpy as np
 
 from api.core.model_security import save_tokenizer_safely
+from api.core.metrics import METRICS, timer
 
 if TYPE_CHECKING:
     from sentence_transformers import CrossEncoder  # pragma: no cover
@@ -21,8 +22,13 @@ _DEFAULT_ALPHA = 0.7
 _DEFAULT_MAX_CANDIDATES = 25
 _DEFAULT_BATCH_SIZE = 32
 
-_model_cache: Dict[str, CrossEncoder] = {}
+_model_cache: Dict[str, Any] = {}
 _model_lock = threading.Lock()
+
+
+def _model_cache_key(name: str, backend: str, device: str) -> str:
+    """Stable key that encodes all three dimensions that affect which runtime is loaded."""
+    return f"{name}|{backend.lower()}|{device.upper()}"
 
 
 class OpenVINOCrossEncoder:
@@ -124,7 +130,7 @@ def get_cross_encoder_device() -> str:
     if env_device and env_device.strip():
         return env_device.strip()
 
-    backend = os.getenv("CROSS_ENCODER_BACKEND", "").strip().lower()
+    backend = os.getenv("CROSS_ENCODER_BACKEND", "openvino").strip().lower()
     if backend == "openvino":
         try:
             import openvino as ov
@@ -155,7 +161,7 @@ def get_cross_encoder_device() -> str:
 
 
 def _load_cross_encoder(name: str, device: str) -> Any:
-    backend = os.getenv("CROSS_ENCODER_BACKEND", "").strip().lower()
+    backend = os.getenv("CROSS_ENCODER_BACKEND", "openvino").strip().lower()
     dev_upper = device.upper()
 
     if backend == "openvino" or dev_upper in {"GPU", "NPU"}:
@@ -177,22 +183,34 @@ def _load_cross_encoder(name: str, device: str) -> Any:
     return CrossEncoder(name, device=pytorch_device)
 
 
-def get_cross_encoder_model(model_name: str | None = None) -> CrossEncoder:
-    """Thread-safe lazy-loaded singleton for the Cross-Encoder model."""
+def get_cross_encoder_model(model_name: str | None = None) -> Any:
+    """Thread-safe lazy-loaded cache for the Cross-Encoder model.
+
+    The cache key encodes (model_name, backend, device) so that changing
+    CROSS_ENCODER_BACKEND or CROSS_ENCODER_DEVICE in-process always loads a
+    fresh instance rather than silently reusing an instance from a different
+    runtime or hardware target.
+    """
     name = (
         model_name or os.getenv("CROSS_ENCODER_MODEL") or DEFAULT_CROSS_ENCODER_MODEL
     ).strip()
 
-    with _model_lock:
-        if name in _model_cache:
-            return _model_cache[name]
+    backend = os.getenv("CROSS_ENCODER_BACKEND", "openvino").strip().lower()
+    device = get_cross_encoder_device()
+    cache_key = _model_cache_key(name, backend, device)
 
-        device = get_cross_encoder_device()
+    with _model_lock:
+        if cache_key in _model_cache:
+            return _model_cache[cache_key]
+
         logger.info(
-            "Initializing CrossEncoder model '%s' on device '%s'...", name, device
+            "Initializing CrossEncoder model '%s' on device '%s' (backend=%s)...",
+            name,
+            device,
+            backend or "pytorch",
         )
         model = _load_cross_encoder(name, device)
-        _model_cache[name] = model
+        _model_cache[cache_key] = model
         return model
 
 
@@ -345,9 +363,13 @@ def score_query_candidates(
     if not pairs:
         return []
 
+    METRICS.histogram("recommend.cross_encoder_candidate_count").observe(len(pairs))
     try:
         model = get_cross_encoder_model(model_name)
-        raw_scores = model.predict(pairs, batch_size=batch_size, convert_to_numpy=True)
+        with timer("recommend.cross_encoder_latency_ms"):
+            raw_scores = model.predict(
+                pairs, batch_size=batch_size, convert_to_numpy=True
+            )
     except Exception as exc:  # pragma: no cover - defensive inference guard
         logger.warning("CrossEncoder scoring failed (%s); using baseline scores.", exc)
         return [

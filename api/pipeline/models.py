@@ -23,25 +23,7 @@ class RecommendParams:
     profile: str | None = Query(None, description="Optional profile identifier")
     use_llm_intent: bool = Query(
         True,
-        description="Enable the LLM intent parser (set to false for manual overrides).",
-    )
-    ann_description_override: str | None = Query(
-        None,
-        description="Manual ANN description override to blend into the rewrite vector.",
-    )
-    rewrite_override: str | None = Query(
-        None,
-        description="Manual rewrite text override (skips rewrite_query when provided).",
-    )
-    ann_weight_override: float | None = Query(
-        None,
-        ge=0.0,
-        description="Override weight for the ANN description component.",
-    )
-    rewrite_weight_override: float | None = Query(
-        None,
-        ge=0.0,
-        description="Override weight for the rewrite text component.",
+        description="Enable structured intent parsing for the query.",
     )
     ann_backend_override: str | None = Query(
         None,
@@ -104,7 +86,7 @@ class RecommendParams:
     )
     rerank_provider: str | None = Query(
         None,
-        description="Override reranker provider ('cross_encoder', 'small', 'ollama', 'gemini', 'openai').",
+        description="Override local reranker ('cross_encoder' or 'small').",
     )
     debug: bool = Query(False, description="Include debug diagnostics in response.")
 
@@ -162,7 +144,7 @@ class QueryUnderstanding:
     intent_filters: IntentFilters
     structured_search_filters: SearchFilters | None
     es_text_query: str | None
-    rewrite_vec: np.ndarray | None
+    query_vec: np.ndarray | None
     prefer_top_rated: bool
     custom_genres: List[str]
     has_people_filters: bool

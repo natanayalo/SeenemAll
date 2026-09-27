@@ -548,8 +548,6 @@ def default_param_grid() -> (
             "use_llm_intent": False,
         },
         "classic_top_rated": lambda entry: {
-            "ann_weight_override": 0.4,
-            "rewrite_weight_override": 0.2,
             "mixer_ann_weight": 0.3,
             "mixer_collab_weight": 0.2,
             "mixer_trending_weight": 0.0,

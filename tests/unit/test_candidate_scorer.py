@@ -442,7 +442,7 @@ def test_score_candidates_integration():
         intent_filters=IntentFilters("epic space adventure"),
         structured_search_filters=None,
         es_text_query=None,
-        rewrite_vec=vec,
+        query_vec=vec,
         prefer_top_rated=False,
         custom_genres=[],
         has_people_filters=False,
