@@ -95,31 +95,37 @@ make es-sync                         # Push catalog to Elasticsearch (BATCH=250,
 make etl-justwatch                   # Populate availability (optional)
 ```
 
-The API image installs `requirements-openvino.txt`. For a local accelerated
-environment, install that file instead of `requirements.txt`.
+The API image installs `requirements-docker.txt`, which adds the OpenVINO
+runtime dependencies and CPU-only PyTorch fallback. For a local accelerated
+environment, install `requirements-openvino.txt` instead of `requirements.txt`.
 
 ### OpenVINO hardware access
 
-OpenVINO packages alone do not expose an accelerator to a container. The host
-must provide the matching Intel runtime and device:
-
-- Linux GPU: pass `/dev/dri` and install the Intel graphics compute runtime.
-- Linux NPU: pass `/dev/accel` and install the Intel NPU firmware and driver.
-- Docker Desktop on Windows: its [documented GPU compute support](https://docs.docker.com/desktop/features/gpu/)
-  is for NVIDIA GPU-PV. Intel GPU and NPU devices may be available to native
-  Windows OpenVINO while remaining unavailable inside the Docker Desktop VM.
-
-Check the devices visible to the API container with:
+The API image includes the Intel GPU runtime from OpenVINO Model Server
+2026.4.0-GPU, and the Python OpenVINO package is pinned to the same release.
+For Docker Desktop with WSL2, start the stack from WSL with the GPU overlay:
 
 ```bash
-docker compose exec -T api python -c "import openvino as ov; print(ov.Core().available_devices)"
+docker compose -f docker-compose.yml -f docker-compose.wsl-gpu.yml up --build
 ```
 
-If the result is only `['CPU']`, run the API in the Windows virtual environment
-for Intel GPU/NPU acceleration, or use a Linux/WSL Docker Engine configured with
-the [OpenVINO accelerator device mappings](https://github.com/openvinotoolkit/model_server/blob/main/docs/accelerators.md).
-The reranker and embedder fall back to PyTorch CPU when the requested OpenVINO
-device is unavailable.
+Following the [official OpenVINO accelerator guide](https://github.com/openvinotoolkit/model_server/blob/main/docs/accelerators.md),
+the overlay passes WSL's `/dev/dxg` device and mounts `/usr/lib/wsl` into the
+API container. It selects GPU for request and background inference. Verify the
+visible OpenVINO devices with:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.wsl-gpu.yml exec -T api \
+  python -c "import openvino as ov; print(ov.Core().available_devices)"
+```
+
+On the tested WSL2 setup, the expected result includes `GPU` and `CPU`. This
+does not expose the Windows NPU: Docker Desktop/WSL2 still lacks the required
+`/dev/accel` device. Run NPU inference natively on Windows. On native Linux,
+pass `/dev/dri` and install the Intel graphics compute runtime for GPU access;
+NPU access requires `/dev/accel` and the Intel NPU driver. The reranker and
+embedder fall back to PyTorch CPU when the requested OpenVINO device is
+unavailable.
 
 Seed user history:
 

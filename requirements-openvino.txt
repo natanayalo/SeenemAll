@@ -6,3 +6,5 @@
 transformers==5.5.4
 huggingface-hub==1.10.2
 optimum-intel[openvino]==2.2.0
+# Keep the Python bindings aligned with the Intel runtime in the API image.
+openvino==2026.4.0

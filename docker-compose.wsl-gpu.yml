@@ -1,0 +1,13 @@
+services:
+  api:
+    environment:
+      EMBEDDING_BACKEND: ${EMBEDDING_BACKEND:-openvino}
+      EMBEDDING_DEVICE: ${EMBEDDING_DEVICE:-GPU}
+      ETL_EMBEDDING_DEVICE: ${WSL_ETL_EMBEDDING_DEVICE:-GPU}
+      BACKGROUND_TASK_DEVICE: ${WSL_BACKGROUND_TASK_DEVICE:-GPU}
+      CROSS_ENCODER_BACKEND: ${CROSS_ENCODER_BACKEND:-openvino}
+      CROSS_ENCODER_DEVICE: ${CROSS_ENCODER_DEVICE:-GPU}
+    devices:
+      - /dev/dxg:/dev/dxg
+    volumes:
+      - /usr/lib/wsl:/usr/lib/wsl:ro
