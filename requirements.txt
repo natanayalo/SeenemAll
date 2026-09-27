@@ -9,6 +9,8 @@ pgvector==0.2.5
 httpx==0.27.2
 sentence-transformers==6.1.0
 torch==2.14.0
+# spaCy 3.7/Thinc wheels are built against the NumPy 1.x ABI.
+numpy==1.26.4
 spacy==3.7.4
 cachetools==5.3.3
 elasticsearch==8.13.0
