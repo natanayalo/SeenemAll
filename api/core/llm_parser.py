@@ -18,14 +18,11 @@ from .legacy_intent_parser import (
     parse_intent as legacy_parse_intent,
     canonical_genres,
 )
-from .rewrite import Rewrite
 from .persistent_cache import PersistentCache, get_persistent_cache
 from api.core.prompt_eval import load_prompt_template
 from api.core.metrics import METRICS
-from etl.embedding_templates import format_with_template, format_basic
 
 DEFAULT_INTENT = Intent()
-DEFAULT_REWRITE = Rewrite(rewritten_text="")
 
 # Cache configuration
 CACHE_MAXSIZE = 1000
@@ -35,12 +32,9 @@ CACHE_TTL_SECONDS = 300  # 5 minutes
 INTENT_CACHE: TTLCache[Tuple[str, str, str, str], Intent] = TTLCache(
     maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS
 )
-REWRITE_CACHE: TTLCache[str, Rewrite] = TTLCache(
-    maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL_SECONDS
-)
 
 # Metrics
-CACHE_METRICS = {"hits": 0, "misses": 0, "rewrite_hits": 0, "rewrite_misses": 0}
+CACHE_METRICS = {"hits": 0, "misses": 0}
 METRICS_LOCK = Lock()
 logger = logging.getLogger(__name__)
 
@@ -53,7 +47,6 @@ def _env_flag(name: str, *, default: bool) -> bool:
 
 
 _ENABLE_MEDIA_TYPE_SCOPING = _env_flag("INTENT_SCOPE_GENRES_BY_MEDIA", default=True)
-_ENABLE_ANN_DESCRIPTION = _env_flag("INTENT_ENABLE_ANN_DESCRIPTION", default=False)
 _DEFAULT_CACHE_PATH = os.getenv(
     "INTENT_CACHE_PATH",
     os.path.join(os.getcwd(), ".cache", "intent_cache.sqlite"),
@@ -149,11 +142,6 @@ def _persistent_intent_store() -> Optional[PersistentCache]:
     return _persistent_cache_for_namespace("intent")
 
 
-@lru_cache(maxsize=1)
-def _persistent_rewrite_store() -> Optional[PersistentCache]:
-    return _persistent_cache_for_namespace("rewrite")
-
-
 @lru_cache(maxsize=2)
 def _persistent_cache_for_namespace(namespace: str) -> Optional[PersistentCache]:
     if not _PERSISTENT_CACHE_ENABLED:
@@ -243,18 +231,9 @@ def _clone_intent(intent: Intent) -> Intent:
     return intent.model_copy(deep=True)
 
 
-def _clone_rewrite(rewrite: Rewrite) -> Rewrite:
-    return rewrite.model_copy(deep=True)
-
-
 def default_intent() -> Intent:
     """Return a fresh default Intent instance."""
     return _clone_intent(DEFAULT_INTENT)
-
-
-def default_rewrite() -> Rewrite:
-    """Return a fresh default Rewrite instance."""
-    return _clone_rewrite(DEFAULT_REWRITE)
 
 
 def get_cache_key(
@@ -277,12 +256,6 @@ def get_cache_key(
         ).hexdigest()
 
     return (query, user_id, profile_id, linked_entities_hash)
-
-
-def get_rewrite_cache_key(query: str, intent: Intent) -> str:
-    """Creates a cache key for the rewrite cache."""
-    intent_hash = hashlib.sha256(intent.model_dump_json().encode()).hexdigest()
-    return f"{query}:{intent_hash}"
 
 
 def _normalize_llm_output(
@@ -688,43 +661,12 @@ def _call_gemini_parser(
         raise IntentParserError("Gemini parser returned non-JSON content.") from exc
 
 
-def _augment_ann_description_prompt(
-    system_prompt: str, examples: List[Dict[str, Any]]
-) -> Tuple[str, List[Dict[str, Any]]]:
-    if not _ENABLE_ANN_DESCRIPTION or not system_prompt:
-        return system_prompt, list(examples)
-
-    updated_prompt = (
-        f"{system_prompt}\n\n"
-        "When possible, populate `ann_description` with one evocative sentence "
-        "(18-35 words, <=200 characters) that conveys the desired mood, themes, and stakes. "
-        "Avoid restating obvious filters such as media types, named people, or services unless they add vital context. "
-        "Only include the field when there is enough signal; otherwise omit it."
-    )
-    augmented_examples = list(examples)
-    augmented_examples.append(
-        {
-            "input": {"query": "gritty dystopian series on netflix with pedro pascal"},
-            "expected_output": {
-                "include_genres": ["Science Fiction"],
-                "media_types": ["tv"],
-                "include_people": ["Pedro Pascal"],
-                "streaming_providers": ["netflix"],
-                "ann_description": "A gritty dystopian tale where a controlled future society unravels, confronting authoritarian power and personal cost.",
-            },
-        }
-    )
-    return updated_prompt, augmented_examples
-
-
 def _build_prompt_text(
     query: str, user_context: Dict[str, Any], linked_entities: Dict[str, Any] | None
 ) -> Tuple[str, str]:
     prompt_config = load_prompt_template("intent_parser")
     system_prompt = prompt_config.get("system_prompt", "")
     examples = list(prompt_config.get("examples", []))
-
-    system_prompt, examples = _augment_ann_description_prompt(system_prompt, examples)
 
     media_types_hint: List[str] | None = None
     if _ENABLE_MEDIA_TYPE_SCOPING:
@@ -865,11 +807,6 @@ def _offline_intent_stub(query: str) -> Dict[str, Any]:
 
 
 _DECADE_PATTERN = re.compile(r"\b(?:(?P<century>19|20)?(?P<decade>\d{2}))['’]?s\b")
-_GENRE_REWRITE_MAP = {
-    "science fiction": "sci-fi",
-    "sci fi": "sci-fi",
-    "sci-fi": "sci-fi",
-}
 _LANGUAGE_KEYWORDS = {
     "french": "fr",
     "spanish": "es",
@@ -945,144 +882,6 @@ def _normalize_genre_names(genres: Sequence[str] | None) -> List[str]:
     return normalized
 
 
-def _format_ann_description(intent: Intent, query: str) -> str:
-    overview = (intent.ann_description or "").strip()
-    if not overview:
-        overview = query.strip()
-    title = query.strip()
-    if not title:
-        # fallback to first sentence of overview or generic label
-        base = overview.split(".")[0].strip() if overview else ""
-        title = base or "Recommendation"
-    genres = _normalize_genre_names(intent.include_genres)
-    year = None
-    if intent.year_min is not None and intent.year_max is not None:
-        if intent.year_min == intent.year_max:
-            year = intent.year_min
-    template_name = os.getenv("EMBED_TEMPLATE", "basic")
-    item_payload = {
-        "title": title,
-        "overview": overview,
-        "genres": genres,
-        "release_year": year,
-    }
-    try:
-        return format_with_template(template_name, item_payload)
-    except ValueError:
-        return format_basic(
-            title=title,
-            overview=overview,
-            genres=genres,
-            year=year,
-        )
-
-
-def _rewrite_from_intent(intent: Intent) -> Optional[str]:
-    include_genres = intent.include_genres or []
-    for genre in include_genres:
-        key = genre.lower()
-        phrase = _GENRE_REWRITE_MAP.get(key, key)
-        return f"{phrase} movies"
-
-    if intent.exclude_genres:
-        return ""
-
-    return None
-
-
-def _heuristic_rewrite(normalized_query: str) -> Optional[str]:
-    """Fallback heuristics for common queries when LLM intent is unavailable."""
-    lower = normalized_query.lower()
-    normalized = " ".join(lower.replace("-", " ").split())
-    heuristics = [
-        (("post apocalyptic", "tv"), "post-apocalyptic survival resilience tv series"),
-        (("feel good",), "feel-good uplifting short comedy movies"),
-        (("anime", "sci fi"), "anime science fiction adventure films"),
-        (("space opera",), "optimistic space exploration adventure tv series"),
-        (("rom com",), "romantic comedy films from the 2000s"),
-        (("gritty", "superhero"), "gritty street-level vigilante superhero series"),
-        (("fantasy", "witcher"), "high fantasy epic quest tv series"),
-    ]
-
-    for keywords, rewrite in heuristics:
-        if all(keyword in normalized for keyword in keywords):
-            return rewrite
-    return None
-
-
-def _truncate_words(text: str, limit: int = 8) -> str:
-    words = text.split()
-    if len(words) <= limit:
-        return text
-    return " ".join(words[:limit])
-
-
-def rewrite_query(query: str, intent: Intent) -> Rewrite:
-    """
-    Rewrites the user's query into a concise, embeddable format.
-    """
-    normalized_query = query or ""
-    cache_key = get_rewrite_cache_key(normalized_query, intent)
-
-    cached_rewrite = REWRITE_CACHE.get(cache_key)
-    if cached_rewrite is not None:
-        _log_metrics(_increment_metric("rewrite_hits"), cache="rewrite")
-        return _clone_rewrite(cached_rewrite)
-
-    persistent_store = _persistent_rewrite_store()
-    if persistent_store:
-        stored_payload = persistent_store.get(cache_key)
-        if stored_payload:
-            try:
-                persistent_rewrite = Rewrite.model_validate(stored_payload)
-            except ValidationError:
-                persistent_store.delete(cache_key)
-            else:
-                REWRITE_CACHE[cache_key] = _clone_rewrite(persistent_rewrite)
-                _log_metrics(_increment_metric("rewrite_hits"), cache="rewrite")
-                logger.debug(
-                    "Loaded rewrite for query '%s' from persistent cache.",
-                    normalized_query,
-                )
-                return persistent_rewrite
-
-    _log_metrics(_increment_metric("rewrite_misses"), cache="rewrite")
-
-    description = (getattr(intent, "ann_description", "") or "").strip()
-    intent_hint = _rewrite_from_intent(intent)
-    if intent_hint is not None:
-        intent_hint = intent_hint.strip()
-    normalized = normalized_query.strip()
-
-    base_text = ""
-    if description:
-        base_text = description
-    elif intent_hint:
-        base_text = intent_hint
-    else:
-        heuristic = _heuristic_rewrite(normalized)
-        if heuristic:
-            base_text = heuristic
-    if not base_text:
-        base_text = normalized
-
-    combined = base_text or normalized
-    if normalized and normalized.lower() not in (combined or "").lower():
-        combined = f"{combined} {normalized}".strip()
-
-    rewritten_text = _truncate_words(combined)
-    if not rewritten_text:
-        rewritten_text = normalized or ""
-
-    rewrite = Rewrite(rewritten_text=rewritten_text)
-
-    REWRITE_CACHE[cache_key] = _clone_rewrite(rewrite)
-    if persistent_store:
-        persistent_store.set(cache_key, rewrite.model_dump())
-    _log_metrics(_snapshot_metrics(), cache="rewrite", event="store")
-    return rewrite
-
-
 def _increment_metric(name: str) -> Dict[str, int]:
     with METRICS_LOCK:
         CACHE_METRICS[name] += 1
@@ -1101,11 +900,9 @@ def _log_metrics(
         return
     extras = f" event={event}" if event else ""
     logger.debug(
-        "LLM %s cache metrics%s | hits=%d misses=%d rewrite_hits=%d rewrite_misses=%d",
+        "Intent cache metrics for %s%s | hits=%d misses=%d",
         cache,
         extras,
         metrics.get("hits", 0),
         metrics.get("misses", 0),
-        metrics.get("rewrite_hits", 0),
-        metrics.get("rewrite_misses", 0),
     )

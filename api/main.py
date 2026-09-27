@@ -58,7 +58,7 @@ async def app_lifespan(app: FastAPI):
             from api.core.fast_intent_parser import FastIntentParser
 
             parser = FastIntentParser.get_instance()
-            parser._ensure_gliner()
+            parser.require_gliner()
             logging.getLogger("api.main").info(
                 "Intent parser runtime resolved | provider=hybrid_fast model=%s runtime=%s device=%s",
                 parser._model_name,
@@ -66,9 +66,9 @@ async def app_lifespan(app: FastAPI):
                 parser._ov_device,
             )
         except Exception as exc:  # pragma: no cover - defensive startup fallback
-            logging.getLogger("api.main").warning(
-                "Could not pre-warm fast intent parser: %s", exc
-            )
+            raise RuntimeError(
+                "Required fast intent parser runtime failed to initialize."
+            ) from exc
 
         # Pre-warm local cross-encoder model to eliminate first-rerank cold start
         try:

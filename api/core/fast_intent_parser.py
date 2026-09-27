@@ -359,7 +359,6 @@ class DeterministicRuleParser:
             "media_types": media_types or None,
             "include_people": None,
             "streaming_providers": streaming_providers or None,
-            "ann_description": None,
         }
 
 
@@ -495,7 +494,8 @@ class FastIntentParser:
     with zero-shot NER via GLiNER, featuring:
       - Adaptive Gating: skips neural inference when rules fully explain the query (0.2ms).
       - Multi-Runtime Support: PyTorch CPU or accelerated OpenVINO (CPU/Arc GPU).
-      - Resilient Fallback: guaranteed 100% uptime with deterministic rules if neural fails.
+      - Readiness: production startup requires the configured neural runtime to load.
+      - Resilient Fallback: request parsing can fall back to deterministic rules if inference fails.
     """
 
     _instance: Optional[FastIntentParser] = None
@@ -534,6 +534,7 @@ class FastIntentParser:
         self._gliner_model: Any = None
         self._gliner_loaded = False
         self._gliner_failed = False
+        self._gliner_error: Exception | None = None
         self._gliner_lock = threading.Lock()
         self._labels = [
             "person",
@@ -596,12 +597,38 @@ class FastIntentParser:
                 self._gliner_loaded = True
                 return self._gliner_model
             except Exception as exc:
+                self._gliner_error = exc
                 logger.warning(
                     "GLiNER could not be loaded (%s); using deterministic rule parser only.",
                     exc,
                 )
                 self._gliner_failed = True
                 return None
+
+    @property
+    def gliner_failed(self) -> bool:
+        """Whether GLiNER failed to load or failed during inference."""
+        return self._gliner_failed
+
+    def require_gliner(self) -> Any:
+        """Load and smoke-test GLiNER, raising when the required runtime is unavailable."""
+        model = self._ensure_gliner()
+        if model is None:
+            raise RuntimeError(
+                "The configured GLiNER intent runtime could not be loaded."
+            ) from self._gliner_error
+
+        try:
+            model.predict_entities(
+                "intent parser readiness check", self._labels, threshold=self._threshold
+            )
+        except Exception as exc:
+            self._gliner_error = exc
+            self._gliner_failed = True
+            raise RuntimeError(
+                "The configured GLiNER intent runtime failed its startup inference check."
+            ) from exc
+        return model
 
     def _record_parse(
         self,
@@ -639,7 +666,6 @@ class FastIntentParser:
                 "media_types": None,
                 "include_people": None,
                 "streaming_providers": None,
-                "ann_description": None,
             }
             self._record_parse("rules", empty_intent, [], started)
             return empty_intent
@@ -663,6 +689,8 @@ class FastIntentParser:
             except Exception as exc:
                 logger.warning("GLiNER predict_entities error: %s", exc)
                 METRICS.counter("intent.parser.neural_error").inc()
+                self._gliner_error = exc
+                self._gliner_failed = True
                 entities = []
 
             people: List[str] = list(intent.get("include_people") or [])

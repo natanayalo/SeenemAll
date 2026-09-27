@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from api.core.fast_intent_parser import (
     DeterministicRuleParser,
     FastIntentParser,
@@ -130,10 +132,30 @@ def test_fast_intent_parser_gliner_failure_fallback():
     mock_gliner.predict_entities.side_effect = RuntimeError("GPU out of memory")
 
     with patch.object(parser, "_ensure_gliner", return_value=mock_gliner):
-        res = parser.parse("sci-fi movies under 90 minutes")
+        res = parser.parse("Pedro Pascal sci-fi movies under 90 minutes")
         # Should gracefully fall back to rule parser outputs
         assert res["runtime_minutes_max"] == 90
         assert "Science Fiction" in res["include_genres"]
+        assert parser.gliner_failed
+
+
+def test_require_gliner_fails_when_model_cannot_load():
+    parser = FastIntentParser()
+    parser._gliner_error = FileNotFoundError("model.xml is missing")
+
+    with patch.object(parser, "_ensure_gliner", return_value=None):
+        with pytest.raises(RuntimeError, match="could not be loaded"):
+            parser.require_gliner()
+
+
+def test_require_gliner_runs_startup_inference():
+    parser = FastIntentParser()
+    model = MagicMock()
+
+    with patch.object(parser, "_ensure_gliner", return_value=model):
+        assert parser.require_gliner() is model
+
+    model.predict_entities.assert_called_once()
 
 
 def test_fast_intent_parser_singleton():

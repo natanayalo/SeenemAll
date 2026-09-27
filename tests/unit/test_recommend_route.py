@@ -21,7 +21,6 @@ from api.core import business_rules
 from api.core.legacy_intent_parser import IntentFilters
 from api.core.entity_linker import ENTITY_LINKER_CACHE
 from api.core.intent_parser import Intent
-from api.core.rewrite import Rewrite
 from api.core.filter_matcher import QueryFiltersResult
 
 ORIGINAL_PREFILTER = recommend_routes._prefilter_allowed_ids
@@ -605,12 +604,6 @@ def test_recommend_relaxed_prefilter_allows_mismatched_genres(monkeypatch):
         "rerank_with_explanations",
         lambda items, **_: items,
     )
-    monkeypatch.setattr(
-        recommend_routes,
-        "rewrite_query",
-        lambda query, intent: SimpleNamespace(rewritten_text=""),
-    )
-
     with TestClient(app) as client:
         response = client.get(
             "/recommend",
@@ -714,12 +707,6 @@ def test_recommend_merges_collaborative_candidates(monkeypatch):
             1,
             2,
         ],
-    )
-
-    monkeypatch.setattr(
-        recommend_routes,
-        "rewrite_query",
-        lambda query, intent: SimpleNamespace(rewritten_text=""),
     )
 
     monkeypatch.setattr(
@@ -1732,15 +1719,10 @@ def test_recommend_uses_entity_linker_and_blends_query_vector(
         lambda *args, **kwargs: [],
     )
 
-    rewrite_vec = np.full(384, 0.5, dtype="float32")
-    monkeypatch.setattr(
-        recommend_routes,
-        "rewrite_query",
-        lambda query, intent: SimpleNamespace(rewritten_text="rewritten query"),
-    )
+    query_vec = np.full(384, 0.5, dtype="float32")
 
     def fake_encode(texts):
-        stacked = np.stack([rewrite_vec for _ in texts], axis=0)
+        stacked = np.stack([query_vec for _ in texts], axis=0)
         return stacked
 
     monkeypatch.setattr(recommend_routes, "encode_texts", fake_encode)
@@ -1979,11 +1961,6 @@ def test_recommend_skips_llm_when_disabled(monkeypatch):
         return [1]
 
     monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
-    monkeypatch.setattr(
-        recommend_routes,
-        "rewrite_query",
-        lambda query, intent: Rewrite(rewritten_text="rewritten"),
-    )
     monkeypatch.setattr(
         recommend_routes,
         "encode_texts",

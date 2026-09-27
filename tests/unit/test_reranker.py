@@ -28,7 +28,26 @@ def _reset_settings() -> None:
         "RERANK_ENABLED",
     ]:
         os.environ.pop(key, None)
-    os.environ["RERANK_PROVIDER"] = "openai"
+    os.environ["RERANK_PROVIDER"] = "cross_encoder"
+
+
+def _remote_provider_settings(
+    provider: str, api_key: str | None
+) -> reranker.RerankerSettings:
+    if provider == "gemini":
+        model = "gemini-2.0-flash-lite"
+        endpoint = "https://generativelanguage.googleapis.com/v1beta/models"
+    else:
+        model = "gpt-4o-mini"
+        endpoint = "https://api.openai.com/v1/chat/completions"
+    return reranker.RerankerSettings(
+        provider=provider,
+        api_key=api_key,
+        model=model,
+        endpoint=endpoint,
+        enabled=True,
+        timeout=2.0,
+    )
 
 
 def test_rerank_with_explanations_without_api_key(monkeypatch):
@@ -98,12 +117,12 @@ def test_rerank_with_explanations_handles_exception(monkeypatch):
 def test_get_settings_invalid_timeout_warns(monkeypatch, capfd):
     _reset_settings()
     monkeypatch.setenv("RERANK_API_KEY", "fake")
-    monkeypatch.setenv("RERANK_PROVIDER", "openai")
+    monkeypatch.setenv("RERANK_PROVIDER", "cross_encoder")
     monkeypatch.setenv("RERANK_TIMEOUT", "not-a-number")
 
     settings = reranker._get_settings()
 
-    assert settings.timeout == reranker._DEFAULT_TIMEOUT_SECONDS
+    assert settings.timeout == reranker._CROSS_ENCODER_TIMEOUT_SECONDS
     _reset_settings()
 
 
@@ -130,13 +149,14 @@ def test_get_settings_defaults_to_cross_encoder_without_api_key(monkeypatch):
     assert settings.enabled is True
 
 
-def test_get_settings_explicit_ollama(monkeypatch):
+@pytest.mark.parametrize("provider", ["ollama", "openai", "gemini"])
+def test_get_settings_retires_remote_providers(monkeypatch, provider):
     _reset_settings()
-    monkeypatch.setenv("RERANK_PROVIDER", "ollama")
+    monkeypatch.setenv("RERANK_PROVIDER", provider)
     settings = reranker._get_settings()
-    assert settings.provider == "ollama"
-    assert settings.model == "gemma4:12b"
-    assert settings.endpoint == "http://localhost:11434/v1/chat/completions"
+    assert settings.provider == "cross_encoder"
+    assert settings.model == "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    assert settings.endpoint == "local://cross-encoder"
     assert settings.enabled is True
     _reset_settings()
 
@@ -146,7 +166,7 @@ def test_call_openai_reranker_parses_payload(monkeypatch):
     monkeypatch.setenv("RERANK_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_PROJECT", "proj-test")
     monkeypatch.setenv("RERANK_API_KEY", "fake")
-    settings = reranker._get_settings()
+    settings = _remote_provider_settings("openai", "fake")
 
     captured_request = {}
 
@@ -212,7 +232,7 @@ def test_call_reranker_raises_on_unknown_provider():
         reranker._call_reranker(settings, [], None, None, None)
 
 
-def test_rerank_with_explanations_uses_gemini(monkeypatch):
+def test_rerank_legacy_gemini_override_uses_cross_encoder(monkeypatch):
     _reset_settings()
     monkeypatch.setenv("RERANK_API_KEY", "gem-key")
     monkeypatch.setenv("RERANK_PROVIDER", "gemini")
@@ -223,17 +243,19 @@ def test_rerank_with_explanations_uses_gemini(monkeypatch):
     ]
 
     def fake_call(settings, payload, intent, query, user):
-        assert settings.provider == "gemini"
+        assert settings.provider == "cross_encoder"
         return [
-            reranker.LLMDecision(item_id=2, score=0.88, explanation="Gemini pick."),
+            reranker.LLMDecision(item_id=2, score=0.88, explanation="Local pick."),
             reranker.LLMDecision(item_id=1, score=0.75, explanation="Backup."),
         ]
 
-    monkeypatch.setattr(reranker, "_call_gemini_reranker", fake_call)
+    monkeypatch.setattr(reranker, "_call_cross_encoder_reranker", fake_call)
 
-    result = reranker.rerank_with_explanations(items, intent=None, query=None)
+    result = reranker.rerank_with_explanations(
+        items, intent=None, query="local test", provider_override="gemini"
+    )
     assert [item["id"] for item in result[:2]] == [2, 1]
-    assert result[0]["explanation"] == "Gemini pick."
+    assert result[0]["explanation"] == "Local pick."
     _reset_settings()
 
 
@@ -537,7 +559,7 @@ def test_call_openai_reranker_handles_unexpected_response(monkeypatch):
     _reset_settings()
     monkeypatch.setenv("RERANK_API_KEY", "fake")
     monkeypatch.setenv("RERANK_PROVIDER", "openai")
-    settings = reranker._get_settings()
+    settings = _remote_provider_settings("openai", "fake")
 
     class DummyResponse:
         def raise_for_status(self):
@@ -571,7 +593,7 @@ def test_call_gemini_reranker_parses_payload(monkeypatch):
     monkeypatch.setenv("RERANK_API_KEY", "gem-key")
     monkeypatch.setenv("RERANK_PROVIDER", "gemini")
     monkeypatch.delenv("RERANK_ENDPOINT", raising=False)
-    settings = reranker._get_settings()
+    settings = _remote_provider_settings("gemini", "gem-key")
 
     captured_request = {}
 
@@ -638,7 +660,7 @@ def test_call_gemini_reranker_sanitizes_error(monkeypatch, capfd):
     monkeypatch.setenv("RERANK_API_KEY", "gem-key")
     monkeypatch.setenv("RERANK_PROVIDER", "gemini")
     monkeypatch.delenv("RERANK_ENDPOINT", raising=False)
-    settings = reranker._get_settings()
+    settings = _remote_provider_settings("gemini", "gem-key")
 
     class DummyClient:
         def __init__(self, *args, **kwargs):
@@ -690,7 +712,7 @@ def test_call_gemini_reranker_returns_empty_when_no_text(monkeypatch):
     _reset_settings()
     monkeypatch.setenv("RERANK_API_KEY", "gem")
     monkeypatch.setenv("RERANK_PROVIDER", "gemini")
-    settings = reranker._get_settings()
+    settings = _remote_provider_settings("gemini", "gem")
 
     class DummyResponse:
         status_code = 200
@@ -1031,7 +1053,7 @@ def test_explanation_templates_override(monkeypatch):
     _reset_settings()
 
 
-def test_rerank_with_explanations_uses_llm_decisions(monkeypatch):
+def test_rerank_legacy_openai_override_uses_cross_encoder(monkeypatch):
     _reset_settings()
     monkeypatch.setenv("RERANK_API_KEY", "fake-key")
     monkeypatch.setenv("RERANK_PROVIDER", "openai")
@@ -1048,12 +1070,17 @@ def test_rerank_with_explanations_uses_llm_decisions(monkeypatch):
     ]
 
     def fake_call(settings, data, intent, query, user):
+        assert settings.provider == "cross_encoder"
         return decisions
 
-    monkeypatch.setattr(reranker, "_call_openai_reranker", fake_call)
+    monkeypatch.setattr(reranker, "_call_cross_encoder_reranker", fake_call)
 
     result = reranker.rerank_with_explanations(
-        items, intent=None, query="light laughs", user={"user_id": "u1"}
+        items,
+        intent=None,
+        query="light laughs",
+        user={"user_id": "u1"},
+        provider_override="openai",
     )
 
     assert [item["id"] for item in result[:3]] == [2, 1, 3]
@@ -1194,10 +1221,10 @@ def test_rerank_with_explanations_handles_reranker_error(monkeypatch):
     _reset_settings()
     monkeypatch.setenv("RERANK_API_KEY", "key")
     settings = reranker.RerankerSettings(
-        provider="openai",
-        api_key="key",
-        model="gpt",
-        endpoint="https://example.com",
+        provider="cross_encoder",
+        api_key=None,
+        model="cross-encoder/ms-marco-MiniLM-L-6-v2",
+        endpoint="local://cross-encoder",
         enabled=True,
         timeout=1.0,
     )
@@ -1206,7 +1233,7 @@ def test_rerank_with_explanations_handles_reranker_error(monkeypatch):
     def boom(*_args, **_kwargs):
         raise reranker.RerankerError("boom")
 
-    monkeypatch.setattr(reranker, "_call_openai_reranker", boom)
+    monkeypatch.setattr(reranker, "_call_cross_encoder_reranker", boom)
 
     items = [
         {

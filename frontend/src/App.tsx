@@ -57,8 +57,6 @@ function App() {
   const defaultMixerPopularity = 0.25;
   const defaultMixerNovelty = 0.1;
   const defaultMixerVote = 0.2;
-  const defaultAnnDescriptionWeight = 1.2;
-  const defaultRewriteTextWeight = 1.0;
   const [userId, setUserId] = useState('u1'); // Default user ID
   const [query, setQuery] = useState('');
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -66,10 +64,6 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [diversify, setDiversify] = useState(true);
   const [useLlmIntent, setUseLlmIntent] = useState(true);
-  const [manualAnnDescription, setManualAnnDescription] = useState('');
-  const [manualRewrite, setManualRewrite] = useState('');
-  const [annWeight, setAnnWeight] = useState(defaultAnnDescriptionWeight);
-  const [rewriteWeight, setRewriteWeight] = useState(defaultRewriteTextWeight);
   const [genreOverride, setGenreOverride] = useState('');
   const [useMixerOverrides, setUseMixerOverrides] = useState(false);
   const [mixerAnnWeight, setMixerAnnWeight] = useState(defaultMixerAnn);
@@ -115,24 +109,8 @@ function App() {
       if (!useLlmIntent) {
         params.append('use_llm_intent', 'false');
       }
-      if (manualAnnDescription.trim()) {
-        params.append('ann_description_override', manualAnnDescription.trim());
-      }
-      if (manualRewrite.trim()) {
-        params.append('rewrite_override', manualRewrite.trim());
-      }
       if (genreOverride.trim()) {
         params.append('genre_override', genreOverride.trim());
-      }
-      const hasCustomAnnWeight =
-        Math.abs(annWeight - defaultAnnDescriptionWeight) > 0.001;
-      if (hasCustomAnnWeight) {
-        params.append('ann_weight_override', annWeight.toString());
-      }
-      const hasCustomRewriteWeight =
-        Math.abs(rewriteWeight - defaultRewriteTextWeight) > 0.001;
-      if (hasCustomRewriteWeight) {
-        params.append('rewrite_weight_override', rewriteWeight.toString());
       }
       if (useMixerOverrides) {
         params.append('mixer_ann_weight', mixerAnnWeight.toString());
@@ -252,7 +230,7 @@ function App() {
             <Form.Check
               type="switch"
               id="use-llm-toggle"
-              label="Use LLM intent parser"
+              label="Use structured intent parsing"
               checked={useLlmIntent}
               onChange={(e) => setUseLlmIntent(e.target.checked)}
               className="mt-2"
@@ -297,29 +275,6 @@ function App() {
         <Row className="justify-content-center mt-3">
           <Col md={4}>
             <Form.Group>
-              <Form.Label>Manual ANN Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                value={manualAnnDescription}
-                onChange={(e) => setManualAnnDescription(e.target.value)}
-                placeholder="Optional override e.g. 'A deadly survival game for a cash prize'"
-              />
-            </Form.Group>
-          </Col>
-          <Col md={4}>
-            <Form.Group>
-              <Form.Label>Manual Rewrite Text</Form.Label>
-              <Form.Control
-                type="text"
-                value={manualRewrite}
-                onChange={(e) => setManualRewrite(e.target.value)}
-                placeholder="Optional override e.g. 'sci-fi survival games'"
-              />
-            </Form.Group>
-          </Col>
-          <Col md={4}>
-            <Form.Group>
               <Form.Label>Genre Override</Form.Label>
               <Form.Control
                 type="text"
@@ -330,32 +285,6 @@ function App() {
               <Form.Text className="text-muted">
                 When set, replaces inferred genres with this comma-separated list.
               </Form.Text>
-            </Form.Group>
-          </Col>
-        </Row>
-        <Row className="justify-content-center mt-2">
-          <Col md={3}>
-            <Form.Group>
-              <Form.Label>ANN Description Weight ({annWeight.toFixed(2)})</Form.Label>
-              <Form.Range
-                min={0}
-                max={2}
-                step={0.1}
-                value={annWeight}
-                onChange={(e) => setAnnWeight(parseFloat(e.target.value))}
-              />
-            </Form.Group>
-          </Col>
-          <Col md={3}>
-            <Form.Group>
-              <Form.Label>Rewrite Text Weight ({rewriteWeight.toFixed(2)})</Form.Label>
-              <Form.Range
-                min={0}
-                max={2}
-                step={0.1}
-                value={rewriteWeight}
-                onChange={(e) => setRewriteWeight(parseFloat(e.target.value))}
-              />
             </Form.Group>
           </Col>
         </Row>

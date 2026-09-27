@@ -10,17 +10,14 @@ from api.core.intent_parser import Intent
 from api.core import llm_parser
 from api.core.llm_parser import (
     parse_intent,
-    rewrite_query,
     DEFAULT_INTENT,
     IntentParserSettings,
 )
-from api.core.rewrite import Rewrite
 
 
 @pytest.fixture(autouse=True)
 def _reset_llm_state(monkeypatch):
     llm_parser.INTENT_CACHE.clear()
-    llm_parser.REWRITE_CACHE.clear()
     for key in llm_parser.CACHE_METRICS:
         llm_parser.CACHE_METRICS[key] = 0
     monkeypatch.delenv("INTENT_API_KEY", raising=False)
@@ -32,7 +29,6 @@ def _reset_llm_state(monkeypatch):
     original_get_settings = llm_parser._get_settings
     if hasattr(original_get_settings, "cache_clear"):
         original_get_settings.cache_clear()
-    monkeypatch.setattr(llm_parser, "_ENABLE_ANN_DESCRIPTION", False, raising=False)
     yield
     current_get_settings = getattr(llm_parser, "_get_settings", None)
     if hasattr(current_get_settings, "cache_clear"):
@@ -93,36 +89,6 @@ def test_parse_intent_fixtures():
                 assert (
                     actual_value == expected_value
                 ), f"Query: '{query}' field '{field}' mismatch"
-
-
-def test_rewrite_query():
-    """
-    Tests the rewrite_query function with a set of predefined fixtures.
-    """
-    test_cases = [
-        (
-            Intent(include_genres=["sci-fi"], runtime_minutes_max=120),
-            Rewrite(rewritten_text="sci-fi movies some query"),
-        ),
-        (
-            Intent(include_genres=["Science Fiction"]),
-            Rewrite(rewritten_text="sci-fi movies some query"),
-        ),
-        (
-            Intent(exclude_genres=["horror"]),
-            Rewrite(rewritten_text="some query"),
-        ),
-        (
-            Intent(ann_description="desperate players risk their lives for fortune"),
-            Rewrite(
-                rewritten_text="desperate players risk their lives for fortune some"
-            ),
-        ),
-    ]
-
-    for intent, expected_rewrite in test_cases:
-        rewrite = rewrite_query("some query", intent)
-        assert rewrite == expected_rewrite
 
 
 def test_parse_intent_uses_cache(monkeypatch):
@@ -390,34 +356,6 @@ def test_build_prompt_scopes_genres_when_media_known(monkeypatch):
     assert recorded["media_types"] == ["tv"]
 
 
-def test_parse_intent_returns_ann_description_when_enabled(monkeypatch):
-    monkeypatch.setattr(llm_parser, "_ENABLE_ANN_DESCRIPTION", True)
-    settings = IntentParserSettings(
-        provider="openai",
-        api_key="key",
-        model="gpt-test",
-        endpoint="https://example.com",
-        enabled=True,
-        timeout=2.0,
-    )
-    monkeypatch.setattr(llm_parser, "_get_settings", lambda: settings)
-
-    def fake_call(settings, query, user_context, linked_entities):
-        return {
-            "include_genres": ["Science Fiction"],
-            "ann_description": "A dark dystopian TV series set in a controlled future society.",
-        }
-
-    monkeypatch.setattr(llm_parser, "_call_openai_parser", fake_call)
-
-    intent = parse_intent("dystopian series", {"user_id": "u42"})
-    assert "Science Fiction" in (intent.include_genres or [])
-    assert intent.ann_description == (
-        "[Science Fiction, Sci-Fi & Fantasy] dystopian series :: "
-        "A dark dystopian TV series set in a controlled future society."
-    )
-
-
 def test_load_fallback_rules_handles_missing_and_invalid(monkeypatch, tmp_path, caplog):
     llm_parser._load_fallback_rules.cache_clear()
     missing = tmp_path / "missing.json"
@@ -474,13 +412,6 @@ def test_get_settings_invalid_timeout_warns(monkeypatch, caplog):
     llm_parser._get_settings.cache_clear()
 
 
-def test_default_rewrite_returns_new_instance():
-    first = llm_parser.default_rewrite()
-    second = llm_parser.default_rewrite()
-    assert first is not second
-    assert first == second
-
-
 def test_normalize_llm_output_merges_fragments():
     assert llm_parser._normalize_llm_output(None) is None
     assert llm_parser._normalize_llm_output("not a collection") is None
@@ -493,7 +424,7 @@ def test_normalize_llm_output_merges_fragments():
                 "exclude_genres": ["Horror"],
                 "maturity_rating_max": "PG",
             },
-            {"include_genres": ["Drama"], "ann_description": None},
+            {"include_genres": ["Drama"]},
             {"languages": "en"},
             {"media_types": None},
             {"include_genres": []},
@@ -903,9 +834,7 @@ def test_call_gemini_parser_error_paths(monkeypatch):
     assert payload == {"include_genres": ["Drama"]}
 
 
-def test_build_prompt_text_ann_description(monkeypatch):
-    monkeypatch.setattr(llm_parser, "_ENABLE_ANN_DESCRIPTION", True, raising=False)
-
+def test_build_prompt_text_has_no_ann_description(monkeypatch):
     def fake_prompt(name):
         assert name == "intent_parser"
         return {"system_prompt": "base prompt", "examples": []}
@@ -915,13 +844,12 @@ def test_build_prompt_text_ann_description(monkeypatch):
         llm_parser, "canonical_genres", lambda media_types=None: ["Drama"]
     )
     system_prompt, user_prompt = llm_parser._build_prompt_text("query", {}, None)
-    assert "When possible, populate `ann_description`" in system_prompt
+    assert "ann_description" not in system_prompt
     assert "Allowed catalog genres" in system_prompt
     assert "Query: query" in user_prompt
 
 
 def test_build_prompt_text_without_system_prompt(monkeypatch):
-    monkeypatch.setattr(llm_parser, "_ENABLE_ANN_DESCRIPTION", False, raising=False)
     monkeypatch.setattr(
         llm_parser,
         "load_prompt_template",
@@ -954,24 +882,11 @@ def test_offline_intent_stub_handles_blank_and_legacy(monkeypatch):
     assert payload["media_types"] == ["movie"]
 
 
-def test_rewrite_query_truncates_long_queries():
-    long_query = "one two three four five six seven eight nine ten"
-    rewrite = rewrite_query(long_query, Intent())
-    assert rewrite.rewritten_text == "one two three four five six seven eight"
-
-
-def test_rewrite_query_truncates_ann_description(monkeypatch):
-    description = "one two three four five six seven eight nine ten"
-    intent = Intent(ann_description=description)
-    rewrite = rewrite_query("ignored", intent)
-    assert rewrite.rewritten_text == "one two three four five six seven eight"
-
-
 def test_log_metrics_emits_when_debug(caplog):
     caplog.set_level(logging.DEBUG, logger=llm_parser.__name__)
     llm_parser._log_metrics(
-        {"hits": 1, "misses": 2, "rewrite_hits": 0, "rewrite_misses": 3},
+        {"hits": 1, "misses": 2},
         cache="intent",
         event="store",
     )
-    assert "LLM intent cache metrics" in caplog.text
+    assert "Intent cache metrics for intent" in caplog.text
