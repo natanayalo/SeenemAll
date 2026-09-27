@@ -13,4 +13,4 @@ torch==2.14.0
 numpy==1.26.4
 spacy==3.7.4
 cachetools==5.3.3
-elasticsearch==8.13.0
+elasticsearch==9.5.1
