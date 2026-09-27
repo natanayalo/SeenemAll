@@ -89,6 +89,11 @@ class RecommendParams:
         ge=0.0,
         description="Override novelty weight (default MIXER_NOVELTY_WEIGHT).",
     )
+    mixer_intent_weight: float | None = Query(
+        None,
+        ge=0.0,
+        description="Override intent overlap weight.",
+    )
     strict_filters: bool = Query(
         False,
         description="Require items to satisfy every inferred genre (AND semantics).",

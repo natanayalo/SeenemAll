@@ -529,6 +529,10 @@ def default_param_grid() -> (
             "use_llm_intent": True,
             "rerank": False,
         },
+        "calibrated_mixer": lambda entry: {
+            "use_llm_intent": True,
+            "rerank": False,
+        },
         "collab_boost": lambda entry: {
             "mixer_ann_weight": 0.4,
             "mixer_collab_weight": 0.8,

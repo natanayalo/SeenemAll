@@ -162,14 +162,13 @@ def run_prefilter_query(
     stmt = select(Item.id)
 
     if required_services:
-        stmt = (
-            stmt.join(
-                Availability,
-                (Availability.item_id == Item.id)
-                & (Availability.country == COUNTRY_DEFAULT),
+        stmt = stmt.where(
+            Item.id.in_(
+                select(Availability.item_id).where(
+                    (Availability.country == COUNTRY_DEFAULT)
+                    & Availability.service.in_(required_services)
+                )
             )
-            .where(Availability.service.in_(required_services))
-            .distinct()
         )
 
     media_types = intent.media_types or []
