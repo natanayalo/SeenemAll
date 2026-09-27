@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 import numpy as np
-import pytest
 
 from api.core.elasticsearch_search import SearchFilters
 from api.core.legacy_intent_parser import IntentFilters
@@ -54,11 +53,15 @@ def test_bayesian_vote_score_small_sample():
 
 def test_bayesian_vote_score_large_sample():
     # 10,000 votes with 8.5 retains high rating
-    score_large = compute_bayesian_vote_score(8.5, 10000, min_votes=50.0, prior_mean=0.65)
+    score_large = compute_bayesian_vote_score(
+        8.5, 10000, min_votes=50.0, prior_mean=0.65
+    )
     assert np.isclose(score_large, 0.85, atol=0.01)
 
     # 10,000 votes with 3.0 retains low rating
-    score_low_large = compute_bayesian_vote_score(3.0, 10000, min_votes=50.0, prior_mean=0.65)
+    score_low_large = compute_bayesian_vote_score(
+        3.0, 10000, min_votes=50.0, prior_mean=0.65
+    )
     assert np.isclose(score_low_large, 0.30, atol=0.01)
 
 
@@ -353,7 +356,10 @@ def test_apply_mixer_scores_with_query_and_clusters():
 
     # Candidate 1 aligns with query vector and genre -> receives higher relevance
     assert candidates[0]["id"] == 1
-    assert candidates[0]["features"]["semantic_affinity"] > candidates[1]["features"]["semantic_affinity"]
+    assert (
+        candidates[0]["features"]["semantic_affinity"]
+        > candidates[1]["features"]["semantic_affinity"]
+    )
     assert candidates[0]["features"]["intent_overlap"] == 1.0
     assert candidates[1]["features"]["intent_overlap"] == 0.0
 
@@ -421,7 +427,9 @@ def test_score_candidates_integration():
     pool = CandidatePool(
         ids=[100],
         merged_scores={100: {"ann": 0.9, "collab": 0.5}},
-        prefilter=PrefilterDecision(allowed_ids=None, boost_ids=[], enforce_genres=False),
+        prefilter=PrefilterDecision(
+            allowed_ids=None, boost_ids=[], enforce_genres=False
+        ),
         items_with_data={100: (mock_item, vec, watch_opts)},
         boost_ids=[],
         enforce_genres=False,
