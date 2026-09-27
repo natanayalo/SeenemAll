@@ -244,7 +244,24 @@ def test_load_cross_encoder_openvino_and_fallback(monkeypatch):
 
     fallback_loaded = cross_encoder._load_cross_encoder("test-model", "GPU")
     assert fallback_loaded is not None
-    assert mock_st_ce.called
+    mock_st_ce.assert_called_once_with("test-model", device="cpu")
+
+
+def test_load_cross_encoder_maps_npu_to_pytorch_cpu(monkeypatch):
+    monkeypatch.setenv("CROSS_ENCODER_BACKEND", "openvino")
+    monkeypatch.setattr(
+        cross_encoder.OpenVINOCrossEncoder,
+        "__init__",
+        MagicMock(side_effect=RuntimeError("OpenVINO init failed")),
+    )
+    import sentence_transformers
+
+    mock_st_ce = MagicMock()
+    monkeypatch.setattr(sentence_transformers, "CrossEncoder", mock_st_ce)
+
+    cross_encoder._load_cross_encoder("test-model", "NPU")
+
+    mock_st_ce.assert_called_once_with("test-model", device="cpu")
 
 
 def test_openvino_cross_encoder_predict():

@@ -170,7 +170,11 @@ def _load_cross_encoder(name: str, device: str) -> Any:
 
     from sentence_transformers import CrossEncoder
 
-    return CrossEncoder(name, device=device.lower())
+    pytorch_device = device.lower()
+    if pytorch_device.startswith(("gpu", "npu")):
+        pytorch_device = "cpu"
+
+    return CrossEncoder(name, device=pytorch_device)
 
 
 def get_cross_encoder_model(model_name: str | None = None) -> CrossEncoder:
