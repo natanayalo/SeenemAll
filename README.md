@@ -98,6 +98,29 @@ make etl-justwatch                   # Populate availability (optional)
 The API image installs `requirements-openvino.txt`. For a local accelerated
 environment, install that file instead of `requirements.txt`.
 
+### OpenVINO hardware access
+
+OpenVINO packages alone do not expose an accelerator to a container. The host
+must provide the matching Intel runtime and device:
+
+- Linux GPU: pass `/dev/dri` and install the Intel graphics compute runtime.
+- Linux NPU: pass `/dev/accel` and install the Intel NPU firmware and driver.
+- Docker Desktop on Windows: its [documented GPU compute support](https://docs.docker.com/desktop/features/gpu/)
+  is for NVIDIA GPU-PV. Intel GPU and NPU devices may be available to native
+  Windows OpenVINO while remaining unavailable inside the Docker Desktop VM.
+
+Check the devices visible to the API container with:
+
+```bash
+docker compose exec -T api python -c "import openvino as ov; print(ov.Core().available_devices)"
+```
+
+If the result is only `['CPU']`, run the API in the Windows virtual environment
+for Intel GPU/NPU acceleration, or use a Linux/WSL Docker Engine configured with
+the [OpenVINO accelerator device mappings](https://github.com/openvinotoolkit/model_server/blob/main/docs/accelerators.md).
+The reranker and embedder fall back to PyTorch CPU when the requested OpenVINO
+device is unavailable.
+
 Seed user history:
 
 ```bash
