@@ -21,7 +21,6 @@ from api.core import business_rules
 from api.core.legacy_intent_parser import IntentFilters
 from api.core.entity_linker import ENTITY_LINKER_CACHE
 from api.core.intent_parser import Intent
-from api.core.rewrite import Rewrite
 from api.core.filter_matcher import QueryFiltersResult
 
 ORIGINAL_PREFILTER = recommend_routes._prefilter_allowed_ids
@@ -605,12 +604,6 @@ def test_recommend_relaxed_prefilter_allows_mismatched_genres(monkeypatch):
         "rerank_with_explanations",
         lambda items, **_: items,
     )
-    monkeypatch.setattr(
-        recommend_routes,
-        "rewrite_query",
-        lambda query, intent: SimpleNamespace(rewritten_text=""),
-    )
-
     with TestClient(app) as client:
         response = client.get(
             "/recommend",
@@ -714,12 +707,6 @@ def test_recommend_merges_collaborative_candidates(monkeypatch):
             1,
             2,
         ],
-    )
-
-    monkeypatch.setattr(
-        recommend_routes,
-        "rewrite_query",
-        lambda query, intent: SimpleNamespace(rewritten_text=""),
     )
 
     monkeypatch.setattr(
@@ -1546,10 +1533,6 @@ def _make_recommend_params(**overrides):
         "diversify": True,
         "profile": None,
         "use_llm_intent": True,
-        "ann_description_override": "high stakes",
-        "rewrite_override": "space survival",
-        "ann_weight_override": 0.6,
-        "rewrite_weight_override": 0.4,
         "genre_override": "Drama, Sci-Fi",
         "mixer_ann_weight": 0.7,
         "mixer_collab_weight": 0.2,
@@ -1569,10 +1552,6 @@ def test_get_cache_key_tracks_all_recommendation_overrides():
 
     overrides = [
         {"use_llm_intent": False},
-        {"ann_description_override": "grim dystopia"},
-        {"rewrite_override": "dark competition"},
-        {"ann_weight_override": 0.9},
-        {"rewrite_weight_override": 0.1},
         {"genre_override": "Thriller"},
         {"mixer_ann_weight": 0.4},
         {"mixer_collab_weight": 0.35},
@@ -1740,15 +1719,10 @@ def test_recommend_uses_entity_linker_and_blends_query_vector(
         lambda *args, **kwargs: [],
     )
 
-    rewrite_vec = np.full(384, 0.5, dtype="float32")
-    monkeypatch.setattr(
-        recommend_routes,
-        "rewrite_query",
-        lambda query, intent: SimpleNamespace(rewritten_text="rewritten query"),
-    )
+    query_vec = np.full(384, 0.5, dtype="float32")
 
     def fake_encode(texts):
-        stacked = np.stack([rewrite_vec for _ in texts], axis=0)
+        stacked = np.stack([query_vec for _ in texts], axis=0)
         return stacked
 
     monkeypatch.setattr(recommend_routes, "encode_texts", fake_encode)
@@ -1835,7 +1809,7 @@ def test_recommend_logs_cold_start_path(monkeypatch, caplog):
     )
 
 
-def test_recommend_cold_start_uses_rewrite_ann(monkeypatch):
+def test_recommend_cold_start_uses_raw_query_ann(monkeypatch):
     item = SimpleNamespace(
         id=1,
         tmdb_id=101,
@@ -1877,18 +1851,13 @@ def test_recommend_cold_start_uses_rewrite_ann(monkeypatch):
         ),
     )
 
-    rewrite_vec = np.ones(384, dtype="float32") / np.sqrt(384)
-
+    embedded_texts = []
     monkeypatch.setattr(
         recommend_routes,
-        "rewrite_query",
-        lambda query, intent: SimpleNamespace(rewritten_text="desperate deadly games"),
-    )
-
-    monkeypatch.setattr(
-        recommend_routes,
-        "_build_rewrite_vector",
-        lambda rewrite_text, ann_desc, ann_w, rewrite_w, reference_titles=None: rewrite_vec,
+        "encode_texts",
+        lambda texts: (
+            embedded_texts.extend(texts) or np.ones((len(texts), 384), dtype="float32")
+        ),
     )
 
     ann_called = {}
@@ -1904,6 +1873,7 @@ def test_recommend_cold_start_uses_rewrite_ann(monkeypatch):
         text_query=None,
     ):
         ann_called["vec"] = vec
+        ann_called["text_query"] = text_query
         return [1]
 
     monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
@@ -1933,6 +1903,8 @@ def test_recommend_cold_start_uses_rewrite_ann(monkeypatch):
 
     assert response.status_code == 200
     assert ann_called
+    assert embedded_texts == ["tv shows like Squid Game"]
+    assert ann_called["text_query"] == "tv shows like Squid Game"
 
 
 def test_recommend_skips_llm_when_disabled(monkeypatch):
@@ -1991,11 +1963,6 @@ def test_recommend_skips_llm_when_disabled(monkeypatch):
     monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
     monkeypatch.setattr(
         recommend_routes,
-        "rewrite_query",
-        lambda query, intent: Rewrite(rewritten_text="rewritten"),
-    )
-    monkeypatch.setattr(
-        recommend_routes,
         "encode_texts",
         lambda texts: np.array(
             [[1.0 for _ in range(384)] for _ in texts], dtype="float32"
@@ -2030,7 +1997,7 @@ def test_recommend_skips_llm_when_disabled(monkeypatch):
     assert resp.status_code == 200
 
 
-def test_recommend_manual_rewrite_override(monkeypatch):
+def test_recommend_uses_raw_query_and_ignores_rewrite_override(monkeypatch):
     item = SimpleNamespace(
         id=1,
         tmdb_id=1,
@@ -2064,13 +2031,10 @@ def test_recommend_manual_rewrite_override(monkeypatch):
         ),
     )
 
-    def fail_rewrite(*args, **kwargs):
-        raise AssertionError("rewrite_query should be bypassed")
-
-    monkeypatch.setattr(recommend_routes, "rewrite_query", fail_rewrite)
+    embedded_texts = []
 
     def fake_encode(texts):
-        assert texts == ["manual rewrite"]
+        embedded_texts.extend(texts)
         return np.ones((1, 384), dtype="float32")
 
     monkeypatch.setattr(recommend_routes, "encode_texts", fake_encode)
@@ -2089,6 +2053,7 @@ def test_recommend_manual_rewrite_override(monkeypatch):
     ):
         ann_calls["count"] += 1
         assert vec.shape[0] == 384
+        ann_calls["text_query"] = text_query
         return [1]
 
     monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann)
@@ -2110,6 +2075,7 @@ def test_recommend_manual_rewrite_override(monkeypatch):
             "/recommend",
             params={
                 "user_id": "u1",
+                "query": "raw query",
                 "rewrite_override": "manual rewrite",
             },
         )
@@ -2119,24 +2085,27 @@ def test_recommend_manual_rewrite_override(monkeypatch):
 
     assert resp.status_code == 200
     assert ann_calls["count"] == 1
+    assert embedded_texts == ["raw query"]
+    assert ann_calls["text_query"] == "raw query"
 
 
-def test_build_rewrite_vector_blends_description(monkeypatch):
-    desc = "grim survival stakes"
-    rewrite_text = "sci-fi survival"
+def test_build_query_vector_embeds_only_the_raw_query(monkeypatch):
+    from api.pipeline.intent.rewrite import build_query_vector
+
+    embedded = []
 
     def fake_encode(texts):
-        assert texts == [desc, rewrite_text]
-        return np.array([[1.0, 0.0], [0.0, 1.0]], dtype="float32")
+        embedded.extend(texts)
+        return np.array([[3.0, 4.0]], dtype="float32")
 
     monkeypatch.setattr(recommend_routes, "encode_texts", fake_encode)
 
-    vec = recommend_routes._build_rewrite_vector(
-        rewrite_text, desc, ann_weight_override=0.5, rewrite_weight_override=1.0
-    )
-    expected = np.array([0.4472136, 0.8944272], dtype="float32")
+    vec = build_query_vector("raw sci-fi query")
+
+    expected = np.array([0.6, 0.8], dtype="float32")
     assert vec is not None
-    assert np.allclose(vec[:2], expected, atol=1e-6)
+    assert np.allclose(vec, expected, atol=1e-6)
+    assert embedded == ["raw sci-fi query"]
 
 
 def test_recommend_query_resets_mixer_weights(monkeypatch):
@@ -2687,4 +2656,4 @@ def test_recommend_falls_back_to_keyword_text(monkeypatch):
         )
 
     assert resp.status_code == 200
-    assert captured.get("text_query") == "classic western"
+    assert captured.get("text_query") == "classic western movies"

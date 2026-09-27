@@ -17,6 +17,7 @@ from elasticsearch.exceptions import TransportError
 
 from api import config
 from api.core.elasticsearch_client import get_elasticsearch_client
+from api.core.metrics import timer
 
 
 logger = logging.getLogger(__name__)
@@ -239,7 +240,8 @@ def knn_search(
         search_kwargs["_source"] = {"includes": list(source_includes)}
 
     try:
-        response = client.search(**search_kwargs)
+        with timer("recommend.elasticsearch_knn_latency_ms"):
+            response = client.search(**search_kwargs)
     except TransportError as exc:
         raise ElasticsearchSearchError(f"Elasticsearch search failed: {exc}") from exc
 
@@ -292,7 +294,8 @@ def knn_search(
         if source_includes is not None:
             text_kwargs["_source"] = {"includes": list(source_includes)}
         try:
-            text_response = client.search(**text_kwargs)
+            with timer("recommend.elasticsearch_bm25_latency_ms"):
+                text_response = client.search(**text_kwargs)
             text_hits = text_response.get("hits", {}).get("hits", [])
         except TransportError as exc:
             logger.warning(

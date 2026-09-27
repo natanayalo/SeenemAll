@@ -14,16 +14,13 @@ from api.pipeline.intent.parser import (
     parse_llm_intent,
 )
 from api.pipeline.intent.rewrite import (
-    append_weighted_text,
-    build_rewrite_vector,
+    build_query_vector,
     float_from_env,
 )
 
 # Aliases for backwards compatibility with tests and controller re-exports
 _float_from_env = float_from_env
 _matches_keywords = matches_keywords
-_append_weighted_text = append_weighted_text
-_build_rewrite_vector = build_rewrite_vector
 _parse_llm_intent = parse_llm_intent
 _intent_filters_from_llm = intent_filters_from_llm
 _merge_with_legacy_filters = merge_with_legacy_filters
@@ -33,8 +30,7 @@ _merge_query_filter_hints = merge_query_filter_hints
 
 __all__ = [
     "_SUPPORTED_ANN_BACKENDS",
-    "append_weighted_text",
-    "build_rewrite_vector",
+    "build_query_vector",
     "float_from_env",
     "intent_filters_from_llm",
     "matches_keywords",
@@ -47,8 +43,6 @@ __all__ = [
     "_has_people_filters",
     "_float_from_env",
     "_matches_keywords",
-    "_append_weighted_text",
-    "_build_rewrite_vector",
     "_parse_llm_intent",
     "_intent_filters_from_llm",
     "_merge_with_legacy_filters",

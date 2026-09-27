@@ -40,6 +40,7 @@ class TestHistogram:
         assert snap["avg"] == 0.0
         assert snap["min"] is None
         assert snap["max"] is None
+        assert snap["sample_window"] == 0
 
     def test_observe_single(self):
         h = Histogram()
@@ -61,6 +62,16 @@ class TestHistogram:
         assert snap["max"] == 30.0
         assert snap["avg"] == 20.0
         assert snap["sum"] == 60.0
+
+    def test_percentiles_are_reported(self):
+        h = Histogram()
+        for value in (10.0, 20.0, 30.0, 40.0, 50.0):
+            h.observe(value)
+        snap = h.snapshot()
+        assert snap["p50"] == 30.0
+        assert snap["p95"] == 48.0
+        assert snap["p99"] == 49.6
+        assert snap["sample_window"] == 5
 
 
 class TestMetricsRegistry:

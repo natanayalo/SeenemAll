@@ -68,7 +68,7 @@ graph TD
 - **OpenVINO** acceleration for Intel GPU, NPU, and CPU inference
 - **spaCy** (`en_core_web_sm`) matcher for languages/genres/people/keywords
 - **Docker Compose** (API, DB, Elasticsearch, optional frontend)
-- **Ollama** (default) for local intent parsing and reranking; **OpenAI** and **Gemini** are optional hosted providers
+- **GLiNER v2.1** with deterministic rules for intent parsing, **MiniLM/OpenVINO** for embeddings, and a local **Cross-Encoder/OpenVINO** reranker
 - **Evidently** for evaluation reporting (optional install)
 
 ---
@@ -80,10 +80,7 @@ git clone <repo>
 cd SeenemAll
 
 cp .env.example .env
-# Set TMDB_API_KEY. Ollama must be running and have the configured model; hosted LLM providers are optional.
-# For Docker Compose, make Ollama reachable from the host gateway; protect its listener from untrusted networks.
-
-ollama show gemma4:12b
+# Set TMDB_API_KEY. The API image exports the pinned GLiNER checkpoint during its build.
 
 docker compose up -d --build         # API, Postgres, Elasticsearch (and frontend if enabled)
 
@@ -182,11 +179,11 @@ sequenceDiagram
 
 1. **Profile Load** – `load_user_state` fetches short/long vectors, neighbors, negative items, provider preferences.
 2. **Intent Parsing**
-   - Entity linker captures explicit titles/people.
-   - LLM parser (`use_llm_intent=true`) or legacy stub extracts genres/media types/runtime bounds.
-   - spaCy matcher adds languages, normalized genres (maps “fantasy” → `Fantasy`, `Sci-Fi & Fantasy`), keywords, cast/crew, and “reference titles” (phrases like “like *The Witcher*”).
+   - Deterministic rules extract explicit genres, media types, runtimes, years, providers, and other catalog filters.
+   - GLiNER v2.1 on OpenVINO CPU runs only when unresolved query tokens remain, including open-vocabulary people and themes.
+   - The entity linker and spaCy matcher add explicit titles, languages, keywords, cast/crew, and “reference titles” (phrases like “like *The Witcher*”).
 3. **Prefilter (SQL)** – `_prefilter_allowed_ids` runs a strict (media type + genres + providers) and relaxed pass to produce `allowed_ids`, `boost_ids`, and `enforce_genres`.
-4. **Rewrite Vector** – `_build_rewrite_vector` blends ANN description, rewrites, and extracted titles. Even cold-start users get a query-driven vector for ANN.
+4. **Query Embedding** – The raw user query is embedded with MiniLM/OpenVINO GPU and sent unchanged to retrieval.
 5. **ANN Retrieval**
    - **Elasticsearch** (default): kNN + multi_match query; manual Reciprocal Rank Fusion merges ANN and keyword search. Filters include media types, genres, languages, keywords, cast/crew.
    - **pgvector** (fallback): cosine similarity in Postgres.
@@ -194,7 +191,7 @@ sequenceDiagram
 7. **Collaborative & Trending** – Neighbor scores, business-rule boosts, and trending priors merge with the ANN results up to `candidate_limit`.
 8. **Post-filtering** – We hydrate metadata, enforce media type/genre/runtime/maturity, and strictly reapply cast/crew filters even if we relaxed them earlier. Provider filtering trims watch options unless we need fallback options to fill `limit`.
 9. **Diversification & Scoring** – Optional `diversify=true` runs franchise cap/MMR. Mixer weights are controlled via env vars or query overrides (`mixer_ann_weight`, etc.).
-10. **Reranker** – Ollama (`gemma4:12b`) is the default for explanations and reranking; `RERANK_PROVIDER=openai|gemini` selects a hosted provider, `RERANK_PROVIDER=small` runs the local MiniLM reranker, and `RERANK_ENABLED=0` falls back to heuristic explanations.
+10. **Reranker** – The local `ms-marco-MiniLM-L-6-v2` Cross-Encoder runs through OpenVINO GPU over up to 25 candidates. Deterministic explanations are grounded in catalog features. `RERANK_PROVIDER=small` selects the smaller local alternative; retired remote provider values resolve to the Cross-Encoder.
 11. **Response** – JSON payload with ranked `items`, each including metadata, watch options, source scores, and explanations (`explanation`, `reason` fields), plus optional cursor for pagination.
 
 Logging highlights important fallback decisions (e.g., classic-top-rated heuristics, allowlist relaxation for people filters).
@@ -207,8 +204,7 @@ Logging highlights important fallback decisions (e.g., classic-top-rated heurist
 - `profile` – pick a profile (`user_id::profile`)
 - `limit`, `cursor` – pagination controls
 - `diversify=true|false` – toggles franchise cap/MMR
-- `use_llm_intent=true|false` – choose LLM parser vs legacy stub
-- `rewrite_override` – custom ANN rewrite text
+- `use_llm_intent=true|false` – enable or bypass structured intent parsing
 - `ann_backend_override=elasticsearch|pgvector`
 - `mixer_*` weights – fine-tune ANN/collab/trending/popularity/vote signals
 - `classic_top_rated=true|false` – force the top-rated blend
@@ -269,13 +265,13 @@ Elasticsearch documents include the above fields so both ANN and the reranker ca
 - **Run cold-start milestone**: use `--resolve-titles` to test natural-language queries against sparse catalogs.
 - **Switch ANN backend**: set `ANN_BACKEND=pgvector` in `.env` to force Postgres retrieval (useful for benchmarking).
 - **Elasticsearch hybrid retrieval**: lexical and vector results are fused by the client with weighted RRF (lexical weight 1.5), so hybrid search works with the Basic license. Set `RETRIEVAL_CONSOLIDATED_FILTERS=1` to apply structured filters in retrieval and skip the full SQL ANN allowlist; set it to `0` to roll back that consolidation. `make es-sync` drains the Postgres change queue; catalog ETL targets drain it automatically after each run.
-- **Reranker small model**: `RERANK_PROVIDER=small` for local MiniLM reranker without external keys.
+- **Reranker small model**: `RERANK_PROVIDER=small` selects the local MiniLM alternative. The default is the Cross-Encoder.
 
 ---
 
 ## 🧊 Cold-Start Strategy
 
-- If the user has no vector, we still build a rewrite vector solely from the query (including reference titles like “The Witcher”) and run ANN.
+- If the user has no profile vector, we still embed the raw query (including reference titles like “The Witcher”) and run ANN.
 - People filters trigger relaxed allowlists and a catalogue fallback to ensure actor-based queries never return empty lists.
 - `_cold_start_candidates` orders catalog rows by trending / popularity when ANN fails (still respecting media types, genres, and provider constraints from the query).
 
@@ -286,7 +282,7 @@ Elasticsearch documents include the above fields so both ANN and the reranker ca
 - If ANN returns nothing, check logs for “Relaxed ANN filters…” or “Using catalogue fallback…” messages. Tight genre/provider filters may leave no viable rows.
 - Mapping (genre → catalog name) is controlled in `_GENRE_CANONICAL_TO_CATALOG` (e.g., “fantasy” maps to `["Fantasy", "Sci-Fi & Fantasy"]`).
 - The entity linker uses TMDB data; restart the API after large ETL runs so caches refresh.
-- LLM reranker grace-degrades to ANN ordering with explanations (`RERANK_ENABLED=0` or missing API key).
+- The local reranker falls back to ANN ordering with deterministic explanations if disabled (`RERANK_ENABLED=0`) or if inference fails.
 - Evaluation requires Postgres access (`EVAL_DB_DSN`; defaults to `postgresql+psycopg2://app:app@localhost:5432/reco`).
 
 ---

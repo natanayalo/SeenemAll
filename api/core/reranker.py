@@ -229,10 +229,23 @@ def rerank_with_explanations(
         return []
 
     settings = _get_settings()
-    is_enabled = (
-        settings.enabled if enabled_override is None else bool(enabled_override)
-    )
     effective_provider = (provider_override or settings.provider).strip().lower()
+    if effective_provider not in {"cross_encoder", "small"}:
+        logger.warning(
+            "Ignoring non-local reranker '%s' on the synchronous request path; using Cross-Encoder.",
+            effective_provider,
+        )
+        effective_provider = "cross_encoder"
+    if enabled_override is not None:
+        is_enabled = bool(enabled_override)
+    elif provider_override and effective_provider in {"cross_encoder", "small"}:
+        is_enabled = os.getenv("RERANK_ENABLED", "1").strip().lower() not in {
+            "0",
+            "false",
+            "no",
+        }
+    else:
+        is_enabled = settings.enabled
 
     if effective_provider != settings.provider or is_enabled != settings.enabled:
         if effective_provider == "cross_encoder":
@@ -245,10 +258,12 @@ def rerank_with_explanations(
             override_model = os.getenv("SMALL_RERANK_MODEL", "all-MiniLM-L6-v2")
             override_endpoint = "local://small-rerank"
             override_timeout = _SMALL_RERANK_TIMEOUT_SECONDS
-        else:
-            override_model = settings.model
-            override_endpoint = settings.endpoint
-            override_timeout = settings.timeout
+        else:  # pragma: no cover - guarded by the local provider allowlist above
+            override_model = os.getenv(
+                "CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+            )
+            override_endpoint = "local://cross-encoder"
+            override_timeout = _CROSS_ENCODER_TIMEOUT_SECONDS
 
         settings = RerankerSettings(
             provider=effective_provider,
@@ -476,24 +491,17 @@ def _item_identity(item: Dict[str, Any]) -> tuple[Any, int]:
 @lru_cache(maxsize=1)
 def _get_settings() -> RerankerSettings:
     raw_provider = os.getenv("RERANK_PROVIDER", "cross_encoder").strip().lower()
-    supported = {"openai", "gemini", "small", "ollama", "cross_encoder"}
+    supported = {"small", "cross_encoder"}
     if raw_provider not in supported:
         logger.warning(
-            "Unsupported RERANK_PROVIDER '%s'; falling back to 'cross_encoder'.",
+            "Unsupported or retired RERANK_PROVIDER '%s'; falling back to 'cross_encoder'.",
             raw_provider,
         )
         provider = "cross_encoder"
     else:
         provider = raw_provider
 
-    api_key = None
-    if provider in {"openai", "gemini"}:
-        api_key = os.getenv("RERANK_API_KEY") or os.getenv("OPENAI_API_KEY")
-
-    if provider == "gemini":
-        default_model = "gemini-2.0-flash-lite"
-        default_endpoint = "https://generativelanguage.googleapis.com/v1beta/models"
-    elif provider == "cross_encoder":
+    if provider == "cross_encoder":
         default_model = os.getenv(
             "CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
         )
@@ -501,33 +509,20 @@ def _get_settings() -> RerankerSettings:
     elif provider == "small":
         default_model = os.getenv("SMALL_RERANK_MODEL", "all-MiniLM-L6-v2")
         default_endpoint = "local://small-rerank"
-    elif provider == "ollama":
-        default_model = "gemma4:12b"
-        default_endpoint = "http://localhost:11434/v1/chat/completions"
     else:
-        default_model = "gpt-4o-mini"
-        default_endpoint = "https://api.openai.com/v1/chat/completions"
+        raise AssertionError(f"Unexpected local reranker provider: {provider}")
 
     if provider == "cross_encoder":
         model = os.getenv("CROSS_ENCODER_MODEL", default_model)
-    elif provider == "small":
+    else:
         model = os.getenv("SMALL_RERANK_MODEL", default_model)
-    else:
-        model = os.getenv("RERANK_MODEL", default_model)
-    endpoint = os.getenv("RERANK_ENDPOINT", default_endpoint)
+    endpoint = default_endpoint
     enabled_value = os.getenv("RERANK_ENABLED", "1").strip().lower()
-    if provider in {"cross_encoder", "small", "ollama"}:
-        enabled = enabled_value not in {"0", "false", "no"}
-    else:
-        enabled = bool(api_key) and enabled_value not in {"0", "false", "no"}
+    enabled = enabled_value not in {"0", "false", "no"}
     if provider == "cross_encoder":
         timeout = _CROSS_ENCODER_TIMEOUT_SECONDS
-    elif provider == "small":
-        timeout = _SMALL_RERANK_TIMEOUT_SECONDS
-    elif provider == "ollama":
-        timeout = 120.0
     else:
-        timeout = _DEFAULT_TIMEOUT_SECONDS
+        timeout = _SMALL_RERANK_TIMEOUT_SECONDS
     raw_timeout = os.getenv("RERANK_TIMEOUT")
     if raw_timeout:
         try:
@@ -538,7 +533,7 @@ def _get_settings() -> RerankerSettings:
             )
     return RerankerSettings(
         provider=provider,
-        api_key=api_key,
+        api_key=None,
         model=model,
         endpoint=endpoint,
         enabled=enabled,

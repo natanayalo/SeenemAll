@@ -1,8 +1,9 @@
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes.health import router as health_router
@@ -15,6 +16,7 @@ from api.config import TMDB_API_KEY
 from api.security import require_api_key
 from api.core.entity_linker import EntityLinker
 from api.core.logger import RequestIdMiddleware
+from api.core.metrics import METRICS
 from etl.tmdb_client import TMDBClient
 
 # Configure logging
@@ -52,6 +54,22 @@ async def app_lifespan(app: FastAPI):
                 "Could not pre-warm embedding model: %s", exc
             )
 
+        try:
+            from api.core.fast_intent_parser import FastIntentParser
+
+            parser = FastIntentParser.get_instance()
+            parser.require_gliner()
+            logging.getLogger("api.main").info(
+                "Intent parser runtime resolved | provider=hybrid_fast model=%s runtime=%s device=%s",
+                parser._model_name,
+                parser._runtime,
+                parser._ov_device,
+            )
+        except Exception as exc:  # pragma: no cover - defensive startup fallback
+            raise RuntimeError(
+                "Required fast intent parser runtime failed to initialize."
+            ) from exc
+
         # Pre-warm local cross-encoder model to eliminate first-rerank cold start
         try:
             from api.core.cross_encoder import get_cross_encoder_model
@@ -71,6 +89,20 @@ async def app_lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Seen'emAll", version="0.1.0", lifespan=app_lifespan)
+
+
+@app.middleware("http")
+async def measure_recommendation_request(request: Request, call_next):
+    if request.url.path.rstrip("/") not in {"/recommend", "/recommend/debug"}:
+        return await call_next(request)
+    started = time.perf_counter()
+    try:
+        return await call_next(request)
+    finally:
+        METRICS.histogram("recommend.api_latency_ms").observe(
+            (time.perf_counter() - started) * 1000.0
+        )
+
 
 _cors_origins_raw = (os.getenv("CORS_ALLOW_ORIGINS") or "http://localhost:3000").strip()
 _cors_allow_origins = [

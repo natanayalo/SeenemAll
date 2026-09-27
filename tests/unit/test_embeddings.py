@@ -49,7 +49,7 @@ def test_get_model_initialises_once(monkeypatch):
     embeddings.reset_embedding_cache_for_tests()
     monkeypatch.delenv("EMBEDDING_DEVICE", raising=False)
     monkeypatch.delenv("DEVICE", raising=False)
-    monkeypatch.delenv("EMBEDDING_BACKEND", raising=False)
+    monkeypatch.setenv("EMBEDDING_BACKEND", "pytorch")
 
     import types
     import sys

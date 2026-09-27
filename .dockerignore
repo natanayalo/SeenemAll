@@ -1,27 +1,21 @@
-# VCS
 .git
-.github
-
-# Local Python environments and caches
-.venv
+.github/
+.venv/
+.cache/
+.tmp/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pre-commit-cache/
 __pycache__/
 *.py[cod]
-.mypy_cache/
-.pytest_cache/
-.pre-commit-cache/
-.tmp/
-pytest-temp*/
-**/pytest-temp*/
-
-# Coverage and test artifacts
-.coverage
-htmlcov/
-
-# Local env/config secrets (compose passes env_file at runtime)
 .env
 .env.*
-
-# Frontend build artifacts not needed in API image context
-frontend/node_modules/
-frontend/dist/
-frontend/.cache/
+.coverage
+htmlcov/
+pytest-temp*/
+tests/
+evaluation/
+frontend/
+models/gliner_small_ov/
+*.csv

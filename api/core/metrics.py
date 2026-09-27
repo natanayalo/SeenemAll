@@ -8,7 +8,11 @@ from __future__ import annotations
 
 import threading
 import time
+from collections import deque
+from math import ceil, floor
 from typing import Any, Dict
+
+_LATENCY_SAMPLE_WINDOW = 4096
 
 
 class Counter:
@@ -35,13 +39,14 @@ class Counter:
 class Histogram:
     """Tracks count, sum, min, max for a numeric measurement (e.g. latency)."""
 
-    __slots__ = ("_count", "_sum", "_min", "_max", "_lock")
+    __slots__ = ("_count", "_sum", "_min", "_max", "_samples", "_lock")
 
     def __init__(self) -> None:
         self._count = 0
         self._sum = 0.0
         self._min = float("inf")
         self._max = float("-inf")
+        self._samples: deque[float] = deque(maxlen=_LATENCY_SAMPLE_WINDOW)
         self._lock = threading.Lock()
 
     def observe(self, value: float) -> None:
@@ -52,19 +57,48 @@ class Histogram:
                 self._min = value
             if value > self._max:
                 self._max = value
+            self._samples.append(float(value))
 
-    def snapshot(self) -> Dict[str, float | None]:
+    @staticmethod
+    def _percentile(samples: list[float], percentile: float) -> float | None:
+        if not samples:
+            return None
+        values = sorted(samples)
+        rank = (len(values) - 1) * percentile / 100.0
+        lower = floor(rank)
+        upper = ceil(rank)
+        if lower == upper:
+            return round(values[lower], 3)
+        fraction = rank - lower
+        return round(values[lower] + fraction * (values[upper] - values[lower]), 3)
+
+    def snapshot(self) -> Dict[str, float | int | None]:
         with self._lock:
             if self._count == 0:
-                return {"count": 0, "sum": 0.0, "avg": 0.0, "min": None, "max": None}
+                return {
+                    "count": 0,
+                    "sum": 0.0,
+                    "avg": 0.0,
+                    "min": None,
+                    "max": None,
+                    "p50": None,
+                    "p95": None,
+                    "p99": None,
+                    "sample_window": 0,
+                }
             s = float(self._sum)
             c = float(self._count)
+            samples = list(self._samples)
             return {
                 "count": float(self._count),
                 "sum": round(s, 3),
                 "avg": round(s / c, 3),
                 "min": round(float(self._min), 3),
                 "max": round(float(self._max), 3),
+                "p50": self._percentile(samples, 50),
+                "p95": self._percentile(samples, 95),
+                "p99": self._percentile(samples, 99),
+                "sample_window": len(samples),
             }
 
 

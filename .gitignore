@@ -32,6 +32,9 @@ htmlcov/
 # LLM cache (persisted intents/rewrites)
 .cache/
 
+# Generated production model export (recreated during Docker build)
+models/gliner_small_ov/
+
 # Evaluation artifacts
 evaluation/artifacts/
 evaluation/evaluation_results*.csv

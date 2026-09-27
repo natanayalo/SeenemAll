@@ -37,7 +37,3 @@ class Intent(BaseModel):
     streaming_providers: Optional[List[str]] = Field(
         None, description="Preferred streaming providers (normalized identifiers)."
     )
-    ann_description: Optional[str] = Field(
-        None,
-        description="Optional natural-language summary for ANN query enrichment.",
-    )

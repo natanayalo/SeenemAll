@@ -24,6 +24,7 @@ from api.pipeline.reranker import (
     _encode_cursor,
     format_presentation_items,
 )
+from api.core.metrics import METRICS
 from api.pipeline.retriever import _prefilter_allowed_ids as _prefilter_allowed_ids
 from api.pipeline.runner import get_pipeline
 
@@ -53,6 +54,8 @@ async def recommend(
     reranked, debug_context = await get_or_compute_recommendations(
         request, params, db, canonical_id, _compute_recommendations_async
     )
+    if not reranked:
+        METRICS.counter("recommend.zero_results").inc()
 
     start_index = _decode_cursor(cursor)
     if start_index < 0:

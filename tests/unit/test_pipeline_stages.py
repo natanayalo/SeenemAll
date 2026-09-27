@@ -19,8 +19,7 @@ from api.pipeline.diversity import (
     serendipity_target,
 )
 from api.pipeline.intent import (
-    append_weighted_text,
-    build_rewrite_vector,
+    build_query_vector,
     intent_filters_from_llm,
     matches_keywords,
     merge_maturity_rating,
@@ -115,17 +114,7 @@ def test_intent_helpers(monkeypatch):
     assert matches_keywords("This is an epic movie", {"epic"}) is True
     assert matches_keywords("Boring film", {"epic"}) is False
 
-    texts = []
-    weights = []
-    w = append_weighted_text("hello", None, 1.5, texts, weights)
-    assert w == 1.5
-    assert texts == ["hello"]
-    assert weights == [1.5]
-
-    w_zero = append_weighted_text("", None, 1.5, texts, weights)
-    assert w_zero == 0.0
-
-    vec = build_rewrite_vector("space adventure", "sci-fi battle", 1.0, 1.0)
+    vec = build_query_vector("space adventure")
     assert vec is not None
     assert np.isclose(np.linalg.norm(vec), 1.0)
 
@@ -360,7 +349,7 @@ def test_retriever_classes_adapter_interface(monkeypatch):
         intent_filters=IntentFilters(""),
         structured_search_filters=None,
         es_text_query=None,
-        rewrite_vec=None,
+        query_vec=None,
         prefer_top_rated=False,
         custom_genres=[],
         has_people_filters=False,

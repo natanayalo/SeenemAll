@@ -11,9 +11,15 @@ services:
     depends_on:
       - api
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        FAST_INTENT_MODEL_REVISION: ${FAST_INTENT_MODEL_REVISION:-4e091416cf7c3481db542c2a3d26156916f3a47f}
     container_name: seenemall_api
     env_file: .env
+    environment:
+      FAST_INTENT_OPENVINO_DIR: /opt/models/gliner_small_ov
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

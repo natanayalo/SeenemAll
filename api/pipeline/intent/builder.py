@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 from api.core.elasticsearch_search import SearchFilters
 from api.core.filter_matcher import get_query_filters
 from api.core.legacy_intent_parser import parse_intent as legacy_parse_intent
-from api.core.llm_parser import default_intent, linked_media_types, rewrite_query
-from api.core.rewrite import Rewrite
+from api.core.llm_parser import default_intent, linked_media_types
+from api.core.metrics import METRICS
+from api.core.query_formulation import select_retrieval_query
 from api.pipeline.context import normalize_streaming_services
 from api.pipeline.hooks import get_hook
 from api.pipeline.intent.matcher import (
@@ -24,7 +25,7 @@ from api.pipeline.intent.parser import (
     merge_with_legacy_filters,
     parse_llm_intent,
 )
-from api.pipeline.intent.rewrite import build_rewrite_vector
+from api.pipeline.intent.rewrite import build_query_vector
 from api.pipeline.models import QueryUnderstanding, RecommendParams, UserContext
 
 logger = logging.getLogger("api.routes.recommend")
@@ -143,8 +144,6 @@ async def resolve_query_intent(
             params.mixer_vote_weight = 1.2
         if params.mixer_novelty_weight is None:
             params.mixer_novelty_weight = 0.0
-        if params.ann_weight_override is None:
-            params.ann_weight_override = 0.2
         if heuristic_applied and logger.isEnabledFor(logging.DEBUG):
             logger.debug(
                 "Auto-enabled classic_top_rated for query '%s' due to keyword match.",
@@ -152,14 +151,6 @@ async def resolve_query_intent(
             )
 
     llm_media_types = list(intent.media_types or [])
-    if hasattr(intent, "genre_keywords") and intent.genre_keywords:
-        genre_keyword_text = " ".join(intent.genre_keywords)
-        if llm_intent.ann_description:
-            llm_intent.ann_description = (
-                f"{llm_intent.ann_description.rstrip('.')} {genre_keyword_text}"
-            )
-        else:
-            llm_intent.ann_description = genre_keyword_text
 
     prefilter_kwargs: Dict[str, Any] = {}
     if params.strict_filters:
@@ -250,26 +241,11 @@ async def resolve_query_intent(
             strict_genres=bool(params.strict_filters),
         )
 
-    es_text_query: Optional[str] = (
-        query_filter_result.residual_text or ""
-    ).strip() or None
-    if not es_text_query and keyword_filters:
-        keyword_blob = " ".join(keyword_filters).strip()
-        if keyword_blob:
-            es_text_query = keyword_blob
-    if not es_text_query and query:
-        es_text_query = query.strip() or None
-    titles_source = intent.reference_titles or query_filter_result.reference_titles
-    if titles_source:
-        titles_blob = " ".join(titles_source)
-        if titles_blob:
-            es_text_query = (
-                f"{es_text_query} {titles_blob}".strip()
-                if es_text_query
-                else titles_blob
-            )
-    if query and not es_text_query:
-        es_text_query = query
+    retrieval_query_text, query_formulation = select_retrieval_query(
+        query, query_filter_result
+    )
+    es_text_query: Optional[str] = retrieval_query_text or None
+    METRICS.counter(f"recommend.query_formulation.{query_formulation}").inc()
 
     has_people = _has_people_filters(structured_search_filters)
     entity_media_types = linked_media_types(linked_entities)
@@ -304,47 +280,12 @@ async def resolve_query_intent(
                 sorted(preferred_services),
             )
 
-    if params.ann_description_override:
-        llm_intent.ann_description = params.ann_description_override.strip()
-    include_people = list(dict.fromkeys(llm_intent.include_people or []))
-    if include_people:
-        people_phrase = ", ".join(include_people)
-        if llm_intent.ann_description:
-            if people_phrase not in llm_intent.ann_description:
-                llm_intent.ann_description = (
-                    f"{llm_intent.ann_description.rstrip('.')}. "
-                    f"Featuring {people_phrase}."
-                )
-        else:
-            llm_intent.ann_description = f"Featuring {people_phrase}."
-
     candidate_limit = min(500, max(params.limit, params.limit * 3))
     if intent.has_filters():
         candidate_limit = min(500, max(candidate_limit, params.limit * 5))
 
-    rewrite_result = None
-    manual_rewrite_text = (
-        (params.rewrite_override or "").strip() if params.rewrite_override else ""
-    )
-    if manual_rewrite_text:
-        manual_rewrite_text = " ".join(manual_rewrite_text.split()[:8])
-        rewrite_result = Rewrite(
-            rewritten_text=manual_rewrite_text,
-            facet_allow=None,
-            facet_block=None,
-        )
-    elif query:
-        rewriter_fn = get_hook("rewrite_query", rewrite_query)
-        rewrite_result = rewriter_fn(query or "", llm_intent)
-
-    vector_builder_fn = get_hook("_build_rewrite_vector", build_rewrite_vector)
-    rewrite_vec = vector_builder_fn(
-        getattr(rewrite_result, "rewritten_text", None),
-        getattr(llm_intent, "ann_description", None),
-        params.ann_weight_override,
-        params.rewrite_weight_override,
-        query_filter_result.reference_titles,
-    )
+    vector_builder_fn = get_hook("_build_query_vector", build_query_vector)
+    query_vec = vector_builder_fn(retrieval_query_text)
 
     return QueryUnderstanding(
         query=query,
@@ -352,7 +293,7 @@ async def resolve_query_intent(
         intent_filters=intent,
         structured_search_filters=structured_search_filters,
         es_text_query=es_text_query,
-        rewrite_vec=rewrite_vec,
+        query_vec=query_vec,
         prefer_top_rated=prefer_top_rated,
         custom_genres=custom_genres,
         has_people_filters=has_people,

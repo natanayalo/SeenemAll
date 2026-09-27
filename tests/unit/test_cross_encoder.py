@@ -35,7 +35,7 @@ def test_get_cross_encoder_device_hardware_detection(monkeypatch):
     import torch
 
     monkeypatch.delenv("CROSS_ENCODER_DEVICE", raising=False)
-    monkeypatch.delenv("CROSS_ENCODER_BACKEND", raising=False)
+    monkeypatch.setenv("CROSS_ENCODER_BACKEND", "pytorch")
 
     # Test CUDA detection
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
