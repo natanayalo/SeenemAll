@@ -15,7 +15,7 @@ def healthz():
             content={
                 "status": "degraded",
                 "component": "intent_parser",
-                "reason": "required neural runtime unavailable",
+                "reason": "required neural runtime load or inference failed",
             },
         )
     return {"status": "ok"}

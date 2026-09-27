@@ -681,14 +681,19 @@ class FastIntentParser:
 
         # Step 3: Extract open-vocabulary entities with GLiNER
         gliner = self._ensure_gliner()
+        neural_succeeded = False
         if gliner is not None:
             try:
                 entities = gliner.predict_entities(
                     normalized, self._labels, threshold=self._threshold
                 )
+                self._gliner_error = None
+                self._gliner_failed = False
+                neural_succeeded = True
             except Exception as exc:
                 logger.warning("GLiNER predict_entities error: %s", exc)
                 METRICS.counter("intent.parser.neural_error").inc()
+                METRICS.counter("intent.parser.neural_fallback").inc()
                 self._gliner_error = exc
                 self._gliner_failed = True
                 entities = []
@@ -764,7 +769,7 @@ class FastIntentParser:
             METRICS.counter("intent.parser.neural_fallback").inc()
 
         self._record_parse(
-            "neural" if gliner is not None else "rules",
+            "neural" if neural_succeeded else "rules",
             intent,
             unresolved_tokens,
             started,

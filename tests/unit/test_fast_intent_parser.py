@@ -129,14 +129,37 @@ def test_fast_intent_parser_gliner_failure_fallback():
     parser = FastIntentParser()
 
     mock_gliner = MagicMock()
-    mock_gliner.predict_entities.side_effect = RuntimeError("GPU out of memory")
+    mock_gliner.predict_entities.side_effect = [
+        RuntimeError("GPU out of memory"),
+        [{"label": "person", "text": "Pedro Pascal"}],
+    ]
+    counters = {}
 
-    with patch.object(parser, "_ensure_gliner", return_value=mock_gliner):
+    def get_counter(name):
+        counters.setdefault(name, MagicMock())
+        return counters[name]
+
+    metrics = MagicMock()
+    metrics.counter.side_effect = get_counter
+    with patch.object(parser, "_ensure_gliner", return_value=mock_gliner), patch(
+        "api.core.fast_intent_parser.METRICS", metrics
+    ):
         res = parser.parse("Pedro Pascal sci-fi movies under 90 minutes")
         # Should gracefully fall back to rule parser outputs
         assert res["runtime_minutes_max"] == 90
         assert "Science Fiction" in res["include_genres"]
         assert parser.gliner_failed
+        assert parser._gliner_error is not None
+
+        recovered = parser.parse("Pedro Pascal sci-fi movies under 90 minutes")
+
+    assert recovered["include_people"] == ["Pedro Pascal"]
+    assert not parser.gliner_failed
+    assert parser._gliner_error is None
+    assert counters["intent.parser.neural_error"].inc.call_count == 1
+    assert counters["intent.parser.neural_fallback"].inc.call_count == 1
+    assert counters["intent.parser.path.rules"].inc.call_count == 1
+    assert counters["intent.parser.path.neural"].inc.call_count == 1
 
 
 def test_require_gliner_fails_when_model_cannot_load():
