@@ -13,6 +13,8 @@ from api.pipeline.hooks import get_hook
 from api.pipeline.models import QueryUnderstanding, UserContext
 from api.pipeline.retriever.base import BaseRetriever
 from api.pipeline.retriever.prefilter import genre_contains_clause
+from api.pipeline.retriever.prefilter import apply_search_filters
+from api.core.elasticsearch_search import SearchFilters
 
 logger = logging.getLogger("api.routes.recommend")
 
@@ -23,6 +25,7 @@ def trending_prior_candidates(
     exclude_ids: List[int],
     limit: int,
     allowed_ids: List[int] | None,
+    search_filters: SearchFilters | None = None,
 ) -> List[Tuple[int, float]]:
     if limit <= 0:
         return []
@@ -70,6 +73,11 @@ def trending_prior_candidates(
 
     if filters:
         stmt = stmt.where(*filters)
+    if allowed_ids is not None:
+        if not allowed_ids:
+            return []
+        stmt = stmt.where(Item.id.in_(allowed_ids))
+    stmt = apply_search_filters(stmt, search_filters, exclude_ids)
 
     stmt = stmt.order_by(
         Item.trending_rank.asc().nullslast(),
@@ -170,4 +178,5 @@ class TrendingPriorRetriever(BaseRetriever):
             list(context.exclude_set),
             intent.candidate_limit,
             allowed_ids=allowlist,
+            search_filters=intent.structured_search_filters,
         )

@@ -36,6 +36,7 @@ def test_ann_candidates_invokes_knn_and_returns_ids(
 
 def test_ann_candidates_builds_filters(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(candidate_gen.config, "ANN_BACKEND", "elasticsearch")
+    monkeypatch.setattr(candidate_gen.config, "RETRIEVAL_CONSOLIDATED_FILTERS", True)
     captured = {}
 
     def fake_knn(query_vector, **kwargs):
@@ -54,7 +55,7 @@ def test_ann_candidates_builds_filters(monkeypatch: pytest.MonkeyPatch) -> None:
         allowed_ids=[10, 11],
     )
 
-    assert captured["filters"].include_item_ids == ("10", "11")
+    assert captured["filters"].include_item_ids == ()
     assert captured["filters"].exclude_item_ids == ("1", "2")
     assert captured["k"] == 10
     assert captured["source_includes"] == ["item_id"]
@@ -99,6 +100,7 @@ def test_pgvector_ann_candidates_respects_allowlist(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(candidate_gen.config, "ANN_BACKEND", "pgvector")
+    monkeypatch.setattr(candidate_gen.config, "RETRIEVAL_CONSOLIDATED_FILTERS", False)
     db = DummySession(rows=[(42,), (7,)])
     vec = np.array([0.2, 0.8], dtype="float32")
 
@@ -115,6 +117,7 @@ def test_pgvector_ann_candidates_empty_allowlist_short_circuits(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(candidate_gen.config, "ANN_BACKEND", "pgvector")
+    monkeypatch.setattr(candidate_gen.config, "RETRIEVAL_CONSOLIDATED_FILTERS", False)
     db = DummySession()
     vec = np.array([0.3, 0.7], dtype="float32")
 
@@ -199,7 +202,7 @@ def test_pgvector_ann_candidates_with_search_filters() -> None:
     assert params["genre_1"] == "%action%"
     assert params["lang_1"] == "en"
     assert set(params["exclude"]) == {55, 999}
-    assert set(params["allowed"]) == {101, 102}
+    assert set(params["allowed"]) == {101, 102}  # explicit SearchFilters only
 
 
 def test_pgvector_ann_candidates_with_providers() -> None:
@@ -220,9 +223,9 @@ def test_pgvector_ann_candidates_with_providers() -> None:
     assert len(db.calls) == 1
     stmt, params = db.calls[0]
     sql_text = str(stmt)
-    assert "JOIN availability a ON a.item_id = e.item_id" in sql_text
+    assert "EXISTS (SELECT 1 FROM availability a" in sql_text
     assert params["providers"] == ["netflix", "prime"]
-    assert params["country"] == "US"
+    assert params["country"] == candidate_gen.COUNTRY_DEFAULT
 
 
 def test_pgvector_ann_candidates_empty_include_short_circuits() -> None:

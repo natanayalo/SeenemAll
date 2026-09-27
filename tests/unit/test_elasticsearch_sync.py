@@ -313,7 +313,11 @@ def test_sync_catalog_respects_max_items(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(elasticsearch_sync, "get_sessionmaker", _make_sessionmaker)
 
     stats = elasticsearch_sync.sync_catalog(
-        batch_size=100, max_items=1, embed_version="v-test", refresh=True
+        batch_size=100,
+        max_items=1,
+        embed_version="v-test",
+        refresh=True,
+        updated_after=dt.datetime(2020, 1, 1),
     )
 
     assert stats == {"indexed": 1, "skipped_missing_embedding": 0}
@@ -365,7 +369,9 @@ def test_sync_catalog_handles_max_zero(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(elasticsearch_sync, "get_sessionmaker", _make_sessionmaker)
 
-    stats = elasticsearch_sync.sync_catalog(max_items=0)
+    stats = elasticsearch_sync.sync_catalog(
+        max_items=0, updated_after=dt.datetime(2020, 1, 1)
+    )
     assert stats == {"indexed": 0, "skipped_missing_embedding": 0}
 
 
@@ -413,8 +419,134 @@ def test_sync_catalog_skips_when_missing_embeddings(
     )
     monkeypatch.setattr(elasticsearch_sync, "get_sessionmaker", _make_sessionmaker)
 
-    stats = elasticsearch_sync.sync_catalog()
+    stats = elasticsearch_sync.sync_catalog(updated_after=dt.datetime(2020, 1, 1))
     assert stats == {"indexed": 0, "skipped_missing_embedding": 1}
+
+
+def test_sync_catalog_defaults_to_queue_drain(monkeypatch):
+    captured = {}
+
+    def fake_drain(**kwargs):
+        captured.update(kwargs)
+        return {
+            "indexed": 1,
+            "deleted": 1,
+            "failed": 0,
+            "skipped_missing_embedding": 0,
+        }
+
+    monkeypatch.setattr(elasticsearch_sync, "_drain_sync_queue", fake_drain)
+    stats = elasticsearch_sync.sync_catalog(batch_size=23, max_items=7, refresh=True)
+    assert captured == {
+        "batch_size": 23,
+        "max_items": 7,
+        "embed_version": elasticsearch_sync.DEFAULT_EMBED_VERSION,
+        "refresh": True,
+    }
+    assert stats["deleted"] == 1
+
+
+def test_queue_drain_preserves_failed_and_acknowledges_success(monkeypatch):
+    now = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
+    snapshot = ItemSnapshot(
+        id=1,
+        media_type="movie",
+        title="One",
+        overview=None,
+        runtime=None,
+        release_year=None,
+        maturity_rating=None,
+        genres=None,
+        popularity=None,
+        cast=None,
+        directors=None,
+        producers=None,
+        writers=None,
+        keywords=None,
+        spoken_languages=None,
+        updated_at=now,
+    )
+
+    class Result:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def all(self):
+            return self.rows
+
+        def scalars(self):
+            return self
+
+    queue_reads = 0
+    acknowledgements = []
+
+    class Session:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def execute(self, statement, params=None):
+            nonlocal queue_reads
+            sql = str(statement)
+            if "SELECT item_id, changed_at" in sql:
+                queue_reads += 1
+                rows = [(1, now), (2, now)] if queue_reads == 1 else []
+                return Result(rows)
+            if "DELETE FROM catalog_es_sync_queue" in sql:
+                acknowledgements.append(params["item_id"])
+                return Result([])
+            return Result([snapshot])
+
+        def commit(self):
+            pass
+
+    monkeypatch.setattr(
+        elasticsearch_sync, "get_sessionmaker", lambda: (lambda: Session())
+    )
+    monkeypatch.setattr(
+        elasticsearch_sync,
+        "_load_embeddings",
+        lambda *args, **kwargs: {1: [0.1, 0.2]},
+    )
+    monkeypatch.setattr(
+        elasticsearch_sync,
+        "_load_providers",
+        lambda *args, **kwargs: {1: ["netflix"]},
+    )
+    actions_seen = []
+
+    def fake_bulk(client, actions, **kwargs):
+        actions_seen.extend(actions)
+        return 1, [{"delete": {"_id": "2", "status": 500}}]
+
+    monkeypatch.setattr(elasticsearch_sync.helpers, "bulk", fake_bulk)
+    monkeypatch.setattr(
+        elasticsearch_sync,
+        "create_elasticsearch_client",
+        lambda: SimpleNamespace(close=lambda: None),
+    )
+
+    stats = elasticsearch_sync._drain_sync_queue(
+        batch_size=10, max_items=None, embed_version="v1", refresh=False
+    )
+    assert [action["_op_type"] for action in actions_seen] == ["index", "delete"]
+    assert acknowledgements == [1]
+    assert stats["indexed"] == 1
+    assert stats["failed"] == 1
+
+
+def test_sync_queue_migration_tracks_three_tables_and_backfills():
+    from pathlib import Path
+
+    migration = Path("migrations/versions/0017_catalog_es_sync_queue.py").read_text(
+        encoding="utf-8"
+    )
+    assert "catalog_es_sync_queue" in migration
+    assert '("items", "item_embeddings", "availability")' in migration
+    assert "AFTER INSERT OR UPDATE OR DELETE" in migration
+    assert "SELECT id FROM items" in migration
 
 
 def test_main_success(monkeypatch: pytest.MonkeyPatch, capsys) -> None:

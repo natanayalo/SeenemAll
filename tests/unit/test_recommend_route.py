@@ -1480,6 +1480,10 @@ def test_prefilter_allowed_ids_returns_ordered_unique(monkeypatch):
 
 
 def test_prefilter_prefers_keyword_boosts(monkeypatch):
+    from api import config
+
+    monkeypatch.setattr(config, "RETRIEVAL_CONSOLIDATED_FILTERS", True)
+
     class PrefilterSession:
         def __init__(self):
             self.bind = SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
@@ -1520,8 +1524,9 @@ def test_prefilter_prefers_keyword_boosts(monkeypatch):
 
     result = ORIGINAL_PREFILTER(session, intent, limit=10)
     assert isinstance(result, PrefilterDecision)
-    assert result.allowed_ids == list(range(30, 43))
+    assert result.allowed_ids is None
     assert result.boost_ids[:3] == [10, 11, 12]
+    assert len(result.boost_ids) <= 10
 
 
 def test_float_from_env_parses_values(monkeypatch):

@@ -91,7 +91,7 @@ make migrate                         # Alembic migrations (includes cast/crew/ke
 make es-setup                        # Create Elasticsearch index (run with FORCE=1 on schema change)
 make etl-tmdb                        # Pull TMDB catalog (supports SINCE=2024-01-01T00:00:00Z)
 make embed                           # MiniLM embeddings (EMBED_VERSION, EMBED_BATCH, etc.)
-make es-sync                         # Push catalog to Elasticsearch (BATCH=250, REFRESH=1 optional)
+make es-sync                         # Drain queued catalog changes (BATCH=250, REFRESH=1 optional)
 make etl-justwatch                   # Populate availability (optional)
 ```
 
@@ -257,7 +257,7 @@ Elasticsearch documents include the above fields so both ANN and the reranker ca
 
 - `./.venv/bin/python -m pytest` for unit/integration tests (coverage gate: 85%)
 - `tests/unit/test_filter_matcher.py` verifies the spaCy matcher (languages, genres, people, reference titles)
-- `tests/unit/test_elasticsearch_search.py` asserts dual-search fusion and filter placement
+- `tests/unit/test_elasticsearch_search.py` asserts dual-search client-side weighted RRF and filter placement
 - `make lint` (if configured) for static checks
 
 ---
@@ -268,6 +268,7 @@ Elasticsearch documents include the above fields so both ANN and the reranker ca
 - **Backfill embeddings**: `make embed EMBED_VERSION=v2`
 - **Run cold-start milestone**: use `--resolve-titles` to test natural-language queries against sparse catalogs.
 - **Switch ANN backend**: set `ANN_BACKEND=pgvector` in `.env` to force Postgres retrieval (useful for benchmarking).
+- **Elasticsearch hybrid retrieval**: lexical and vector results are fused by the client with weighted RRF (lexical weight 1.5), so hybrid search works with the Basic license. Set `RETRIEVAL_CONSOLIDATED_FILTERS=1` to apply structured filters in retrieval and skip the full SQL ANN allowlist; set it to `0` to roll back that consolidation. `make es-sync` drains the Postgres change queue; catalog ETL targets drain it automatically after each run.
 - **Reranker small model**: `RERANK_PROVIDER=small` for local MiniLM reranker without external keys.
 
 ---

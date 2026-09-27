@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import logging
 from collections import defaultdict
 from typing import Any, Dict, List, Sequence, Tuple
@@ -25,6 +26,21 @@ logger = logging.getLogger("api.routes.recommend")
 
 _REWRITE_BLEND_ALPHA = 0.5
 _REWRITE_BLEND_ALPHA_QUERY = float_from_env("REWRITE_BLEND_ALPHA_QUERY", 0.2)
+
+
+def _cold_start_kwargs(fn: Any, intent: QueryUnderstanding) -> Dict[str, Any]:
+    kwargs: Dict[str, Any] = {"prefer_top_rated": intent.prefer_top_rated}
+    try:
+        signature = inspect.signature(fn)
+        accepts_filters = "search_filters" in signature.parameters or any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD
+            for parameter in signature.parameters.values()
+        )
+    except (TypeError, ValueError):
+        accepts_filters = True
+    if accepts_filters:
+        kwargs["search_filters"] = intent.structured_search_filters
+    return kwargs
 
 
 def _extract_centroid(cluster: Any) -> np.ndarray:
@@ -207,7 +223,7 @@ class ANNRetriever(BaseRetriever):
                 intent.intent_filters,
                 candidate_limit,
                 allowlist,
-                prefer_top_rated=intent.prefer_top_rated,
+                **_cold_start_kwargs(cold_start_fn, intent),
             )
             return ids, False
         else:

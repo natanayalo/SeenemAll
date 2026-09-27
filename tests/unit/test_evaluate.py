@@ -486,6 +486,27 @@ def test_parse_args_ab_test_alias():
     assert args.candidate == "default"
 
 
+def test_ab_quality_gate_requires_latency_lift_and_quality_parity():
+    from evaluation.evaluate import _ab_quality_gate
+
+    baseline = {"latency_mean": 10.0, "latency_p95": 8.0, "ndcg": 0.2, "map": 0.1}
+    improved = {
+        "latency_mean": 9.0,
+        "latency_p95": 7.0,
+        "ndcg": 0.2,
+        "map": 0.1,
+    }
+    assert all(_ab_quality_gate(baseline, improved).values())
+
+    regressed = {
+        "latency_mean": 9.0,
+        "latency_p95": 8.0,
+        "ndcg": 0.19,
+        "map": 0.09,
+    }
+    assert not all(_ab_quality_gate(baseline, regressed).values())
+
+
 def test_default_param_grid_cross_encoder():
     from evaluation.evaluate import default_param_grid
 

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Sequence, Set
+import inspect
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 from sqlalchemy import bindparam, cast, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.types import Text
 
 from api.config import COUNTRY_DEFAULT
+from api import config
 from api.core import llm_parser
 from api.core.elasticsearch_search import SearchFilters
 from api.core.legacy_intent_parser import IntentFilters
@@ -91,6 +93,77 @@ def filter_excluded_candidate_ids(
     return [candidate for candidate in candidates if candidate not in exclude_set]
 
 
+def apply_search_filters(stmt, filters: SearchFilters | None, exclude_ids=()):
+    """Apply hard catalog eligibility constraints to an Item-based SQL query."""
+    if not filters:
+        return stmt
+    if filters.media_types:
+        stmt = stmt.where(Item.media_type.in_(filters.media_types))
+    if filters.genres:
+        genre_clauses = [
+            cast(Item.genres, Text).ilike(f"%{genre.strip().lower()}%")
+            for genre in filters.genres
+            if genre and genre.strip()
+        ]
+        if genre_clauses:
+            if filters.strict_genres:
+                stmt = stmt.where(*genre_clauses)
+            else:
+                stmt = stmt.where(or_(*genre_clauses))
+    for column, minimum, maximum in (
+        (Item.release_year, filters.release_year_gte, filters.release_year_lte),
+        (Item.runtime, filters.runtime_gte, filters.runtime_lte),
+    ):
+        if minimum is not None:
+            stmt = stmt.where(column >= minimum)
+        if maximum is not None:
+            stmt = stmt.where(column <= maximum)
+    if filters.maturity:
+        stmt = stmt.where(Item.maturity_rating.in_(filters.maturity))
+    if filters.languages:
+        clauses = [
+            or_(
+                func.lower(Item.original_language) == language.strip().lower(),
+                cast(Item.spoken_languages, Text).ilike(
+                    f"%{language.strip().lower()}%"
+                ),
+            )
+            for language in filters.languages
+            if language and language.strip()
+        ]
+        if clauses:
+            stmt = stmt.where(or_(*clauses))
+    people_clauses: List[Any] = []
+    for values, column in (
+        (filters.cast, Item.cast),
+        (filters.directors, Item.directors),
+        (filters.producers, Item.producers),
+        (filters.writers, Item.writers),
+    ):
+        people_clauses.extend(
+            cast(column, Text).ilike(f"%{value.strip().lower()}%")
+            for value in values
+            if value and value.strip()
+        )
+    if people_clauses:
+        stmt = stmt.where(or_(*people_clauses))
+    if filters.providers:
+        stmt = stmt.where(
+            Item.id.in_(
+                select(Availability.item_id).where(
+                    Availability.country == COUNTRY_DEFAULT,
+                    Availability.service.in_(filters.providers),
+                )
+            )
+        )
+    exclusions = set(exclude_ids or ()) | {
+        int(value) for value in filters.exclude_item_ids if str(value).isdigit()
+    }
+    if exclusions:
+        stmt = stmt.where(~Item.id.in_(exclusions))
+    return stmt
+
+
 def ordered_unique(values: List[int]) -> List[int]:
     seen: set[int] = set()
     ordered: List[int] = []
@@ -158,6 +231,7 @@ def run_prefilter_query(
     include_keywords: bool = False,
     require_all_keywords: bool = False,
     keywords_override: Sequence[str] | None = None,
+    search_filters: SearchFilters | None = None,
 ) -> List[int]:
     stmt = select(Item.id)
 
@@ -235,6 +309,9 @@ def run_prefilter_query(
             else:
                 stmt = stmt.where(or_(*keyword_filters))
 
+    if search_filters is not None:
+        stmt = apply_search_filters(stmt, search_filters)
+
     if prefer_top_rated:
         stmt = stmt.order_by(
             Item.top_rated_rank.asc().nullslast(),
@@ -265,15 +342,31 @@ def prefilter_allowed_ids(
     preferred_services: Set[str] | None = None,
     prefer_top_rated: bool = False,
     require_all_genres: bool = False,
+    search_filters: SearchFilters | None = None,
 ) -> PrefilterDecision:
     if intent is None or not intent.has_filters():
         return PrefilterDecision(None, [], True, False)
 
     threshold = max(10, limit // 2)
-    fetch_limit = max(limit * 5, limit)
+    boost_cap = max(5, min(limit, 25))
+    fetch_limit = (
+        boost_cap if config.RETRIEVAL_CONSOLIDATED_FILTERS else max(limit * 5, limit)
+    )
     strict_genres = intent.required_genres or intent.effective_genres()
 
     run_query_fn = get_hook("_run_prefilter_query", run_prefilter_query)
+    accepts_search_filters = False
+    try:
+        signature = inspect.signature(run_query_fn)
+        accepts_search_filters = "search_filters" in signature.parameters or any(
+            item.kind is inspect.Parameter.VAR_KEYWORD
+            for item in signature.parameters.values()
+        )
+    except (TypeError, ValueError):
+        accepts_search_filters = True
+    query_filter_kwargs = (
+        {"search_filters": search_filters} if accepts_search_filters else {}
+    )
     strict_ids = run_query_fn(
         db,
         intent,
@@ -283,6 +376,7 @@ def prefilter_allowed_ids(
         prefer_top_rated=prefer_top_rated,
         require_all_genres=require_all_genres,
         genres_override=strict_genres,
+        **query_filter_kwargs,
     )
     logger.debug(
         "Prefilter strict run | threshold=%d strict_count=%d media_types=%s genres=%s",
@@ -291,7 +385,6 @@ def prefilter_allowed_ids(
         intent.media_types,
         strict_genres,
     )
-    boost_cap = max(5, min(limit, 25))
 
     def _unique_slice(values: Sequence[int], cap: int | None = None) -> List[int]:
         seen: set[int] = set()
@@ -334,6 +427,7 @@ def prefilter_allowed_ids(
                 genres_override=strict_genres,
                 include_keywords=True,
                 keywords_override=intent_keywords,
+                **query_filter_kwargs,
             )
         )
         if len(keyword_boost_ids) < boost_cap:
@@ -348,6 +442,7 @@ def prefilter_allowed_ids(
                     require_all_genres=False,
                     include_keywords=True,
                     keywords_override=intent_keywords,
+                    **query_filter_kwargs,
                 )
             )
         keyword_boost_ids = ordered_unique(keyword_boost_ids)
@@ -364,6 +459,14 @@ def prefilter_allowed_ids(
             return _unique_slice(combined, boost_cap)
         return _unique_slice(primary, boost_cap)
 
+    if config.RETRIEVAL_CONSOLIDATED_FILTERS:
+        return PrefilterDecision(
+            None,
+            _resolve_boost_ids(strict_ids),
+            bool(strict_genres),
+            keyword_boost_active,
+        )
+
     if len(strict_ids) >= threshold or prefer_top_rated:
         logger.debug("Prefilter returning strict allowlist.")
         unique_strict = _unique_slice(strict_ids)
@@ -379,6 +482,7 @@ def prefilter_allowed_ids(
         required_services=preferred_services,
         prefer_top_rated=prefer_top_rated,
         require_all_genres=False,
+        **query_filter_kwargs,
     )
 
     if len(relaxed_ids) >= threshold:
