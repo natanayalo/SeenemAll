@@ -39,6 +39,7 @@ class SearchFilters:
     release_year_lte: Optional[int] = None
     runtime_gte: Optional[int] = None
     runtime_lte: Optional[int] = None
+    strict_genres: bool = False
     exclude_item_ids: Sequence[str] = ()
 
 
@@ -82,7 +83,6 @@ def _build_filter_clauses(
 
     for field, values in (
         ("item_id", filters.include_item_ids),
-        ("genres", filters.genres),
         ("media_type", filters.media_types),
         ("streaming_providers", filters.providers),
         ("maturity", filters.maturity),
@@ -95,6 +95,14 @@ def _build_filter_clauses(
         term_clause = _terms_filter(field, values)
         if term_clause:
             clauses.append(term_clause)
+
+    if filters.genres:
+        if filters.strict_genres:
+            clauses.extend({"term": {"genres": genre}} for genre in filters.genres)
+        else:
+            genre_clause = _terms_filter("genres", filters.genres)
+            if genre_clause:
+                clauses.append(genre_clause)
 
     keyword_clause = _terms_filter("keywords", filters.keywords)
     if keyword_clause:

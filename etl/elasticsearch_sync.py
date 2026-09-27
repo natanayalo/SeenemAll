@@ -18,13 +18,14 @@ from typing import (
 
 from elasticsearch import helpers
 from elasticsearch.exceptions import TransportError
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from api import config
 from api.core.elasticsearch_client import create_elasticsearch_client
 from api.db.models import Availability, Item, ItemEmbedding
 from api.db.session import get_sessionmaker
+from api.config import COUNTRY_DEFAULT
 
 DEFAULT_BATCH_SIZE = int(os.getenv("ES_SYNC_BATCH_SIZE", "500"))
 DEFAULT_EMBED_VERSION = os.getenv("EMBED_VERSION", "v1")
@@ -228,12 +229,12 @@ def _load_embeddings(
 
 
 def _load_providers(
-    session: Session, *, item_ids: Sequence[int]
+    session: Session, *, item_ids: Sequence[int], country: str = COUNTRY_DEFAULT
 ) -> Dict[int, List[str]]:
     if not item_ids:
         return {}
     stmt = select(Availability.item_id, Availability.service).where(
-        Availability.item_id.in_(item_ids)
+        Availability.item_id.in_(item_ids), Availability.country == country
     )
     rows = session.execute(stmt).all()
     return _normalise_providers(rows)
@@ -271,6 +272,16 @@ def sync_catalog(
     updated_after: Optional[dt.datetime] = None,
     refresh: bool = False,
 ) -> Dict[str, int]:
+    if max_items == 0:
+        return {"indexed": 0, "skipped_missing_embedding": 0}
+    if updated_after is None:
+        return _drain_sync_queue(
+            batch_size=batch_size,
+            max_items=max_items,
+            embed_version=embed_version,
+            refresh=refresh,
+        )
+
     SessionLocal = get_sessionmaker()
     client = create_elasticsearch_client()
     total_indexed = 0
@@ -325,6 +336,148 @@ def sync_catalog(
     }
 
 
+def _snapshot(row: Item) -> ItemSnapshot:
+    return ItemSnapshot(
+        id=row.id,
+        media_type=row.media_type,
+        title=row.title,
+        overview=row.overview,
+        runtime=row.runtime,
+        release_year=row.release_year,
+        maturity_rating=row.maturity_rating,
+        genres=row.genres,
+        popularity=row.popularity,
+        cast=row.cast,
+        directors=row.directors,
+        producers=row.producers,
+        writers=row.writers,
+        keywords=row.keywords,
+        spoken_languages=row.spoken_languages,
+        updated_at=row.updated_at,
+    )
+
+
+def _drain_sync_queue(
+    *,
+    batch_size: int,
+    max_items: Optional[int],
+    embed_version: str,
+    refresh: bool,
+) -> Dict[str, int]:
+    """Apply queued catalog changes and acknowledge only unchanged successful rows."""
+    SessionLocal = get_sessionmaker()
+    client = create_elasticsearch_client()
+    total_indexed = total_deleted = total_missing_embeddings = total_failed = 0
+    processed = 0
+    try:
+        while max_items is None or processed < max_items:
+            limit = batch_size
+            if max_items is not None:
+                limit = min(limit, max_items - processed)
+            if limit <= 0:
+                break
+            with SessionLocal() as session:
+                queued = session.execute(
+                    text(
+                        "SELECT item_id, changed_at FROM catalog_es_sync_queue "
+                        "ORDER BY changed_at, item_id LIMIT :limit"
+                    ),
+                    {"limit": limit},
+                ).all()
+                if not queued:
+                    break
+                queue_rows = [(int(row[0]), row[1]) for row in queued]
+                item_ids = [item_id for item_id, _ in queue_rows]
+                item_rows = (
+                    session.execute(select(Item).where(Item.id.in_(item_ids)))
+                    .scalars()
+                    .all()
+                )
+                snapshots = {row.id: _snapshot(row) for row in item_rows}
+                embeddings = _load_embeddings(
+                    session, item_ids=item_ids, version=embed_version
+                )
+                providers = _load_providers(session, item_ids=item_ids)
+
+            actions: List[Dict[str, Any]] = []
+            for item_id, _ in queue_rows:
+                snapshot = snapshots.get(item_id)
+                embedding = embeddings.get(item_id)
+                if snapshot is None or not embedding:
+                    actions.append(
+                        {
+                            "_op_type": "delete",
+                            "_index": config.ELASTICSEARCH_ITEMS_INDEX,
+                            "_id": str(item_id),
+                        }
+                    )
+                    if snapshot is not None:
+                        total_missing_embeddings += 1
+                    continue
+                document = _build_document(
+                    snapshot,
+                    embedding=embedding,
+                    providers=providers.get(item_id, ()),
+                )
+                actions.append(
+                    {
+                        "_op_type": "index",
+                        "_index": config.ELASTICSEARCH_ITEMS_INDEX,
+                        "_id": str(item_id),
+                        "_source": document,
+                    }
+                )
+
+            _, errors = helpers.bulk(
+                client,
+                actions,
+                refresh=refresh,
+                raise_on_error=False,
+                raise_on_exception=False,
+            )
+            failed_ids = {
+                str(operation.get("_id"))
+                for error in errors or []
+                for operation in error.values()
+                if operation.get("_id") is not None
+            }
+            successful_rows = [
+                (item_id, changed_at)
+                for item_id, changed_at in queue_rows
+                if str(item_id) not in failed_ids
+            ]
+            with SessionLocal() as session:
+                for item_id, changed_at in successful_rows:
+                    session.execute(
+                        text(
+                            "DELETE FROM catalog_es_sync_queue "
+                            "WHERE item_id = :item_id AND changed_at = :changed_at"
+                        ),
+                        {"item_id": item_id, "changed_at": changed_at},
+                    )
+                session.commit()
+
+            for item_id, _ in queue_rows:
+                if str(item_id) in failed_ids:
+                    total_failed += 1
+                elif item_id in snapshots and embeddings.get(item_id):
+                    total_indexed += 1
+                else:
+                    total_deleted += 1
+            processed += len(queue_rows)
+            if failed_ids:
+                break
+    finally:
+        client.close()
+
+    return {
+        "indexed": total_indexed,
+        "deleted": total_deleted,
+        "skipped_missing_embedding": total_missing_embeddings,
+        "failed": total_failed,
+    }
+
+
 def _parse_datetime(value: str) -> dt.datetime:
     try:
         return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -366,7 +519,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     print(
         f"Indexed {stats['indexed']} items "
-        f"(skipped {stats['skipped_missing_embedding']} without embeddings)."
+        f"(deleted {stats.get('deleted', 0)}, "
+        f"skipped {stats['skipped_missing_embedding']} without embeddings, "
+        f"failed {stats.get('failed', 0)})."
     )
     return 0
 

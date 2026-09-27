@@ -8,6 +8,7 @@ from pgvector.sqlalchemy import Vector
 
 from api import config
 from api.core.elasticsearch_search import SearchFilters, knn_search
+from api.config import COUNTRY_DEFAULT
 
 
 def _to_string_ids(values: Sequence[int] | None) -> List[str]:
@@ -39,8 +40,10 @@ def _ann_candidates_elasticsearch(
     text_query: Optional[str],
 ) -> List[int]:
     base_filters = search_filters or SearchFilters()
+    legacy_allowlist = not config.RETRIEVAL_CONSOLIDATED_FILTERS
     include_ids = _combine_sequences(
-        base_filters.include_item_ids, _to_string_ids(allowed_ids)
+        base_filters.include_item_ids,
+        _to_string_ids(allowed_ids) if legacy_allowlist else (),
     )
     exclude_ids_combined = _combine_sequences(
         base_filters.exclude_item_ids, _to_string_ids(exclude_ids)
@@ -61,6 +64,7 @@ def _ann_candidates_elasticsearch(
         release_year_lte=base_filters.release_year_lte,
         runtime_gte=base_filters.runtime_gte,
         runtime_lte=base_filters.runtime_lte,
+        strict_genres=base_filters.strict_genres,
         exclude_item_ids=tuple(exclude_ids_combined),
     )
 
@@ -102,14 +106,16 @@ def _ann_candidates_pgvector(
     text_query: Optional[str] = None,
 ) -> List[int]:
     base_filters = search_filters or SearchFilters()
+    legacy_allowlist = not config.RETRIEVAL_CONSOLIDATED_FILTERS
     include_ids = _combine_sequences(
-        base_filters.include_item_ids, _to_string_ids(allowed_ids)
+        base_filters.include_item_ids,
+        _to_string_ids(allowed_ids) if legacy_allowlist else (),
     )
     exclude_ids_combined = _combine_sequences(
         base_filters.exclude_item_ids, _to_string_ids(exclude_ids)
     )
 
-    if allowed_ids is not None and len(allowed_ids) == 0:
+    if legacy_allowlist and allowed_ids is not None and len(allowed_ids) == 0:
         return []
     if base_filters.include_item_ids and not include_ids:
         return []
@@ -135,7 +141,6 @@ def _ann_candidates_pgvector(
             return []
 
     needs_item_join = False
-    needs_availability_join = False
 
     if base_filters.media_types:
         needs_item_join = True
@@ -192,7 +197,8 @@ def _ann_candidates_pgvector(
             params[key] = f"%{g.strip().lower()}%"
             genre_conditions.append(f"lower(i.genres::text) LIKE :{key}")
         if genre_conditions:
-            where_clauses.append(f"({' OR '.join(genre_conditions)})")
+            operator = " AND " if base_filters.strict_genres else " OR "
+            where_clauses.append(f"({operator.join(genre_conditions)})")
 
     if base_filters.languages:
         needs_item_join = True
@@ -209,18 +215,17 @@ def _ann_candidates_pgvector(
             where_clauses.append(f"({' OR '.join(lang_conditions)})")
 
     if base_filters.providers:
-        needs_availability_join = True
-        where_clauses.append("a.service = ANY(:providers)")
-        where_clauses.append("a.country = :country")
+        where_clauses.append(
+            "EXISTS (SELECT 1 FROM availability a "
+            "WHERE a.item_id = e.item_id AND a.service = ANY(:providers) "
+            "AND a.country = :country)"
+        )
         params["providers"] = list(base_filters.providers)
-        params["country"] = "US"
+        params["country"] = COUNTRY_DEFAULT
 
     from_clause = "item_embeddings e"
     if needs_item_join:
         from_clause += " JOIN items i ON i.id = e.item_id"
-    if needs_availability_join:
-        from_clause += " JOIN availability a ON a.item_id = e.item_id"
-
     where_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
     query = text(
@@ -258,7 +263,11 @@ def ann_candidates(
 
     exclude_list = list(exclude_ids or [])
 
-    if allowed_ids is not None and len(allowed_ids) == 0:
+    if (
+        not config.RETRIEVAL_CONSOLIDATED_FILTERS
+        and allowed_ids is not None
+        and len(allowed_ids) == 0
+    ):
         return []
 
     backend = (backend_override or config.ANN_BACKEND or "").strip().lower()

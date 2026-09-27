@@ -264,3 +264,41 @@ def test_sync_availability_skips_failed_fetches(monkeypatch):
     # First session is for catalog read, second for upserts.
     assert sessions[1].commits == 1
     assert dummy_client.closed is True
+
+
+def test_successful_empty_justwatch_result_replaces_old_availability(monkeypatch):
+    item = mod.ItemRow(1, 10, "movie", "Example", 2020)
+    monkeypatch.setattr(mod, "_fetch_catalog_items", lambda db, limit: [item])
+
+    async def empty_fetch(client, rows):
+        return [{"offers": []} for _ in rows]
+
+    monkeypatch.setattr(mod, "_fetch_chunk", empty_fetch)
+    replacements = []
+    monkeypatch.setattr(
+        mod,
+        "_replace_availability",
+        lambda db, item_id, country, offers: replacements.append(
+            (item_id, country, list(offers))
+        ),
+    )
+
+    class FakeSession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def commit(self):
+            pass
+
+    monkeypatch.setattr(mod, "get_sessionmaker", lambda: (lambda: FakeSession()))
+
+    class DummyClient:
+        async def aclose(self):
+            pass
+
+    monkeypatch.setattr(mod, "JustWatchClient", lambda **_: DummyClient())
+    asyncio.run(mod._sync_availability(country="IL", limit=None))
+    assert replacements == [(1, "IL", [])]

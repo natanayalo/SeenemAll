@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import Any, Dict, List, Tuple
 
@@ -24,19 +25,33 @@ from api.pipeline.retriever.trending import trending_prior_candidates
 logger = logging.getLogger("api.routes.recommend")
 
 
+def _supports_parameter(fn: Any, parameter: str) -> bool:
+    try:
+        signature = inspect.signature(fn)
+    except (TypeError, ValueError):
+        return True
+    return parameter in signature.parameters or any(
+        item.kind is inspect.Parameter.VAR_KEYWORD
+        for item in signature.parameters.values()
+    )
+
+
 def retrieve_candidates(
     db: Session,
     context: UserContext,
     intent: QueryUnderstanding,
 ) -> CandidatePool:
     prefilter_fn = get_hook("_prefilter_allowed_ids", prefilter_allowed_ids)
+    prefilter_kwargs = dict(intent.prefilter_kwargs)
+    if _supports_parameter(prefilter_fn, "search_filters"):
+        prefilter_kwargs["search_filters"] = intent.structured_search_filters
     prefilter: PrefilterDecision = prefilter_fn(
         db,
         intent.intent_filters,
         intent.candidate_limit,
         preferred_services=intent.preferred_services,
         prefer_top_rated=intent.prefer_top_rated,
-        **intent.prefilter_kwargs,
+        **prefilter_kwargs,
     )
 
     allowlist = prefilter.allowed_ids
@@ -49,12 +64,15 @@ def retrieve_candidates(
     ids, rewrite_used = ann_retriever.retrieve(db, context, intent, allowlist)
 
     collab_fn = get_hook("_collaborative_candidates", collaborative_candidates)
+    collab_kwargs: Dict[str, Any] = {"allowed_ids": allowlist}
+    if _supports_parameter(collab_fn, "search_filters"):
+        collab_kwargs["search_filters"] = intent.structured_search_filters
     collab_results = collab_fn(
         db,
         context.profile_meta.get("neighbors"),
         exclude,
         candidate_limit,
-        allowed_ids=allowlist,
+        **collab_kwargs,
     )
     collab_scores = {iid: score for iid, score in collab_results}
 
@@ -77,12 +95,15 @@ def retrieve_candidates(
             trending_fn = get_hook(
                 "_trending_prior_candidates", trending_prior_candidates
             )
+            trending_kwargs: Dict[str, Any] = {"allowed_ids": allowlist}
+            if _supports_parameter(trending_fn, "search_filters"):
+                trending_kwargs["search_filters"] = intent.structured_search_filters
             trending_results = trending_fn(
                 db,
                 intent.intent_filters,
                 exclude,
                 candidate_limit,
-                allowed_ids=allowlist,
+                **trending_kwargs,
             )
             trending_scores = {iid: score for iid, score in trending_results}
             if trending_scores:

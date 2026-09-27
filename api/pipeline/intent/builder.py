@@ -198,17 +198,31 @@ async def resolve_query_intent(
     keyword_filters = _unique_sequence(keyword_filters)
 
     structured_search_filters: SearchFilters | None = None
-    if providers_list or any(
-        len(seq)
-        for seq in (
-            query_filter_result.languages,
-            keyword_filters,
-            genre_filters,
-            media_type_filters,
-            query_filter_result.cast,
-            query_filter_result.directors,
-            query_filter_result.producers,
-            query_filter_result.writers,
+    if (
+        providers_list
+        or any(
+            len(seq)
+            for seq in (
+                query_filter_result.languages,
+                keyword_filters,
+                genre_filters,
+                media_type_filters,
+                query_filter_result.cast,
+                query_filter_result.directors,
+                query_filter_result.producers,
+                query_filter_result.writers,
+            )
+        )
+        or any(
+            value is not None
+            for value in (
+                llm_intent.year_min,
+                llm_intent.year_max,
+                llm_intent.runtime_minutes_min,
+                llm_intent.runtime_minutes_max,
+                intent.min_runtime,
+                intent.max_runtime,
+            )
         )
     ):
         structured_search_filters = SearchFilters(
@@ -221,6 +235,19 @@ async def resolve_query_intent(
             directors=query_filter_result.directors,
             producers=query_filter_result.producers,
             writers=query_filter_result.writers,
+            release_year_gte=llm_intent.year_min,
+            release_year_lte=llm_intent.year_max,
+            runtime_gte=(
+                llm_intent.runtime_minutes_min
+                if llm_intent.runtime_minutes_min is not None
+                else intent.min_runtime
+            ),
+            runtime_lte=(
+                llm_intent.runtime_minutes_max
+                if llm_intent.runtime_minutes_max is not None
+                else intent.max_runtime
+            ),
+            strict_genres=bool(params.strict_filters),
         )
 
     es_text_query: Optional[str] = (

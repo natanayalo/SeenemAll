@@ -26,4 +26,7 @@ ELASTICSEARCH_KNN_K = int(os.getenv("ELASTICSEARCH_KNN_K", "40"))
 ELASTICSEARCH_KNN_NUM_CANDIDATES = int(
     os.getenv("ELASTICSEARCH_KNN_NUM_CANDIDATES", "200")
 )
+# Set false to restore the legacy SQL allowlist. Hybrid ranking always uses the
+# client-side weighted RRF implementation, which works with every ES license.
+RETRIEVAL_CONSOLIDATED_FILTERS = _env_bool("RETRIEVAL_CONSOLIDATED_FILTERS", "false")
 ANN_BACKEND = os.getenv("ANN_BACKEND", "elasticsearch").strip().lower()

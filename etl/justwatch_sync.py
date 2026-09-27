@@ -199,8 +199,6 @@ async def _sync_availability(
                     prepared = _prepare_offers(
                         flatten_offers(raw_offers) if raw_offers else []
                     )
-                    if not prepared:
-                        continue
                     total_updated += len(prepared)
                     _replace_availability(db, row.item_id, country, prepared)
                 db.commit()

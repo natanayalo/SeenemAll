@@ -28,12 +28,15 @@ head:
 
 etl-tmdb:
 	docker compose exec api python scripts/run_tmdb_sync.py
+	docker compose exec api python scripts/run_elasticsearch_sync.py
 
 embed:
 	docker compose exec api python -m etl.compute_embeddings
+	docker compose exec api python scripts/run_elasticsearch_sync.py
 
 etl-justwatch:
 	docker compose exec api python scripts/run_justwatch_sync.py
+	docker compose exec api python scripts/run_elasticsearch_sync.py
 
 eval:
 	$(EVAL_PYTHON) -m evaluation.evaluate --k=10 --set evaluation/evaluation_set.json

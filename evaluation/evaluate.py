@@ -854,6 +854,22 @@ def load_baseline_snapshot(path: Path) -> Dict[str, Any]:
         return json.load(fp)
 
 
+def _ab_quality_gate(
+    baseline: Dict[str, Any], candidate: Dict[str, Any]
+) -> Dict[str, bool]:
+    """Require latency improvement without ranking-metric regression."""
+    return {
+        "latency_mean_improved": float(candidate.get("latency_mean", 0.0))
+        < float(baseline.get("latency_mean", 0.0)),
+        "latency_p95_improved": float(candidate.get("latency_p95", 0.0))
+        < float(baseline.get("latency_p95", 0.0)),
+        "ndcg_non_regression": float(candidate.get("ndcg", 0.0))
+        >= float(baseline.get("ndcg", 0.0)),
+        "map_non_regression": float(candidate.get("map", 0.0))
+        >= float(baseline.get("map", 0.0)),
+    }
+
+
 def run_ab_comparison(
     entries: Sequence[EvaluationEntry],
     k: int = 10,
@@ -957,6 +973,27 @@ def run_ab_comparison(
         print(
             f"  {label:<24} {fmt_b:>10} {fmt_c:>11} {fmt_d:>11} {sign + f'{lift_pct:.2f}%':>12}"
         )
+
+    gate_enabled = bool(baseline_file and baseline_file.exists())
+    gate_checks = _ab_quality_gate(base, cand) if gate_enabled else {}
+    report["quality_gate"] = {
+        "enabled": gate_enabled,
+        "passed": all(gate_checks.values()),
+        "checks": gate_checks,
+    }
+    print(
+        "A/B quality gate: "
+        + (
+            "PASS"
+            if report["quality_gate"]["passed"]
+            else ("FAIL" if gate_enabled else "SKIPPED (no stored baseline)")
+        )
+        + (
+            " (mean/P95 latency must improve; nDCG@K/MAP must not regress)."
+            if gate_enabled
+            else "."
+        )
+    )
 
     print("=" * 76 + "\n")
 
@@ -1442,7 +1479,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     # 2. Counterfactual A/B Comparison Mode
     if args.ab_compare:
-        run_ab_comparison(
+        report = run_ab_comparison(
             entries=entries,
             k=args.k,
             baseline_param=args.baseline,
@@ -1452,6 +1489,8 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             in_process=args.in_process,
             baseline_file=args.baseline_file,
         )
+        if not report.get("quality_gate", {}).get("passed", False):
+            sys.exit(1)
         return
 
     # 3. Standard Multi-grid Evaluation Mode

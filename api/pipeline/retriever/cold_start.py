@@ -12,6 +12,8 @@ from api.pipeline.hooks import get_hook
 from api.pipeline.models import QueryUnderstanding, UserContext
 from api.pipeline.retriever.base import BaseRetriever
 from api.pipeline.retriever.prefilter import genre_contains_clause
+from api.pipeline.retriever.prefilter import apply_search_filters
+from api.core.elasticsearch_search import SearchFilters
 
 logger = logging.getLogger("api.routes.recommend")
 
@@ -22,6 +24,7 @@ def cold_start_candidates(
     limit: int,
     allowlist: List[int] | None,
     prefer_top_rated: bool = False,
+    search_filters: SearchFilters | None = None,
 ) -> List[int]:
     stmt = select(Item.id).join(ItemEmbedding, ItemEmbedding.item_id == Item.id)
 
@@ -38,6 +41,8 @@ def cold_start_candidates(
             genre_filters = [clause_fn(db, genre) for genre in genres if genre]
             if genre_filters:
                 stmt = stmt.where(or_(*genre_filters))
+
+    stmt = apply_search_filters(stmt, search_filters)
 
     if prefer_top_rated:
         stmt = stmt.order_by(
@@ -84,4 +89,5 @@ class ColdStartRetriever(BaseRetriever):
             intent.candidate_limit,
             allowlist,
             prefer_top_rated=intent.prefer_top_rated,
+            search_filters=intent.structured_search_filters,
         )

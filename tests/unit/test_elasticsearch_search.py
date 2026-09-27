@@ -31,7 +31,17 @@ def test_knn_search_builds_body(monkeypatch: pytest.MonkeyPatch) -> None:
                             ]
                         }
                     },
-                    {"hits": {"hits": []}},
+                    {
+                        "hits": {
+                            "hits": [
+                                {
+                                    "_id": "2",
+                                    "_score": 0.7,
+                                    "_source": {"item_id": "2"},
+                                }
+                            ]
+                        }
+                    },
                 ]
             )
 
@@ -52,11 +62,11 @@ def test_knn_search_builds_body(monkeypatch: pytest.MonkeyPatch) -> None:
         k=5,
         num_candidates=10,
         text_query="space opera",
-        filters=SearchFilters(genres=["sci-fi"], runtime_lte=150),
+        filters=SearchFilters(genres=["sci-fi"], runtime_lte=150, keywords=("space",)),
         source_includes=["title"],
     )
 
-    assert results[0]["item_id"] == "1"
+    assert results[0]["item_id"] == "2"
     assert len(fake_client.calls) == 2
 
     knn_call = fake_client.calls[0]
@@ -68,13 +78,40 @@ def test_knn_search_builds_body(monkeypatch: pytest.MonkeyPatch) -> None:
     assert {"range": {"runtime": {"lte": 150}}} in knn_filter["filter"]
     assert knn_call["_source"]["includes"] == ["title"]
 
+    assert "query" not in knn_body and "rank" not in knn_body
+
     text_call = fake_client.calls[1]
     text_body = text_call["body"]
     assert "knn" not in text_body
     text_bool = text_body["query"]["bool"]
     assert any("multi_match" in clause for clause in text_bool["must"])
     assert {"terms": {"genres": ["sci-fi"]}} in text_bool["filter"]
+    assert text_bool["should"] == [{"terms": {"keywords": ["space"]}}]
     assert text_call["_source"]["includes"] == ["title"]
+
+
+def test_knn_search_strict_genres_and_client_weighted_fusion(monkeypatch):
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def search(self, **kwargs):
+            self.calls.append(kwargs)
+            item = str(len(self.calls))
+            return {"hits": {"hits": [{"_id": item, "_source": {"item_id": item}}]}}
+
+    fake = FakeClient()
+    monkeypatch.setattr(elasticsearch_search, "get_elasticsearch_client", lambda: fake)
+    knn_search(
+        [0.1, 0.2],
+        k=2,
+        text_query="crime mystery",
+        filters=SearchFilters(genres=("Crime", "Mystery"), strict_genres=True),
+    )
+    assert len(fake.calls) == 2
+    clauses = fake.calls[0]["body"]["knn"]["filter"]["bool"]["filter"]
+    assert {"term": {"genres": "Crime"}} in clauses
+    assert {"term": {"genres": "Mystery"}} in clauses
 
 
 def test_knn_search_applies_exclusions(monkeypatch: pytest.MonkeyPatch) -> None:
