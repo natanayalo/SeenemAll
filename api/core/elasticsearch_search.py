@@ -42,6 +42,7 @@ class SearchFilters:
     runtime_lte: Optional[int] = None
     strict_genres: bool = False
     exclude_item_ids: Sequence[str] = ()
+    is_vibe: bool = False
 
 
 class ElasticsearchSearchError(RuntimeError):
@@ -294,12 +295,18 @@ def knn_search(
                     "operator": "or",
                 }
             }
+        is_vibe = bool(filters and getattr(filters, "is_vibe", False))
         if keyword_should_list:
             should_clauses: List[Mapping[str, Any]] = list(keyword_should_list)
-            if text_multi_match:
-                should_clauses.insert(0, text_multi_match)
-            text_bool.setdefault("should", []).extend(should_clauses)
-            text_bool["minimum_should_match"] = 1
+            if is_vibe:
+                if text_multi_match:
+                    should_clauses.insert(0, text_multi_match)
+                text_bool.setdefault("should", []).extend(should_clauses)
+                text_bool["minimum_should_match"] = 1
+            else:
+                if text_multi_match:
+                    text_bool.setdefault("must", []).append(text_multi_match)
+                text_bool.setdefault("should", []).extend(should_clauses)
         elif text_multi_match:
             text_bool.setdefault("must", []).append(text_multi_match)
         text_body: Dict[str, Any] = {

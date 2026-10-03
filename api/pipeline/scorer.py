@@ -472,10 +472,22 @@ def apply_mixer_scores(
 
         norm_score = (linear_score / total_weight) if total_weight > 0.0 else f_ann
 
+        rel_year = item.get("release_year")
+        try:
+            rel_year_int = int(rel_year) if rel_year is not None else 0
+        except (ValueError, TypeError):
+            rel_year_int = 0
+
+        v_count = item.get("vote_count")
+        try:
+            v_count_int = int(v_count) if v_count is not None else 0
+        except (ValueError, TypeError):
+            v_count_int = 0
+
         if (
             getattr(intent_filters, "is_vibe", False)
-            and (item.get("release_year") or 0) >= 2025
-            and (item.get("vote_count") or 0) < 500
+            and rel_year_int >= 2025
+            and v_count_int < 500
         ):
             norm_score *= 0.5
 

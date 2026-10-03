@@ -59,6 +59,7 @@ def relax_filters_for_people(filters: SearchFilters | None) -> SearchFilters | N
         runtime_gte=filters.runtime_gte,
         runtime_lte=filters.runtime_lte,
         exclude_item_ids=filters.exclude_item_ids,
+        is_vibe=filters.is_vibe,
     )
 
 
@@ -84,6 +85,7 @@ def relax_people_filters(filters: SearchFilters | None) -> SearchFilters | None:
         runtime_lte=filters.runtime_lte,
         exclude_item_ids=filters.exclude_item_ids,
         strict_genres=filters.strict_genres,
+        is_vibe=filters.is_vibe,
     )
 
 

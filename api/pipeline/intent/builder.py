@@ -467,6 +467,7 @@ async def resolve_query_intent(
                 else intent.max_runtime
             ),
             strict_genres=bool(params.strict_filters),
+            is_vibe=bool(getattr(intent, "is_vibe", False)),
         )
 
     retrieval_query_text, query_formulation = select_retrieval_query(

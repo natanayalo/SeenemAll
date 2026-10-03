@@ -427,3 +427,10 @@ def test_deterministic_vibe_lexicon_parsing():
             assert (
                 kw in res["keywords"]
             ), f"Query '{q}' should contain keyword '{kw}', got {res['keywords']}"
+
+
+def test_media_types_detects_both_movie_and_tv_when_present():
+    parser = DeterministicRuleParser()
+    res = parser.parse("sci-fi movies and tv shows")
+    assert "movie" in res["media_types"]
+    assert "tv" in res["media_types"]

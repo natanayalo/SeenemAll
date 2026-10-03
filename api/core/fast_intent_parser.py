@@ -595,6 +595,11 @@ NEGATION_PATTERNS = [
     ),
 ]
 
+VIBE_PATTERNS = [
+    (re.compile(rf"\b{re.escape(phrase)}\b"), meta)
+    for phrase, meta in VIBE_LEXICON.items()
+]
+
 
 class DeterministicRuleParser:
     """Zero-dependency deterministic rule parser for constraints, numbers, and negations (<1ms)."""
@@ -719,9 +724,8 @@ class DeterministicRuleParser:
         # 4b. Vibe & Mood Expressions
         detected_vibe_keywords: List[str] = []
         is_vibe_query = False
-        for phrase, meta in VIBE_LEXICON.items():
-            pattern = rf"\b{re.escape(phrase)}\b"
-            if re.search(pattern, lower_q):
+        for vibe_pat, meta in VIBE_PATTERNS:
+            if vibe_pat.search(lower_q):
                 is_vibe_query = True
                 for g in meta.get("genres", []):
                     if g not in exclude_genres and g not in include_genres:
@@ -758,9 +762,10 @@ class DeterministicRuleParser:
         )
         if is_tv_cue:
             media_types.append("tv")
-        elif any(w in lower_q for w in ["movie", "movies", "film", "films", "cinema"]):
-            media_types.append("movie")
-        elif is_vibe_query and "anime" not in lower_q:
+        if any(w in lower_q for w in ["movie", "movies", "film", "films", "cinema"]):
+            if "movie" not in media_types:
+                media_types.append("movie")
+        elif not media_types and is_vibe_query and "anime" not in lower_q:
             media_types.append("movie")
 
         # 6. Streaming Providers
