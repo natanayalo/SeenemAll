@@ -39,7 +39,7 @@
   },
   {
     "name": "rom-com",
-    "keywords": ["romcom", "rom-com", "romance", "date night"],
+    "keywords": ["romcom", "rom-com", "romantic comedy", "date night"],
     "include_genres": ["Romance", "Comedy"],
     "maturity_rating_max": "PG-13"
   },

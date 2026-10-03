@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, List, Optional, Sequence
 
 from fastapi import HTTPException, Request
+from sqlalchemy import cast, select, String
 from sqlalchemy.orm import Session
 
+from api.db.models import Item
 from api.core.elasticsearch_search import SearchFilters
-from api.core.filter_matcher import get_query_filters
+from api.core.filter_matcher import get_filter_matcher, get_query_filters
 from api.core.legacy_intent_parser import parse_intent as legacy_parse_intent
 from api.core.llm_parser import default_intent, linked_media_types
 from api.core.metrics import METRICS
@@ -174,9 +177,47 @@ async def resolve_query_intent(
                 seen.add(value)
         return ordered
 
+    merged_reference_titles = _unique_sequence(
+        list(query_filter_result.reference_titles or ())
+        + list(llm_intent.reference_titles or [])
+        + list(llm_intent.franchises or [])
+    )
+    if merged_reference_titles:
+        for t in merged_reference_titles:
+            if t not in intent.reference_titles:
+                intent.reference_titles.append(t)
+        from dataclasses import is_dataclass, replace
+
+        if is_dataclass(query_filter_result) and not isinstance(
+            query_filter_result, type
+        ):
+            query_filter_result = replace(
+                query_filter_result, reference_titles=tuple(merged_reference_titles)
+            )
+        else:
+            try:
+                setattr(
+                    query_filter_result,
+                    "reference_titles",
+                    tuple(merged_reference_titles),
+                )
+            except Exception:
+                pass
+
     genre_filters = intent.required_genres or intent.effective_genres()
     if not genre_filters:
         genre_filters = list(query_filter_result.genres)
+
+    from api.core.fast_intent_parser import FRANCHISE_GENRES
+
+    for f in llm_intent.franchises or []:
+        f_clean = f.lower().strip()
+        for franchise_key, mapped_genres in FRANCHISE_GENRES.items():
+            if franchise_key in f_clean or f_clean in franchise_key:
+                for g in mapped_genres:
+                    if g not in genre_filters:
+                        genre_filters.append(g)
+
     genre_filters = _unique_sequence(genre_filters)
 
     media_type_filters = intent.media_types or list(query_filter_result.media_types)
@@ -186,7 +227,194 @@ async def resolve_query_intent(
     keyword_filters = list(intent.keywords or [])
     if not keyword_filters and not keywords_refined:
         keyword_filters = list(query_filter_result.keywords)
+    for kw in getattr(llm_intent, "keywords", None) or []:
+        if kw not in keyword_filters:
+            keyword_filters.append(kw)
     keyword_filters = _unique_sequence(keyword_filters)
+
+    cast_filters = list(query_filter_result.cast)
+    director_filters = list(query_filter_result.directors)
+    producer_filters = list(query_filter_result.producers)
+    writer_filters = list(query_filter_result.writers)
+
+    matcher_getter = get_hook("get_filter_matcher", get_filter_matcher)
+    matcher = matcher_getter()
+
+    def _add_person(name: str, target_role: str) -> None:
+        if not name or not name.strip():
+            return
+        resolved_name, roles = matcher.resolve_person(name)
+        canonical = resolved_name or name.strip()
+        role_to_list = {
+            "cast": cast_filters,
+            "directors": director_filters,
+            "producers": producer_filters,
+            "writers": writer_filters,
+        }
+        assigned_role = target_role
+        if roles and target_role not in roles:
+            for r in ("directors", "cast", "producers", "writers"):
+                if r in roles:
+                    assigned_role = r
+                    break
+        target = role_to_list.get(assigned_role, cast_filters)
+        if canonical not in target:
+            target.append(canonical)
+
+    for actor in llm_intent.include_actors or []:
+        _add_person(actor, "cast")
+    for director in llm_intent.include_directors or []:
+        _add_person(director, "directors")
+    for producer in llm_intent.include_producers or []:
+        _add_person(producer, "producers")
+    for writer in llm_intent.include_writers or []:
+        _add_person(writer, "writers")
+
+    if llm_intent.include_people:
+        for person in llm_intent.include_people:
+            if person:
+                _add_person(person, "cast")
+
+    ref_names_lower = {t.lower().strip() for t in merged_reference_titles if t}
+    for ref_t in merged_reference_titles:
+        canonical_ref, _ = matcher.resolve_person(ref_t)
+        if canonical_ref:
+            ref_names_lower.add(canonical_ref.lower().strip())
+
+    matched_coll_ids: List[int] = []
+    for cid, cname in getattr(query_filter_result, "matched_collections", ()):
+        if cid not in matched_coll_ids:
+            matched_coll_ids.append(cid)
+        ref_names_lower.add(cname.lower().strip())
+        base = re.sub(
+            r"\s+(?:collection|trilogy|saga|series|movies|films)$", "", cname.lower()
+        ).strip()
+        if base:
+            ref_names_lower.add(base)
+            if base.startswith("the "):
+                ref_names_lower.add(base[4:].strip())
+
+    for f in llm_intent.franchises or []:
+        ref_names_lower.add(f.lower().strip())
+        resolved_list = matcher.resolve_collections(f)
+        if not resolved_list:
+            resolved_single = matcher.resolve_collection(f)
+            if resolved_single:
+                resolved_list = [resolved_single]
+        for cid, cname in resolved_list:
+            if cid not in matched_coll_ids:
+                matched_coll_ids.append(cid)
+            ref_names_lower.add(cname.lower().strip())
+
+    query_lower = (query or "").lower()
+
+    if "dark knight" in query_lower:
+        dark_knight_ids = [
+            cid
+            for cid, cname in getattr(query_filter_result, "matched_collections", ())
+            if "dark knight" in cname.lower()
+        ]
+        if not dark_knight_ids:
+            dk_res = matcher.resolve_collection("dark knight")
+            if dk_res:
+                dark_knight_ids = [dk_res[0]]
+        if dark_knight_ids:
+            matched_coll_ids = [
+                cid for cid in matched_coll_ids if cid in dark_knight_ids
+            ]
+
+    collection_item_ids: List[int] = []
+    if matched_coll_ids:
+        coll_stmt = select(Item.id, Item.release_year).where(
+            Item.collection_id.in_(matched_coll_ids)
+        )
+        if llm_intent.year_min:
+            coll_stmt = coll_stmt.where(Item.release_year >= llm_intent.year_min)
+        if llm_intent.year_max:
+            coll_stmt = coll_stmt.where(Item.release_year <= llm_intent.year_max)
+        if llm_intent.exclude_genres:
+            for ex in llm_intent.exclude_genres:
+                coll_stmt = coll_stmt.where(~cast(Item.genres, String).ilike(f"%{ex}%"))
+        if "movie" in media_type_filters or "movie" in (intent.media_types or []):
+            coll_stmt = coll_stmt.where(Item.media_type == "movie")
+        coll_stmt = coll_stmt.order_by(Item.release_year.asc().nulls_last())
+        coll_rows = db.execute(coll_stmt).all()
+        collection_item_ids = [r.id for r in coll_rows]
+
+    # MCU franchise handling
+    is_mcu_query = any(
+        c in query_lower for c in ("marvel cinematic universe", "mcu")
+    ) or (
+        "marvel" in query_lower
+        and any(w in query_lower for w in ("phase", "universe", "cinematic"))
+    )
+    if is_mcu_query:
+        mcu_stmt = select(Item.id, Item.collection_id).where(
+            cast(Item.keywords, String).ilike("%marvel cinematic universe%")
+        )
+        if llm_intent.year_min:
+            mcu_stmt = mcu_stmt.where(Item.release_year >= llm_intent.year_min)
+        if llm_intent.year_max:
+            mcu_stmt = mcu_stmt.where(Item.release_year <= llm_intent.year_max)
+        if "movie" in media_type_filters or "movie" in (intent.media_types or []):
+            mcu_stmt = mcu_stmt.where(Item.media_type == "movie")
+        mcu_stmt = mcu_stmt.order_by(Item.release_year.asc().nulls_last())
+        mcu_rows = db.execute(mcu_stmt).all()
+        for r in mcu_rows:
+            if r.id not in collection_item_ids:
+                collection_item_ids.append(r.id)
+            if r.collection_id and r.collection_id not in matched_coll_ids:
+                matched_coll_ids.append(r.collection_id)
+
+    chronological_cues = (
+        "chronological",
+        "in order",
+        "release order",
+        "timeline",
+        "order",
+        "trilogy",
+        "saga",
+        "series",
+        "phase",
+        "era",
+    )
+    is_chronological = (bool(matched_coll_ids) or bool(collection_item_ids)) and any(
+        cue in query_lower for cue in chronological_cues
+    )
+
+    if ref_names_lower:
+        cast_filters = [
+            c for c in cast_filters if c.lower().strip() not in ref_names_lower
+        ]
+        director_filters = [
+            d for d in director_filters if d.lower().strip() not in ref_names_lower
+        ]
+        producer_filters = [
+            p for p in producer_filters if p.lower().strip() not in ref_names_lower
+        ]
+        writer_filters = [
+            w for w in writer_filters if w.lower().strip() not in ref_names_lower
+        ]
+
+    cast_filters = _unique_sequence(cast_filters)
+    director_filters = _unique_sequence(director_filters)
+    producer_filters = _unique_sequence(producer_filters)
+    writer_filters = _unique_sequence(writer_filters)
+
+    if matched_coll_ids or collection_item_ids:
+        has_tv_explicit = any(
+            w in query_lower
+            for w in ("tv ", "tv show", "television", "miniseries", "sitcom")
+        )
+        if not has_tv_explicit:
+            if "tv" in media_type_filters:
+                media_type_filters = [m for m in media_type_filters if m != "tv"]
+            if intent.media_types and "tv" in intent.media_types:
+                intent.media_types = [m for m in intent.media_types if m != "tv"]
+
+    language_filters = _unique_sequence(
+        list(query_filter_result.languages) + list(llm_intent.languages or [])
+    )
 
     structured_search_filters: SearchFilters | None = None
     if (
@@ -194,14 +422,14 @@ async def resolve_query_intent(
         or any(
             len(seq)
             for seq in (
-                query_filter_result.languages,
+                language_filters,
                 keyword_filters,
                 genre_filters,
                 media_type_filters,
-                query_filter_result.cast,
-                query_filter_result.directors,
-                query_filter_result.producers,
-                query_filter_result.writers,
+                cast_filters,
+                director_filters,
+                producer_filters,
+                writer_filters,
             )
         )
         or any(
@@ -218,14 +446,14 @@ async def resolve_query_intent(
     ):
         structured_search_filters = SearchFilters(
             providers=tuple(providers_list),
-            languages=query_filter_result.languages,
+            languages=tuple(language_filters),
             keywords=tuple(keyword_filters),
             genres=tuple(genre_filters),
             media_types=tuple(media_type_filters),
-            cast=query_filter_result.cast,
-            directors=query_filter_result.directors,
-            producers=query_filter_result.producers,
-            writers=query_filter_result.writers,
+            cast=tuple(cast_filters),
+            directors=tuple(director_filters),
+            producers=tuple(producer_filters),
+            writers=tuple(writer_filters),
             release_year_gte=llm_intent.year_min,
             release_year_lte=llm_intent.year_max,
             runtime_gte=(
@@ -281,8 +509,8 @@ async def resolve_query_intent(
             )
 
     candidate_limit = min(500, max(params.limit, params.limit * 3))
-    if intent.has_filters():
-        candidate_limit = min(500, max(candidate_limit, params.limit * 5))
+    if intent.has_filters() or getattr(llm_intent, "is_vibe", False):
+        candidate_limit = min(500, max(candidate_limit, params.limit * 10, 100))
 
     vector_builder_fn = get_hook("_build_query_vector", build_query_vector)
     query_vec = vector_builder_fn(retrieval_query_text)
@@ -301,4 +529,7 @@ async def resolve_query_intent(
         backend_override_normalized=backend_override_normalized,
         preferred_services=preferred_services,
         prefilter_kwargs=prefilter_kwargs,
+        matched_collection_ids=matched_coll_ids,
+        collection_item_ids=collection_item_ids,
+        is_chronological_requested=is_chronological,
     )

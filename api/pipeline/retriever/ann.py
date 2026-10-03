@@ -20,6 +20,7 @@ from api.pipeline.retriever.prefilter import (
     filter_excluded_candidate_ids,
     people_only_candidate_ids,
     relax_filters_for_people,
+    relax_people_filters,
 )
 
 logger = logging.getLogger("api.routes.recommend")
@@ -116,6 +117,7 @@ class ANNRetriever(BaseRetriever):
     ) -> Tuple[List[int], bool]:
         ann_candidates_fn = get_hook("ann_candidates", ann_candidates)
         relax_fn = get_hook("_relax_filters_for_people", relax_filters_for_people)
+        relax_people_fn = get_hook("_relax_people_filters", relax_people_filters)
         people_fallback_fn = get_hook(
             "_people_only_candidate_ids", people_only_candidate_ids
         )
@@ -215,6 +217,39 @@ class ANNRetriever(BaseRetriever):
                                     canonical_id,
                                 )
                             return filtered_fallback, True
+
+                        no_people_filters = relax_people_fn(structured_search_filters)
+                        if no_people_filters:
+                            intent.structured_search_filters = no_people_filters
+                            structured_search_filters = no_people_filters
+                            try:
+                                ann_ids = ann_candidates_fn(
+                                    db,
+                                    query_vec,
+                                    exclude,
+                                    limit=candidate_limit,
+                                    allowed_ids=None,
+                                    backend_override=backend_override,
+                                    search_filters=structured_search_filters,
+                                    text_query=es_text_query,
+                                )
+                            except ValueError as exc:
+                                raise HTTPException(
+                                    status_code=400, detail=str(exc)
+                                ) from exc
+                            except ElasticsearchSearchError as exc:
+                                logger.error("Elasticsearch retrieval error: %s", exc)
+                                raise HTTPException(
+                                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                                    detail="Search service temporarily unavailable.",
+                                ) from exc
+                            if ann_ids:
+                                if logger.isEnabledFor(logging.INFO):
+                                    logger.info(
+                                        "Relaxed people filters for user %s due to zero matches.",
+                                        canonical_id,
+                                    )
+                                return ann_ids, True
 
             cold_start_fn = get_hook("_cold_start_candidates", cold_start_candidates)
             logger.info("Using cold-start candidates for user %s", canonical_id)
@@ -395,4 +430,35 @@ class ANNRetriever(BaseRetriever):
                             "Using catalogue fallback for user %s due to people filters.",
                             canonical_id,
                         )
+                else:
+                    no_people_filters = relax_people_fn(structured_search_filters)
+                    if no_people_filters:
+                        intent.structured_search_filters = no_people_filters
+                        structured_search_filters = no_people_filters
+                        fallback_vec = (
+                            q_vec
+                            if "q_vec" in locals()
+                            else (
+                                _extract_centroid(clusters[0])
+                                if clusters
+                                else context.short_v
+                            )
+                        )
+                        if fallback_vec is not None:
+                            ids = _run_ann_query(
+                                ann_candidates_fn,
+                                db,
+                                fallback_vec,
+                                exclude,
+                                candidate_limit,
+                                None,
+                                backend_override,
+                                structured_search_filters,
+                                es_text_query,
+                            )
+                            if ids and logger.isEnabledFor(logging.INFO):
+                                logger.info(
+                                    "Relaxed people filters for user %s due to zero matches.",
+                                    canonical_id,
+                                )
             return ids, False

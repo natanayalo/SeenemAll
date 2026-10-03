@@ -50,31 +50,53 @@ def item_matches_people_filters(item: Item, filters: SearchFilters) -> bool:
                         names.add(name.strip().lower())
         return names
 
-    cast_names = _extract_names(getattr(item, "cast", None))
-    if filters.cast:
-        if not any(name.strip().lower() in cast_names for name in filters.cast):
-            return False
+    role_names_map = {
+        "cast": _extract_names(getattr(item, "cast", None)),
+        "directors": _extract_names(getattr(item, "directors", None)),
+        "producers": _extract_names(getattr(item, "producers", None)),
+        "writers": _extract_names(getattr(item, "writers", None)),
+    }
 
-    director_names = _extract_names(getattr(item, "directors", None))
-    if filters.directors:
-        if not any(
-            name.strip().lower() in director_names for name in filters.directors
-        ):
-            return False
+    person_to_roles: Dict[str, Set[str]] = {}
+    for role, person_list in (
+        ("cast", filters.cast or ()),
+        ("directors", filters.directors or ()),
+        ("producers", filters.producers or ()),
+        ("writers", filters.writers or ()),
+    ):
+        for p in person_list:
+            if p and p.strip():
+                person_to_roles.setdefault(p.strip().lower(), set()).add(role)
 
-    producer_names = _extract_names(getattr(item, "producers", None))
-    if filters.producers:
-        if not any(
-            name.strip().lower() in producer_names for name in filters.producers
-        ):
-            return False
+    if not person_to_roles:
+        return True
 
-    writer_names = _extract_names(getattr(item, "writers", None))
-    if filters.writers:
-        if not any(name.strip().lower() in writer_names for name in filters.writers):
+    for person_name, allowed_roles in person_to_roles.items():
+        matched = False
+        for role in allowed_roles:
+            if person_name in role_names_map[role]:
+                matched = True
+                break
+        if not matched:
             return False
 
     return True
+
+
+def item_matches_language_filters(item: Item, languages: Sequence[str]) -> bool:
+    if not languages:
+        return True
+    from api.pipeline.retriever.prefilter import LANGUAGE_TO_ISO
+
+    item_lang = (getattr(item, "original_language", None) or "").strip().lower()
+    for lang in languages:
+        if not lang:
+            continue
+        lang_clean = lang.strip().lower()
+        iso = LANGUAGE_TO_ISO.get(lang_clean, lang_clean)
+        if item_lang == iso or item_lang == lang_clean:
+            return True
+    return False
 
 
 def prioritize_boosted_items(
@@ -450,6 +472,13 @@ def apply_mixer_scores(
 
         norm_score = (linear_score / total_weight) if total_weight > 0.0 else f_ann
 
+        if (
+            getattr(intent_filters, "is_vibe", False)
+            and (item.get("release_year") or 0) >= 2025
+            and (item.get("vote_count") or 0) < 500
+        ):
+            norm_score *= 0.5
+
         # Calibrated logistic scaling: P(relevant) = σ(β * (S - S0))
         # Maps [0.0, 1.0] smoothly into a calibrated probability in (0, 1)
         z = 6.0 * (norm_score - 0.5)
@@ -490,7 +519,7 @@ def score_candidates(
 
     ordered: List[Dict[str, Any]] = []
     fallback_candidates: List[Dict[str, Any]] = []
-    max_candidates = min(intent.candidate_limit, max(params.limit * 2, 25))
+    max_candidates = min(intent.candidate_limit, max(params.limit * 5, 50))
     skipped_intent = 0
     skipped_people = 0
     rank_counter = 0
@@ -513,6 +542,12 @@ def score_candidates(
         ):
             if not people_match_fn(it, pool.structured_search_filters):
                 skipped_people += 1
+                continue
+        if pool.structured_search_filters and pool.structured_search_filters.languages:
+            if not item_matches_language_filters(
+                it, pool.structured_search_filters.languages
+            ):
+                skipped_intent += 1
                 continue
 
         sources = pool.merged_scores.get(iid, {})
@@ -608,6 +643,9 @@ def score_candidates(
     vote_weight_override = params.mixer_vote_weight
     novelty_weight_override = params.mixer_novelty_weight
     intent_weight_override = getattr(params, "mixer_intent_weight", None)
+    is_vibe = getattr(intent.llm_intent, "is_vibe", False) or getattr(
+        intent.intent_filters, "is_vibe", False
+    )
 
     if intent.query:
         if trending_weight_override is None:
@@ -615,7 +653,7 @@ def score_candidates(
         if popularity_weight_override is None:
             popularity_weight_override = 0.0
         if vote_weight_override is None:
-            vote_weight_override = 0.0
+            vote_weight_override = 0.5 if is_vibe else 0.0
         if novelty_weight_override is None:
             novelty_weight_override = 0.0
 

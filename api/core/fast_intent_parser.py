@@ -20,6 +20,7 @@ import threading
 import time
 from typing import Any, Dict, List, Optional, Set
 
+from api.core.filter_matcher import is_comparative_prefix
 from api.core.metrics import METRICS
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,399 @@ GENRE_SYNONYMS: Dict[str, List[str]] = {
     "zombie": ["Horror"],
     "gore": ["Horror"],
     "sadness": ["Drama"],
+    "cyberpunk": ["Science Fiction", "Animation"],
+    "neo-western": ["Crime", "Drama", "Thriller", "Western"],
+    "courtroom": ["Drama", "Crime", "Mystery"],
+    "dystopian": ["Science Fiction", "Drama", "Thriller"],
+    "road trip": ["Comedy", "Drama", "Adventure"],
+    "existential": ["Drama", "Thriller", "Mystery"],
+    "magical realism": ["Romance", "Fantasy", "Comedy", "Drama"],
+    "black comedy": ["Comedy", "Drama"],
+    "satirical": ["Comedy", "Drama"],
+    "slow-burn": ["Horror", "Mystery", "Thriller", "Drama"],
+    "psychological horror": ["Horror", "Mystery", "Thriller"],
+    "mind-bending": ["Science Fiction", "Thriller", "Mystery"],
+    "hard sci-fi": ["Science Fiction", "Drama"],
+    "hard science fiction": ["Science Fiction", "Drama"],
+    "survival": ["Thriller", "Horror", "Action"],
+    "claustrophobic": ["Thriller", "Horror", "Science Fiction"],
+    "coming-of-age": ["Drama", "Comedy"],
+}
+
+VIBE_LEXICON: Dict[str, Dict[str, Any]] = {
+    "mind-bending": {
+        "genres": ["Science Fiction", "Thriller", "Mystery"],
+        "keywords": [
+            "mind bending",
+            "dream",
+            "simulation",
+            "alternate reality",
+            "time loop",
+            "parallel universe",
+            "subconscious",
+            "memory",
+            "quantum",
+        ],
+    },
+    "mind bending": {
+        "genres": ["Science Fiction", "Thriller", "Mystery"],
+        "keywords": [
+            "mind bending",
+            "dream",
+            "simulation",
+            "alternate reality",
+            "time loop",
+            "parallel universe",
+            "subconscious",
+            "memory",
+            "quantum",
+        ],
+    },
+    "existential dread": {
+        "genres": ["Drama", "Thriller", "Mystery"],
+        "keywords": [
+            "existentialism",
+            "dread",
+            "isolation",
+            "paranoia",
+            "alienation",
+            "despair",
+            "nihilism",
+            "madness",
+            "psychological",
+        ],
+    },
+    "existential": {
+        "genres": ["Drama", "Thriller", "Mystery"],
+        "keywords": [
+            "existentialism",
+            "dread",
+            "isolation",
+            "paranoia",
+            "alienation",
+            "despair",
+            "nihilism",
+            "philosophy",
+        ],
+    },
+    "cozy autumn": {
+        "genres": ["Mystery", "Comedy", "Drama"],
+        "keywords": [
+            "whodunit",
+            "autumn",
+            "murder mystery",
+            "eccentric",
+            "investigation",
+            "boarding school",
+            "manor",
+            "detective",
+            "fall",
+        ],
+    },
+    "cyberpunk": {
+        "genres": ["Science Fiction", "Animation"],
+        "keywords": [
+            "cyberpunk",
+            "neo-noir",
+            "dystopia",
+            "cyborg",
+            "artificial intelligence",
+            "future noir",
+            "high tech",
+            "neon",
+        ],
+    },
+    "coming-of-age": {
+        "genres": ["Drama", "Comedy"],
+        "keywords": [
+            "coming of age",
+            "youth",
+            "growing up",
+            "adolescence",
+            "friendship",
+            "nostalgia",
+            "melancholy",
+            "high school",
+        ],
+    },
+    "coming of age": {
+        "genres": ["Drama", "Comedy"],
+        "keywords": [
+            "coming of age",
+            "youth",
+            "growing up",
+            "adolescence",
+            "friendship",
+            "nostalgia",
+            "melancholy",
+            "high school",
+        ],
+    },
+    "slow-burn": {
+        "genres": ["Horror", "Mystery", "Thriller", "Drama"],
+        "keywords": [
+            "slow burn",
+            "psychological horror",
+            "isolation",
+            "paranoia",
+            "cult",
+            "madness",
+            "creepy",
+            "folk horror",
+        ],
+    },
+    "slow burn": {
+        "genres": ["Horror", "Mystery", "Thriller", "Drama"],
+        "keywords": [
+            "slow burn",
+            "psychological horror",
+            "isolation",
+            "paranoia",
+            "cult",
+            "madness",
+            "creepy",
+            "folk horror",
+        ],
+    },
+    "psychological horror": {
+        "genres": ["Horror", "Mystery", "Thriller"],
+        "keywords": [
+            "psychological horror",
+            "slow burn",
+            "isolation",
+            "paranoia",
+            "hallucination",
+            "cult",
+            "madness",
+            "supernatural",
+        ],
+    },
+    "road trip": {
+        "genres": ["Comedy", "Drama", "Adventure"],
+        "keywords": [
+            "road trip",
+            "feel good",
+            "journey",
+            "friendship",
+            "family road trip",
+            "self discovery",
+            "indie comedy",
+        ],
+    },
+    "feel-good": {
+        "genres": ["Comedy", "Drama"],
+        "keywords": [
+            "feel good",
+            "heartwarming",
+            "uplifting",
+            "optimistic",
+            "friendship",
+            "wholesome",
+        ],
+    },
+    "feel good": {
+        "genres": ["Comedy", "Drama"],
+        "keywords": [
+            "feel good",
+            "heartwarming",
+            "uplifting",
+            "optimistic",
+            "friendship",
+            "wholesome",
+        ],
+    },
+    "black comedy": {
+        "genres": ["Comedy", "Drama"],
+        "keywords": [
+            "black comedy",
+            "dark comedy",
+            "satire",
+            "cynical",
+            "absurdism",
+            "parody",
+            "dark satire",
+        ],
+    },
+    "dark satire": {
+        "genres": ["Comedy", "Drama"],
+        "keywords": [
+            "satire",
+            "black comedy",
+            "dark comedy",
+            "cynical",
+            "dystopia",
+            "parody",
+            "media satire",
+            "political satire",
+        ],
+    },
+    "satirical": {
+        "genres": ["Comedy", "Drama"],
+        "keywords": [
+            "satire",
+            "black comedy",
+            "dark comedy",
+            "cynical",
+            "dystopia",
+            "parody",
+            "media satire",
+            "political satire",
+        ],
+    },
+    "dystopian": {
+        "genres": ["Science Fiction", "Drama", "Thriller"],
+        "keywords": [
+            "dystopia",
+            "dystopian",
+            "totalitarian",
+            "future",
+            "oppression",
+            "satire",
+            "post-apocalyptic",
+        ],
+    },
+    "dystopia": {
+        "genres": ["Science Fiction", "Drama", "Thriller"],
+        "keywords": [
+            "dystopia",
+            "dystopian",
+            "totalitarian",
+            "future",
+            "oppression",
+            "satire",
+            "post-apocalyptic",
+        ],
+    },
+    "claustrophobic": {
+        "genres": ["Thriller", "Horror", "Science Fiction"],
+        "keywords": [
+            "claustrophobia",
+            "isolation",
+            "trapped",
+            "survival",
+            "bunker",
+            "snowstorm",
+            "confined space",
+            "hostage",
+        ],
+    },
+    "survival": {
+        "genres": ["Thriller", "Horror", "Action"],
+        "keywords": [
+            "survival",
+            "trapped",
+            "isolation",
+            "wilderness",
+            "survival horror",
+            "race against time",
+        ],
+    },
+    "magical realism": {
+        "genres": ["Romance", "Fantasy", "Comedy", "Drama"],
+        "keywords": [
+            "magical realism",
+            "whimsical",
+            "eccentric",
+            "fairy tale",
+            "surreal",
+            "destiny",
+            "love",
+            "romantic fantasy",
+        ],
+    },
+    "whimsical": {
+        "genres": ["Romance", "Fantasy", "Comedy", "Drama"],
+        "keywords": [
+            "whimsical",
+            "magical realism",
+            "eccentric",
+            "fairy tale",
+            "surreal",
+            "destiny",
+            "charming",
+        ],
+    },
+    "neo-western": {
+        "genres": ["Crime", "Drama", "Thriller", "Western"],
+        "keywords": [
+            "neo-western",
+            "desert",
+            "border",
+            "texas",
+            "sheriff",
+            "cartel",
+            "moral ambiguity",
+            "heist",
+            "modern western",
+        ],
+    },
+    "hard science fiction": {
+        "genres": ["Science Fiction", "Drama"],
+        "keywords": [
+            "hard science fiction",
+            "space exploration",
+            "existential",
+            "artificial intelligence",
+            "first contact",
+            "monolith",
+            "consciousness",
+            "physics",
+        ],
+    },
+    "hard sci-fi": {
+        "genres": ["Science Fiction", "Drama"],
+        "keywords": [
+            "hard science fiction",
+            "space exploration",
+            "existential",
+            "artificial intelligence",
+            "first contact",
+            "monolith",
+            "consciousness",
+            "physics",
+        ],
+    },
+    "philosophical": {
+        "genres": ["Science Fiction", "Drama"],
+        "keywords": [
+            "philosophical",
+            "existential",
+            "space exploration",
+            "consciousness",
+            "human condition",
+            "contemplative",
+        ],
+    },
+    "courtroom": {
+        "genres": ["Drama", "Crime", "Mystery"],
+        "keywords": [
+            "courtroom",
+            "trial",
+            "lawyer",
+            "jury",
+            "judge",
+            "defense attorney",
+            "justice",
+            "verdict",
+            "legal drama",
+            "prosecutor",
+        ],
+    },
+    "legal drama": {
+        "genres": ["Drama", "Crime", "Mystery"],
+        "keywords": [
+            "courtroom",
+            "trial",
+            "lawyer",
+            "jury",
+            "judge",
+            "defense attorney",
+            "justice",
+            "verdict",
+            "legal drama",
+            "prosecutor",
+        ],
+    },
 }
 
 FRANCHISE_GENRES: Dict[str, List[str]] = {
@@ -87,6 +481,7 @@ FRANCHISE_GENRES: Dict[str, List[str]] = {
     "lord of the rings": ["Fantasy", "Adventure"],
     "batman": ["Action", "Crime"],
     "dark knight": ["Action", "Crime"],
+    "marvel cinematic universe": ["Action", "Science Fiction"],
     "marvel": ["Action", "Science Fiction"],
     "mcu": ["Action", "Science Fiction"],
     "james bond": ["Action", "Thriller"],
@@ -241,8 +636,16 @@ class DeterministicRuleParser:
         year_min: Optional[int] = None
         year_max: Optional[int] = None
 
-        range_match = YEAR_RANGE_PATTERN.search(lower_q)
-        if range_match:
+        if "phase 1" in lower_q or "phase one" in lower_q:
+            year_min = 2008
+            year_max = 2012
+        elif "phase 2" in lower_q or "phase two" in lower_q:
+            year_min = 2013
+            year_max = 2015
+        elif "phase 3" in lower_q or "phase three" in lower_q:
+            year_min = 2016
+            year_max = 2019
+        elif range_match := YEAR_RANGE_PATTERN.search(lower_q):
             year_min = int(range_match.group(1))
             year_max = int(range_match.group(2))
         else:
@@ -272,6 +675,8 @@ class DeterministicRuleParser:
 
         # 3. Negations
         exclude_genres: Set[str] = set()
+        if "live action" in lower_q or "live-action" in lower_q:
+            exclude_genres.add("Animation")
         for pat in NEGATION_PATTERNS:
             for m in pat.finditer(lower_q):
                 neg_clause = m.group(1).strip()
@@ -297,28 +702,65 @@ class DeterministicRuleParser:
                     if g not in exclude_genres and g not in include_genres:
                         include_genres.append(g)
 
+        detected_franchises: List[str] = []
         for franchise, mapped_genres in FRANCHISE_GENRES.items():
             if franchise in lower_q:
+                canonical_franchise = (
+                    "MCU"
+                    if franchise in ("mcu", "marvel cinematic universe")
+                    else franchise.title()
+                )
+                if canonical_franchise not in detected_franchises:
+                    detected_franchises.append(canonical_franchise)
                 for g in mapped_genres:
                     if g not in exclude_genres and g not in include_genres:
                         include_genres.append(g)
 
+        # 4b. Vibe & Mood Expressions
+        detected_vibe_keywords: List[str] = []
+        is_vibe_query = False
+        for phrase, meta in VIBE_LEXICON.items():
+            pattern = rf"\b{re.escape(phrase)}\b"
+            if re.search(pattern, lower_q):
+                is_vibe_query = True
+                for g in meta.get("genres", []):
+                    if g not in exclude_genres and g not in include_genres:
+                        include_genres.append(g)
+                for kw in meta.get("keywords", []):
+                    if kw not in detected_vibe_keywords:
+                        detected_vibe_keywords.append(kw)
+
         # 5. Media Types
         media_types: List[str] = []
-        if any(
+        is_tv_cue = any(
             w in lower_q
             for w in [
                 "tv series",
                 "tv show",
                 "tv shows",
                 "television",
-                "series",
                 "miniseries",
                 "sitcom",
             ]
-        ):
+        ) or (
+            "series" in lower_q
+            and not detected_franchises
+            and not any(
+                f in lower_q
+                for f in [
+                    "animation series",
+                    "action series",
+                    "adventure series",
+                    "movie series",
+                    "film series",
+                ]
+            )
+        )
+        if is_tv_cue:
             media_types.append("tv")
         elif any(w in lower_q for w in ["movie", "movies", "film", "films", "cinema"]):
+            media_types.append("movie")
+        elif is_vibe_query and "anime" not in lower_q:
             media_types.append("movie")
 
         # 6. Streaming Providers
@@ -358,7 +800,15 @@ class DeterministicRuleParser:
             "boost_genres": None,
             "media_types": media_types or None,
             "include_people": None,
+            "include_actors": None,
+            "include_directors": None,
+            "include_producers": None,
+            "include_writers": None,
+            "reference_titles": None,
+            "franchises": detected_franchises or None,
             "streaming_providers": streaming_providers or None,
+            "keywords": detected_vibe_keywords or None,
+            "is_vibe": is_vibe_query,
         }
 
 
@@ -440,6 +890,7 @@ for phrase in (
     | set(GENRE_SYNONYMS.keys())
     | set(STREAMING_PROVIDERS.keys())
     | set(LANGUAGES.keys())
+    | set(VIBE_LEXICON.keys())
     | {r.lower() for r in MATURITY_RATINGS}
 ):
     for tok in re.split(r"[^\w]+", phrase.lower()):
@@ -512,6 +963,12 @@ class FastIntentParser:
         "boost_genres",
         "media_types",
         "include_people",
+        "include_actors",
+        "include_directors",
+        "include_producers",
+        "include_writers",
+        "reference_titles",
+        "franchises",
         "streaming_providers",
     )
 
@@ -537,7 +994,14 @@ class FastIntentParser:
         self._gliner_error: Exception | None = None
         self._gliner_lock = threading.Lock()
         self._labels = [
+            "director",
+            "actor",
+            "producer",
+            "writer",
             "person",
+            "movie title",
+            "tv show title",
+            "franchise",
             "genre",
             "streaming_service",
             "language",
@@ -665,7 +1129,15 @@ class FastIntentParser:
                 "boost_genres": None,
                 "media_types": None,
                 "include_people": None,
+                "include_actors": None,
+                "include_directors": None,
+                "include_producers": None,
+                "include_writers": None,
+                "reference_titles": None,
+                "franchises": None,
                 "streaming_providers": None,
+                "keywords": None,
+                "is_vibe": False,
             }
             self._record_parse("rules", empty_intent, [], started)
             return empty_intent
@@ -699,20 +1171,39 @@ class FastIntentParser:
                 entities = []
 
             people: List[str] = list(intent.get("include_people") or [])
+            actors: List[str] = list(intent.get("include_actors") or [])
+            directors: List[str] = list(intent.get("include_directors") or [])
+            producers: List[str] = list(intent.get("include_producers") or [])
+            writers: List[str] = list(intent.get("include_writers") or [])
+            reference_titles: List[str] = list(intent.get("reference_titles") or [])
+            franchises: List[str] = list(intent.get("franchises") or [])
             genres: List[str] = list(intent.get("include_genres") or [])
             providers: List[str] = list(intent.get("streaming_providers") or [])
             languages: List[str] = list(intent.get("languages") or [])
             media_types: List[str] = list(intent.get("media_types") or [])
             exclude_genres: Set[str] = set(intent.get("exclude_genres") or [])
 
+            def _add_entity_ci(target_list: List[str], item: str) -> None:
+                for idx, existing in enumerate(target_list):
+                    if existing.lower() == item.lower():
+                        if any(c.isupper() for c in item) and not any(
+                            c.isupper() for c in existing
+                        ):
+                            target_list[idx] = item
+                        return
+                target_list.append(item)
+
+            last_comparative_end: Optional[int] = None
             for ent in entities:
                 label = ent.get("label")
                 text = (ent.get("text") or "").strip()
                 text_lower = text.lower()
+                start = ent.get("start", 0)
+                end = ent.get("end", 0)
                 if not text:
                     continue
 
-                if label == "person":
+                if label in {"person", "director", "actor", "producer", "writer"}:
                     if text_lower not in {
                         "movie",
                         "movies",
@@ -720,10 +1211,105 @@ class FastIntentParser:
                         "shows",
                         "series",
                         "actor",
+                        "actors",
+                        "actress",
                         "director",
+                        "directors",
+                        "producer",
+                        "producers",
+                        "writer",
+                        "writers",
                     }:
-                        if text not in people:
-                            people.append(text)
+                        prefix = normalized[:start]
+                        is_conjunction_after_comparative = (
+                            last_comparative_end is not None
+                            and normalized[last_comparative_end:start].strip().lower()
+                            in {",", "and", "or", "&", ", and", ", or"}
+                        )
+                        if (
+                            is_comparative_prefix(prefix)
+                            or is_conjunction_after_comparative
+                        ):
+                            _add_entity_ci(reference_titles, text)
+                            last_comparative_end = end
+                        else:
+                            last_comparative_end = None
+                            _add_entity_ci(people, text)
+                            if label == "director":
+                                _add_entity_ci(directors, text)
+                            elif label == "actor":
+                                _add_entity_ci(actors, text)
+                            elif label == "producer":
+                                _add_entity_ci(producers, text)
+                            elif label == "writer":
+                                _add_entity_ci(writers, text)
+
+                elif label in {"movie title", "tv show title", "movie", "tv_show"}:
+                    _GENERIC_TITLE_SUFFIXES = (
+                        " movies",
+                        " movie",
+                        " films",
+                        " film",
+                        " tv shows",
+                        " tv show",
+                        " shows",
+                        " show",
+                        " series",
+                        " miniseries",
+                        " blockbusters",
+                        " classics",
+                    )
+                    if text_lower not in {
+                        "movie",
+                        "movies",
+                        "film",
+                        "films",
+                        "tv",
+                        "show",
+                        "shows",
+                        "series",
+                        "miniseries",
+                        "cinema",
+                        "feature",
+                        "documentary",
+                        "actor",
+                        "director",
+                        "cold_start",
+                        "tv series",
+                        "tv show",
+                        "tv shows",
+                    } and not any(
+                        text_lower.endswith(sfx) for sfx in _GENERIC_TITLE_SUFFIXES
+                    ):
+                        _add_entity_ci(reference_titles, text)
+
+                elif label == "franchise":
+                    _GENERIC_FRANCHISE_SUFFIXES = (
+                        " blockbusters",
+                        " classics",
+                        " movies",
+                        " films",
+                    )
+                    if text_lower not in {
+                        "movie",
+                        "movies",
+                        "film",
+                        "films",
+                        "tv",
+                        "show",
+                        "shows",
+                        "series",
+                        "blockbusters",
+                        "classics",
+                        "cold_start",
+                    } and not any(
+                        text_lower.endswith(sfx) for sfx in _GENERIC_FRANCHISE_SUFFIXES
+                    ):
+                        _add_entity_ci(franchises, text)
+                        _add_entity_ci(reference_titles, text)
+                        actors[:] = [a for a in actors if a.lower() != text_lower]
+                        directors[:] = [d for d in directors if d.lower() != text_lower]
+                        people[:] = [p for p in people if p.lower() != text_lower]
 
                 elif label == "genre":
                     canonical = CANONICAL_GENRES.get(text_lower)
@@ -753,14 +1339,27 @@ class FastIntentParser:
                         any(m in text_lower for m in ["tv", "series", "show"])
                         and "tv" not in media_types
                     ):
-                        media_types.append("tv")
+                        if not franchises or "tv" in text_lower or "show" in text_lower:
+                            media_types.append("tv")
                     elif (
                         any(m in text_lower for m in ["movie", "film"])
                         and "movie" not in media_types
                     ):
                         media_types.append("movie")
 
+            if franchises:
+                franchise_set = {f.lower() for f in franchises}
+                actors[:] = [a for a in actors if a.lower() not in franchise_set]
+                directors[:] = [d for d in directors if d.lower() not in franchise_set]
+                people[:] = [p for p in people if p.lower() not in franchise_set]
+
             intent["include_people"] = people or None
+            intent["include_actors"] = actors or None
+            intent["include_directors"] = directors or None
+            intent["include_producers"] = producers or None
+            intent["include_writers"] = writers or None
+            intent["reference_titles"] = reference_titles or None
+            intent["franchises"] = franchises or None
             intent["include_genres"] = genres or None
             intent["streaming_providers"] = providers or None
             intent["languages"] = languages or None

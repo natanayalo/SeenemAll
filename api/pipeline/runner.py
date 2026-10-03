@@ -62,6 +62,9 @@ class RecommendationPipeline:
                 limit=params.limit,
                 diversify=params.diversify,
                 boost_ids=pool.boost_ids,
+                exempt_collection_ids=set(
+                    getattr(intent, "matched_collection_ids", ()) or ()
+                ),
             )
 
         # Stage 6: Presentation & Reranking
@@ -75,6 +78,29 @@ class RecommendationPipeline:
                 rerank=params.rerank,
                 rerank_provider=params.rerank_provider,
             )
+
+        matched_coll_ids = set(getattr(intent, "matched_collection_ids", ()) or ())
+        coll_item_ids = set(getattr(intent, "collection_item_ids", ()) or ())
+        if matched_coll_ids or coll_item_ids:
+            franchise_items = [
+                it
+                for it in reranked
+                if it.get("collection_id") in matched_coll_ids
+                or it.get("id") in coll_item_ids
+            ]
+            other_items = [
+                it
+                for it in reranked
+                if it.get("collection_id") not in matched_coll_ids
+                and it.get("id") not in coll_item_ids
+            ]
+            franchise_items.sort(
+                key=lambda it: (
+                    it.get("release_year") is None,
+                    it.get("release_year") or 0,
+                )
+            )
+            reranked = franchise_items + other_items
 
         pipeline_ms = (time.perf_counter() - _pipeline_start) * 1000
         METRICS.histogram("recommend.total_latency_ms").observe(pipeline_ms)

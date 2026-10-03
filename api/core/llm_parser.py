@@ -144,7 +144,7 @@ def _persistent_intent_store() -> Optional[PersistentCache]:
 
 @lru_cache(maxsize=2)
 def _persistent_cache_for_namespace(namespace: str) -> Optional[PersistentCache]:
-    if not _PERSISTENT_CACHE_ENABLED:
+    if not _env_flag("INTENT_CACHE_PERSIST", default=True):
         return None
 
     path = os.getenv("INTENT_CACHE_PATH", _DEFAULT_CACHE_PATH)

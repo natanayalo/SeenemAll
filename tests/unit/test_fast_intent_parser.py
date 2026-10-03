@@ -105,6 +105,57 @@ def test_fast_intent_parser_empty():
     res = parser.parse("")
     assert res["include_genres"] is None
     assert res["include_people"] is None
+    assert res["include_actors"] is None
+    assert res["include_directors"] is None
+    assert res["include_producers"] is None
+    assert res["include_writers"] is None
+    assert res["reference_titles"] is None
+    assert res["franchises"] is None
+
+
+def test_fast_intent_parser_role_extraction():
+    parser = FastIntentParser()
+    mock_gliner = MagicMock()
+    mock_gliner.predict_entities.return_value = [
+        {"label": "director", "text": "Christopher Nolan"},
+        {"label": "actor", "text": "Keanu Reeves"},
+        {"label": "producer", "text": "Steven Spielberg"},
+        {"label": "writer", "text": "Quentin Tarantino"},
+        {"label": "person", "text": "Pedro Pascal"},
+    ]
+
+    with patch.object(parser, "_ensure_gliner", return_value=mock_gliner):
+        res = parser.parse(
+            "films by Nolan with Keanu produced by Spielberg written by Tarantino with Pedro"
+        )
+        assert res["include_directors"] == ["Christopher Nolan"]
+        assert res["include_actors"] == ["Keanu Reeves"]
+        assert res["include_producers"] == ["Steven Spielberg"]
+        assert res["include_writers"] == ["Quentin Tarantino"]
+        assert "Christopher Nolan" in res["include_people"]
+        assert "Keanu Reeves" in res["include_people"]
+        assert "Steven Spielberg" in res["include_people"]
+        assert "Quentin Tarantino" in res["include_people"]
+        assert "Pedro Pascal" in res["include_people"]
+
+
+def test_fast_intent_parser_reference_titles_and_franchises():
+    parser = FastIntentParser()
+    mock_gliner = MagicMock()
+    mock_gliner.predict_entities.return_value = [
+        {"label": "movie", "text": "Arrival"},
+        {"label": "tv_show", "text": "Severance"},
+        {"label": "franchise", "text": "Star Wars"},
+        {"label": "movie", "text": "movie"},  # Should be filtered out as generic
+    ]
+
+    with patch.object(parser, "_ensure_gliner", return_value=mock_gliner):
+        res = parser.parse("movies like Arrival and Severance in Star Wars universe")
+        assert res["franchises"] == ["Star Wars"]
+        assert "Arrival" in res["reference_titles"]
+        assert "Severance" in res["reference_titles"]
+        assert "Star Wars" in res["reference_titles"]
+        assert "movie" not in res["reference_titles"]
 
 
 def test_fast_intent_parser_gliner_entities():
@@ -195,6 +246,13 @@ def test_llm_parser_hybrid_fast_provider(monkeypatch):
     monkeypatch.setenv("INTENT_PROVIDER", "hybrid_fast")
     monkeypatch.setenv("INTENT_CACHE_PERSIST", "0")
     _get_settings.cache_clear()
+    from api.core.llm_parser import (
+        _persistent_intent_store,
+        _persistent_cache_for_namespace,
+    )
+
+    _persistent_intent_store.cache_clear()
+    _persistent_cache_for_namespace.cache_clear()
 
     settings = _get_settings()
     assert settings.provider == "hybrid_fast"
@@ -299,3 +357,73 @@ def test_openvino_runtime_loader(monkeypatch):
         model = parser._ensure_gliner()
         assert model is mock_ov_model
         mock_gliner_mod.GLiNER.from_pretrained.assert_called_once()
+
+
+def test_comparative_person_routed_to_reference_titles():
+    parser = FastIntentParser()
+    mock_gliner = MagicMock()
+
+    mock_gliner.predict_entities.return_value = [
+        {"start": 12, "end": 29, "text": "Quentin Tarantino", "label": "director"}
+    ]
+
+    with patch.object(parser, "_ensure_gliner", return_value=mock_gliner):
+        res_comp = parser.parse("movies like Quentin Tarantino")
+        assert res_comp.get("include_directors") is None
+        assert res_comp.get("reference_titles") == ["Quentin Tarantino"]
+
+    mock_gliner.predict_entities.return_value = [
+        {"start": 10, "end": 27, "text": "Quentin Tarantino", "label": "director"}
+    ]
+
+    with patch.object(parser, "_ensure_gliner", return_value=mock_gliner):
+        res_filter = parser.parse("movies by Quentin Tarantino")
+        assert res_filter.get("include_directors") == ["Quentin Tarantino"]
+        assert res_filter.get("reference_titles") is None
+
+
+def test_deterministic_vibe_lexicon_parsing():
+    parser = DeterministicRuleParser()
+
+    queries = [
+        ("existential dread indie thrillers", "Thriller", ["existentialism", "dread"]),
+        ("cozy autumn mystery", "Mystery", ["autumn", "whodunit"]),
+        ("neon cyberpunk anime noir", "Animation", ["cyberpunk", "neo-noir"]),
+        (
+            "surreal slow-burn psychological horror",
+            "Horror",
+            ["slow burn", "psychological horror"],
+        ),
+        ("feel-good road trip indie comedy", "Comedy", ["road trip", "friendship"]),
+        ("dark satirical dystopian black comedy", "Comedy", ["satire", "dystopia"]),
+        (
+            "claustrophobic isolated survival thrillers",
+            "Thriller",
+            ["survival", "isolation"],
+        ),
+        (
+            "whimsical magical realism romance",
+            "Romance",
+            ["magical realism", "whimsical"],
+        ),
+        ("gritty neo-western crime", "Western", ["neo-western", "desert"]),
+        (
+            "philosophical hard science fiction",
+            "Science Fiction",
+            ["hard science fiction", "philosophical"],
+        ),
+        ("gripping courtroom legal drama", "Drama", ["courtroom", "legal drama"]),
+    ]
+
+    for q, expected_genre, expected_kws in queries:
+        res = parser.parse(q)
+        assert res["is_vibe"] is True, f"Query '{q}' should be flagged as is_vibe"
+        assert (
+            res["include_genres"] is not None
+            and expected_genre in res["include_genres"]
+        ), f"Query '{q}' should include genre '{expected_genre}', got {res['include_genres']}"
+        assert res["keywords"] is not None, f"Query '{q}' should have keywords"
+        for kw in expected_kws:
+            assert (
+                kw in res["keywords"]
+            ), f"Query '{q}' should contain keyword '{kw}', got {res['keywords']}"

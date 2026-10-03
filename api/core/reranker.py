@@ -842,6 +842,10 @@ def _build_small_rerank_query(intent: IntentFilters | None, query: str | None) -
         if maturity:
             segments.append(f"Rating ≤ {maturity}")
 
+        keywords = getattr(intent, "keywords", None) or []
+        if keywords:
+            segments.append("Keywords: " + ", ".join(str(k) for k in keywords[:6]))
+
     return " | ".join(seg for seg in segments if seg).strip()
 
 
@@ -893,6 +897,9 @@ def _build_small_rerank_documents(items: Sequence[Dict[str, Any]]) -> List[str]:
             parts.append(f"Runtime: {runtime} minutes")
         if release_year:
             parts.append(f"Released: {release_year}")
+        keywords = _extract_genre_names(item.get("keywords"))
+        if keywords:
+            parts.append("Keywords: " + ", ".join(keywords[:6]))
         if overview:
             parts.append(overview)
 

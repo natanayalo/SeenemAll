@@ -120,3 +120,131 @@ def test_query_filter_matcher_extracts_genre_even_with_keyword_overlap(monkeypat
 
     assert list(filters.genres) == ["Western"]
     assert list(filters.keywords) == ["Classic Western"]
+
+
+def test_query_filter_matcher_role_cues(monkeypatch):
+    rows = [
+        (
+            [],
+            [],
+            [],
+            [{"name": "Tom Cruise"}],
+            [{"name": "Christopher McQuarrie"}],
+            [{"name": "Tom Cruise"}],  # Also producer
+            [],
+        )
+    ]
+
+    monkeypatch.setattr(
+        "api.core.filter_matcher.get_sessionmaker",
+        lambda: lambda: DummySession(rows),
+    )
+
+    matcher = QueryFilterMatcher()
+
+    # "starring" cue -> cast only, not producer
+    filters_starring = matcher.match("action movie starring Tom Cruise")
+    assert list(filters_starring.cast) == ["Tom Cruise"]
+    assert not filters_starring.producers
+    assert not filters_starring.directors
+
+    # "directed by" cue -> directors only
+    filters_dir = matcher.match("thriller directed by Christopher McQuarrie")
+    assert list(filters_dir.directors) == ["Christopher McQuarrie"]
+    assert not filters_dir.cast
+
+    # "film with" cue -> cast
+    filters_with = matcher.match("film with Tom Cruise")
+    assert list(filters_with.cast) == ["Tom Cruise"]
+    assert not filters_with.producers
+
+
+def test_query_filter_matcher_comparative_people(monkeypatch):
+    rows = [
+        (
+            [],
+            [],
+            [],
+            [{"name": "Tom Cruise"}],
+            [{"name": "Christopher McQuarrie"}],
+            [],
+            [],
+        )
+    ]
+
+    monkeypatch.setattr(
+        "api.core.filter_matcher.get_sessionmaker",
+        lambda: lambda: DummySession(rows),
+    )
+
+    matcher = QueryFilterMatcher()
+
+    # "like" cue -> reference_titles, NOT cast
+    filters_like = matcher.match("action movies like Tom Cruise")
+    assert not filters_like.cast
+    assert not filters_like.directors
+    assert list(filters_like.reference_titles) == ["Tom Cruise"]
+
+    # "in the style of" cue -> reference_titles, NOT directors
+    filters_style = matcher.match("movies in the style of Christopher McQuarrie")
+    assert not filters_style.directors
+    assert not filters_style.cast
+    assert list(filters_style.reference_titles) == ["Christopher McQuarrie"]
+
+    # Multi-person comparative conjunction
+    filters_multi = matcher.match("movies like Tom Cruise and Christopher McQuarrie")
+    assert not filters_multi.cast
+    assert not filters_multi.directors
+    assert set(filters_multi.reference_titles) == {
+        "Tom Cruise",
+        "Christopher McQuarrie",
+    }
+
+
+def test_query_filter_matcher_resolves_collections(monkeypatch):
+    rows = [
+        ([], [], [], [], [], [], [], 10, "Star Wars Collection"),
+        ([], [], [], [], [], [], [], 10194, "Toy Story Collection"),
+        ([], [], [], [], [], [], [], 263, "The Dark Knight Collection"),
+    ]
+
+    monkeypatch.setattr(
+        "api.core.filter_matcher.get_sessionmaker",
+        lambda: lambda: DummySession(rows),
+    )
+
+    matcher = QueryFilterMatcher()
+    filters = matcher.match("Star Wars chronological")
+    assert (10, "Star Wars Collection") in filters.matched_collections
+
+    # "series" without explicit tv should not force tv media_type when collection matched
+    filters_toy = matcher.match("Toy Story animation series")
+    assert (10194, "Toy Story Collection") in filters_toy.matched_collections
+    assert "tv" not in filters_toy.media_types
+
+    single = matcher.resolve_collection("Dark Knight")
+    assert single == (263, "The Dark Knight Collection")
+
+    all_colls = matcher.resolve_collections("Star Wars")
+    assert (10, "Star Wars Collection") in all_colls
+
+
+def test_query_filter_matcher_multi_collection_grouping(monkeypatch):
+    rows = [
+        ([], [], [], [], [], [], [], 556, "Spider-Man Collection"),
+        ([], [], [], [], [], [], [], 531241, "Spider-Man (MCU) Collection"),
+        ([], [], [], [], [], [], [], 225941, "Spider-Man (TV) Collection"),
+    ]
+
+    monkeypatch.setattr(
+        "api.core.filter_matcher.get_sessionmaker",
+        lambda: lambda: DummySession(rows),
+    )
+
+    matcher = QueryFilterMatcher()
+    matched = matcher.resolve_collections("Spider-Man")
+    coll_ids = [cid for cid, _ in matched]
+    assert 556 in coll_ids
+    assert 531241 in coll_ids
+    # TV collection with (TV) should be skipped from generic alias
+    assert 225941 not in coll_ids

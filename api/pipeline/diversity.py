@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 
 from api.core.reranker import diversify_with_mmr
 from api.pipeline.hooks import get_hook
@@ -18,17 +18,24 @@ else:
 
 
 def apply_franchise_cap(
-    candidates: List[Dict[str, Any]], cap: int = 2
+    candidates: List[Dict[str, Any]],
+    cap: int = 2,
+    exempt_collection_ids: Set[int] | None = None,
 ) -> List[Dict[str, Any]]:
     if not candidates or cap <= 0:
         return candidates
 
+    exempt = exempt_collection_ids or set()
     franchise_counts: Dict[int, int] = {}
     filtered_candidates: List[Dict[str, Any]] = []
 
     for item in candidates:
         collection_id = item.get("collection_id")
         if collection_id is None:
+            filtered_candidates.append(item)
+            continue
+
+        if collection_id in exempt:
             filtered_candidates.append(item)
             continue
 
@@ -133,14 +140,36 @@ def apply_diversity_policies(
     limit: int,
     diversify: bool,
     boost_ids: List[int],
+    exempt_collection_ids: Set[int] | None = None,
 ) -> List[Dict[str, Any]]:
     if diversify:
         cap_fn = get_hook("_apply_franchise_cap", apply_franchise_cap)
-        ordered = cap_fn(ordered)
+        try:
+            ordered = cap_fn(ordered, exempt_collection_ids=exempt_collection_ids)
+        except TypeError:
+            ordered = cap_fn(ordered)
+
+    boost_set = set(boost_ids or ())
+    if boost_set:
+        boost_lookup = {it["id"]: it for it in ordered if it.get("id") in boost_set}
+        ordered_boosted = [
+            boost_lookup[bid] for bid in (boost_ids or ()) if bid in boost_lookup
+        ]
+        remaining = [it for it in ordered if it.get("id") not in boost_set]
+    else:
+        ordered_boosted = []
+        remaining = ordered
 
     if diversify:
         mmr_fn = get_hook("diversify_with_mmr", diversify_with_mmr)
-        ordered = mmr_fn(ordered, limit=limit)
+        if boost_set:
+            slots_needed = max(0, limit - len(ordered_boosted))
+            remaining = (
+                mmr_fn(remaining, limit=slots_needed) if slots_needed > 0 else []
+            )
+            ordered = ordered_boosted + remaining
+        else:
+            ordered = mmr_fn(ordered, limit=limit)
 
     serendipity_fn = get_hook("_apply_serendipity_slot", apply_serendipity_slot)
     ordered = serendipity_fn(ordered, serendipity_context, limit)

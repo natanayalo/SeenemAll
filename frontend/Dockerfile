@@ -13,16 +13,14 @@ RUN npm ci --prefer-offline
 COPY . .
 
 # Build for production
-RUN npm run build
+RUN npm run build && npm prune --omit=dev
 
 # Production stage
 FROM node:22-alpine
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci --omit=dev --prefer-offline
-
 # Copy built assets and server
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY server.js ./server.js
 

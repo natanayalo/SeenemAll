@@ -1,91 +1,91 @@
 {
-  "timestamp": "2026-09-27T18:20:27.731160+00:00",
+  "timestamp": "2026-10-03T22:46:00.687355+00:00",
   "backend": "elasticsearch",
   "config": "default",
   "k": 10,
   "aggregates": {
-    "precision": 0.08064516129032256,
-    "recall": 0.22109575012800825,
-    "map": 0.16475538798119443,
-    "ndcg": 0.22675524991181728,
-    "ild": 0.5524866001374059,
-    "unique_count": 420.0,
+    "precision": 0.19354838709677416,
+    "recall": 0.4725806451612903,
+    "map": 0.38340237570076274,
+    "ndcg": 0.4430057236653608,
+    "ild": 0.6086782359700724,
+    "unique_count": 469.0,
     "coverage_ratio": 0.0,
-    "gini": 0.15099558561097023,
-    "intent_alignment": 0.8012113617376775,
-    "latency_mean": 393.5660661293021,
-    "latency_p50": 196.09535000199685,
-    "latency_p95": 360.97162500373076,
+    "gini": 0.14164145019636656,
+    "intent_alignment": 0.8949206349206349,
+    "latency_mean": 42.273687095955886,
+    "latency_p50": 4.369949994725175,
+    "latency_p95": 5.875030007155143,
     "count": 62,
     "category_metrics": {
       "franchise": {
-        "precision": 1.8,
-        "recall": 4.335714285714285,
-        "map": 3.841269841269841,
-        "ndcg": 5.064438117702892,
-        "ild": 7.574998426448795,
-        "intent": 7.3,
+        "precision": 6.0,
+        "recall": 12.833333333333334,
+        "map": 12.738888888888889,
+        "ndcg": 12.859282459276782,
+        "ild": 6.84062711894143,
+        "intent": 11.4,
         "intent_count": 13,
         "count": 13
       },
       "vibe": {
-        "precision": 0.8999999999999999,
-        "recall": 1.9999999999999998,
-        "map": 1.0669444444444445,
-        "ndcg": 1.9100365433196145,
-        "ild": 7.956479885756505,
-        "intent": 10.649999999999999,
+        "precision": 1.9999999999999998,
+        "recall": 4.2,
+        "map": 2.1815903540903543,
+        "ndcg": 3.738313374041187,
+        "ild": 8.833958365891323,
+        "intent": 13.0,
         "intent_count": 13,
         "count": 13
       },
       "constraint": {
         "precision": 0.6000000000000001,
-        "recall": 1.1222222222222222,
-        "map": 0.8818181818181818,
-        "ndcg": 1.307754163793639,
-        "ild": 6.894436347398022,
-        "intent": 9.31904761904762,
-        "intent_count": 10,
+        "recall": 1.0833333333333333,
+        "map": 0.9793447293447293,
+        "ndcg": 1.4070124141455738,
+        "ild": 6.6150172414591735,
+        "intent": 10.466666666666667,
+        "intent_count": 11,
         "count": 13
       },
       "cold_start": {
-        "precision": 0.6,
-        "recall": 1.8333333333333333,
-        "map": 0.7303571428571429,
-        "ndcg": 1.2119271988224574,
-        "ild": 7.359076248990966,
-        "intent": 10.65,
+        "precision": 0.8999999999999999,
+        "recall": 2.666666666666667,
+        "map": 1.2070360195360195,
+        "ndcg": 1.8842683796263817,
+        "ild": 8.229058282353307,
+        "intent": 10.049999999999999,
         "intent_count": 12,
         "count": 12
       },
       "entity": {
-        "precision": 0.7,
-        "recall": 1.9166666666666665,
-        "map": 1.6944444444444444,
-        "ndcg": 2.0942981390262365,
-        "ild": 1.223111237294003,
-        "intent": 4.0,
-        "intent_count": 4,
+        "precision": 1.6,
+        "recall": 4.266666666666667,
+        "map": 3.561111111111111,
+        "ndcg": 4.015057209567363,
+        "ild": 3.235991866393515,
+        "intent": 4.928571428571429,
+        "intent_count": 5,
         "count": 5
       },
       "typo": {
-        "precision": 0.30000000000000004,
-        "recall": 2.0,
-        "map": 1.5,
-        "ndcg": 1.8572241391023743,
-        "ild": 2.6347737717301998,
-        "intent": 2.75,
+        "precision": 0.5,
+        "recall": 3.0,
+        "map": 2.333333333333333,
+        "ndcg": 2.5,
+        "ild": 2.6185661364528814,
+        "intent": 2.35,
         "intent_count": 4,
         "count": 4
       },
       "multi_constraint": {
-        "precision": 0.1,
-        "recall": 0.5,
-        "map": 0.5,
-        "ndcg": 0.6131471927654584,
-        "ild": 0.6112932909006816,
-        "intent": 1.0,
-        "intent_count": 1,
+        "precision": 0.4,
+        "recall": 1.25,
+        "map": 0.7696428571428571,
+        "ndcg": 1.0624210305950816,
+        "ild": 1.3648316186528713,
+        "intent": 1.5,
+        "intent_count": 2,
         "count": 2
       }
     }
@@ -97,13 +97,13 @@
       "query": "Star Wars chronological",
       "query_id": "q0000_65789bf7",
       "category": "franchise",
-      "precision@10": 0.2,
-      "recall@10": 0.2857142857142857,
-      "average_precision": 0.2857142857142857,
-      "ndcg@10": 0.4483039899025303,
-      "ild@10": 0.6323884344575086,
-      "intent_alignment": 0.4,
-      "latency_ms": 12294.63
+      "precision@10": 0.7,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.4187458780616607,
+      "intent_alignment": 0.9,
+      "latency_ms": 2281.64
     },
     {
       "backend": "elasticsearch",
@@ -111,13 +111,13 @@
       "query": "Harry Potter wizarding world movies",
       "query_id": "q0001_ce5baac3",
       "category": "franchise",
-      "precision@10": 0.2,
-      "recall@10": 0.25,
-      "average_precision": 0.25,
-      "ndcg@10": 0.41253177989255346,
-      "ild@10": 0.6539702433950312,
+      "precision@10": 0.8,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.47184688786149187,
       "intent_alignment": 1.0,
-      "latency_ms": 369.07
+      "latency_ms": 5.92
     },
     {
       "backend": "elasticsearch",
@@ -125,13 +125,13 @@
       "query": "The Lord of the Rings trilogy",
       "query_id": "q0002_7f17a402",
       "category": "franchise",
-      "precision@10": 0.2,
-      "recall@10": 0.6666666666666666,
-      "average_precision": 0.38888888888888884,
-      "ndcg@10": 0.5307212739772434,
-      "ild@10": 0.6060711042868133,
-      "intent_alignment": 0.5,
-      "latency_ms": 362.06
+      "precision@10": 0.3,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.5610750349829317,
+      "intent_alignment": 0.8,
+      "latency_ms": 4.74
     },
     {
       "backend": "elasticsearch",
@@ -139,13 +139,13 @@
       "query": "The Dark Knight Batman trilogy",
       "query_id": "q0003_6a389de1",
       "category": "franchise",
-      "precision@10": 0.2,
-      "recall@10": 0.6666666666666666,
-      "average_precision": 0.6666666666666666,
-      "ndcg@10": 0.7653606369886217,
-      "ild@10": 0.6071243461417727,
-      "intent_alignment": 0.55,
-      "latency_ms": 315.11
+      "precision@10": 0.3,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.5110615892141379,
+      "intent_alignment": 0.7,
+      "latency_ms": 5.0
     },
     {
       "backend": "elasticsearch",
@@ -153,13 +153,13 @@
       "query": "Marvel Cinematic Universe Phase 1",
       "query_id": "q0004_cc4d41f2",
       "category": "franchise",
-      "precision@10": 0.0,
-      "recall@10": 0.0,
-      "average_precision": 0.0,
-      "ndcg@10": 0.0,
-      "ild@10": 0.6556484840804884,
-      "intent_alignment": 0.4,
-      "latency_ms": 262.8
+      "precision@10": 0.6,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.650414908029228,
+      "intent_alignment": 1.0,
+      "latency_ms": 5.03
     },
     {
       "backend": "elasticsearch",
@@ -167,13 +167,13 @@
       "query": "James Bond Daniel Craig era",
       "query_id": "q0005_56638888",
       "category": "franchise",
-      "precision@10": 0.1,
-      "recall@10": 0.2,
-      "average_precision": 0.2,
-      "ndcg@10": 0.3391602052736161,
-      "ild@10": 0.0,
+      "precision@10": 0.5,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.6448800687134746,
       "intent_alignment": 1.0,
-      "latency_ms": 310.7
+      "latency_ms": 3.9
     },
     {
       "backend": "elasticsearch",
@@ -181,13 +181,13 @@
       "query": "The Matrix collection",
       "query_id": "q0006_644df868",
       "category": "franchise",
-      "precision@10": 0.2,
-      "recall@10": 0.5,
-      "average_precision": 0.5,
-      "ndcg@10": 0.6366824387328317,
-      "ild@10": 0.6672519688750311,
-      "intent_alignment": 0.5,
-      "latency_ms": 179.84
+      "precision@10": 0.4,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.5934802376416416,
+      "intent_alignment": 0.6,
+      "latency_ms": 4.62
     },
     {
       "backend": "elasticsearch",
@@ -195,13 +195,13 @@
       "query": "Toy Story animation series",
       "query_id": "q0007_3a68d78d",
       "category": "franchise",
-      "precision@10": 0.0,
-      "recall@10": 0.0,
-      "average_precision": 0.0,
-      "ndcg@10": 0.0,
-      "ild@10": 0.6794959852789317,
-      "intent_alignment": 0.5,
-      "latency_ms": 249.24
+      "precision@10": 0.4,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.5719250130220205,
+      "intent_alignment": 0.95,
+      "latency_ms": 5.0
     },
     {
       "backend": "elasticsearch",
@@ -209,13 +209,13 @@
       "query": "Mission: Impossible action series",
       "query_id": "q0008_e33c6c9b",
       "category": "franchise",
-      "precision@10": 0.0,
-      "recall@10": 0.0,
-      "average_precision": 0.0,
-      "ndcg@10": 0.0,
-      "ild@10": 0.5966736989786208,
-      "intent_alignment": 0.0,
-      "latency_ms": 189.42
+      "precision@10": 0.5,
+      "recall@10": 0.8333333333333334,
+      "average_precision": 0.7722222222222221,
+      "ndcg@10": 0.8696762340896295,
+      "ild@10": 0.3232740623683165,
+      "intent_alignment": 0.9,
+      "latency_ms": 4.45
     },
     {
       "backend": "elasticsearch",
@@ -223,13 +223,13 @@
       "query": "The Godfather saga",
       "query_id": "q0009_ceb2186e",
       "category": "franchise",
-      "precision@10": 0.2,
-      "recall@10": 0.6666666666666666,
-      "average_precision": 0.6666666666666666,
-      "ndcg@10": 0.7653606369886217,
-      "ild@10": 0.638078101424311,
-      "intent_alignment": 0.75,
-      "latency_ms": 157.83
+      "precision@10": 0.3,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.5413725503791909,
+      "intent_alignment": 0.85,
+      "latency_ms": 4.67
     },
     {
       "backend": "elasticsearch",
@@ -237,13 +237,13 @@
       "query": "Bourne spy franchise",
       "query_id": "q0010_9b62ba93",
       "category": "franchise",
-      "precision@10": 0.2,
-      "recall@10": 0.5,
-      "average_precision": 0.5,
-      "ndcg@10": 0.6366824387328317,
-      "ild@10": 0.5802170587693123,
-      "intent_alignment": 0.7,
-      "latency_ms": 191.41
+      "precision@10": 0.4,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.5121223958509152,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.69
     },
     {
       "backend": "elasticsearch",
@@ -251,13 +251,13 @@
       "query": "Spider-Man live action movies",
       "query_id": "q0011_cb11bb77",
       "category": "franchise",
-      "precision@10": 0.3,
-      "recall@10": 0.6,
-      "average_precision": 0.3833333333333333,
-      "ndcg@10": 0.5296347172140421,
-      "ild@10": 0.5622441460553342,
+      "precision@10": 0.5,
+      "recall@10": 1.0,
+      "average_precision": 0.9666666666666666,
+      "ndcg@10": 0.9896062251871525,
+      "ild@10": 0.41689009784977893,
       "intent_alignment": 1.0,
-      "latency_ms": 243.82
+      "latency_ms": 4.97
     },
     {
       "backend": "elasticsearch",
@@ -265,13 +265,13 @@
       "query": "Indiana Jones adventure series",
       "query_id": "q0012_b6cd20ac",
       "category": "franchise",
-      "precision@10": 0.0,
-      "recall@10": 0.0,
-      "average_precision": 0.0,
-      "ndcg@10": 0.0,
-      "ild@10": 0.6958348547056392,
-      "intent_alignment": 0.0,
-      "latency_ms": 189.86
+      "precision@10": 0.3,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.6235383949666413,
+      "intent_alignment": 0.7,
+      "latency_ms": 4.98
     },
     {
       "backend": "elasticsearch",
@@ -279,13 +279,13 @@
       "query": "mind-bending sci-fi movies like Inception",
       "query_id": "q0013_5507d275",
       "category": "vibe",
-      "precision@10": 0.0,
-      "recall@10": 0.0,
-      "average_precision": 0.0,
-      "ndcg@10": 0.0,
-      "ild@10": 0.0,
+      "precision@10": 0.2,
+      "recall@10": 0.4,
+      "average_precision": 0.3432967032967033,
+      "ndcg@10": 0.4371994911049732,
+      "ild@10": 0.6978896471150854,
       "intent_alignment": 1.0,
-      "latency_ms": 87.02
+      "latency_ms": 4.21
     },
     {
       "backend": "elasticsearch",
@@ -297,9 +297,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.6564666935621539,
+      "ild@10": 0.677954123207702,
       "intent_alignment": 1.0,
-      "latency_ms": 186.42
+      "latency_ms": 5.06
     },
     {
       "backend": "elasticsearch",
@@ -307,13 +307,13 @@
       "query": "cozy autumn mystery",
       "query_id": "q0015_3d73fdbe",
       "category": "vibe",
-      "precision@10": 0.0,
-      "recall@10": 0.0,
-      "average_precision": 0.0,
-      "ndcg@10": 0.0,
-      "ild@10": 0.5765103502731749,
-      "intent_alignment": 0.7,
-      "latency_ms": 188.54
+      "precision@10": 0.1,
+      "recall@10": 0.2,
+      "average_precision": 0.2,
+      "ndcg@10": 0.3391602052736161,
+      "ild@10": 0.666752640920614,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.35
     },
     {
       "backend": "elasticsearch",
@@ -323,11 +323,11 @@
       "category": "vibe",
       "precision@10": 0.2,
       "recall@10": 0.5,
-      "average_precision": 0.3055555555555556,
-      "ndcg@10": 0.5078961547485289,
-      "ild@10": 0.6719007254996843,
-      "intent_alignment": 0.9,
-      "latency_ms": 309.65
+      "average_precision": 0.1875,
+      "ndcg@10": 0.369453583111095,
+      "ild@10": 0.6386462041925158,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.36
     },
     {
       "backend": "elasticsearch",
@@ -339,9 +339,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.7029946228447214,
-      "intent_alignment": 0.8,
-      "latency_ms": 221.03
+      "ild@10": 0.7401454309377401,
+      "intent_alignment": 1.0,
+      "latency_ms": 3.99
     },
     {
       "backend": "elasticsearch",
@@ -349,13 +349,13 @@
       "query": "surreal slow-burn psychological horror",
       "query_id": "q0018_2cd11e42",
       "category": "vibe",
-      "precision@10": 0.0,
-      "recall@10": 0.0,
-      "average_precision": 0.0,
-      "ndcg@10": 0.0,
-      "ild@10": 0.6113973974086973,
+      "precision@10": 0.2,
+      "recall@10": 0.4,
+      "average_precision": 0.2,
+      "ndcg@10": 0.36005461457723403,
+      "ild@10": 0.6652511215224525,
       "intent_alignment": 1.0,
-      "latency_ms": 216.41
+      "latency_ms": 4.72
     },
     {
       "backend": "elasticsearch",
@@ -363,13 +363,13 @@
       "query": "feel-good road trip indie comedy",
       "query_id": "q0019_ca31b7c7",
       "category": "vibe",
-      "precision@10": 0.0,
-      "recall@10": 0.0,
-      "average_precision": 0.0125,
-      "ndcg@10": 0.0,
-      "ild@10": 0.7490606662768337,
-      "intent_alignment": 0.8,
-      "latency_ms": 318.82
+      "precision@10": 0.1,
+      "recall@10": 0.2,
+      "average_precision": 0.02857142857142857,
+      "ndcg@10": 0.11305340175787204,
+      "ild@10": 0.7614548648382814,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.92
     },
     {
       "backend": "elasticsearch",
@@ -377,13 +377,13 @@
       "query": "dark satirical dystopian black comedy",
       "query_id": "q0020_be9f47c5",
       "category": "vibe",
-      "precision@10": 0.1,
-      "recall@10": 0.2,
-      "average_precision": 0.02,
-      "ndcg@10": 0.09803928583135704,
-      "ild@10": 0.6832694406578786,
-      "intent_alignment": 0.75,
-      "latency_ms": 253.05
+      "precision@10": 0.2,
+      "recall@10": 0.4,
+      "average_precision": 0.09444444444444444,
+      "ndcg@10": 0.24816574496561808,
+      "ild@10": 0.681344778197585,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.51
     },
     {
       "backend": "elasticsearch",
@@ -391,13 +391,13 @@
       "query": "claustrophobic isolated survival thrillers",
       "query_id": "q0021_dd3d0353",
       "category": "vibe",
-      "precision@10": 0.1,
-      "recall@10": 0.2,
-      "average_precision": 0.2,
-      "ndcg@10": 0.3391602052736161,
-      "ild@10": 0.6476077080420246,
+      "precision@10": 0.2,
+      "recall@10": 0.4,
+      "average_precision": 0.24,
+      "ndcg@10": 0.4371994911049732,
+      "ild@10": 0.7188204416115288,
       "intent_alignment": 1.0,
-      "latency_ms": 219.3
+      "latency_ms": 4.87
     },
     {
       "backend": "elasticsearch",
@@ -405,13 +405,13 @@
       "query": "whimsical magical realism romance",
       "query_id": "q0022_b0839573",
       "category": "vibe",
-      "precision@10": 0.1,
-      "recall@10": 0.2,
-      "average_precision": 0.05,
-      "ndcg@10": 0.14606834984270645,
-      "ild@10": 0.6910110745909401,
-      "intent_alignment": 0.9,
-      "latency_ms": 217.71
+      "precision@10": 0.2,
+      "recall@10": 0.4,
+      "average_precision": 0.08444444444444445,
+      "ndcg@10": 0.23330247263525344,
+      "ild@10": 0.6606729337945063,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.51
     },
     {
       "backend": "elasticsearch",
@@ -421,11 +421,11 @@
       "category": "vibe",
       "precision@10": 0.2,
       "recall@10": 0.5,
-      "average_precision": 0.41666666666666663,
-      "ndcg@10": 0.5855700749881525,
-      "ild@10": 0.6662412393883671,
-      "intent_alignment": 0.7,
-      "latency_ms": 292.86
+      "average_precision": 0.5,
+      "ndcg@10": 0.6366824387328317,
+      "ild@10": 0.6218330966904795,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.78
     },
     {
       "backend": "elasticsearch",
@@ -433,13 +433,13 @@
       "query": "philosophical hard science fiction",
       "query_id": "q0024_61a8a077",
       "category": "vibe",
-      "precision@10": 0.1,
-      "recall@10": 0.2,
-      "average_precision": 0.02222222222222222,
-      "ndcg@10": 0.10209739512291163,
-      "ild@10": 0.6721828889204152,
-      "intent_alignment": 0.45,
-      "latency_ms": 206.96
+      "precision@10": 0.2,
+      "recall@10": 0.4,
+      "average_precision": 0.12333333333333334,
+      "ndcg@10": 0.2188505885308512,
+      "ild@10": 0.6433538032327554,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.81
     },
     {
       "backend": "elasticsearch",
@@ -447,13 +447,13 @@
       "query": "gripping courtroom legal drama",
       "query_id": "q0025_ef53b11a",
       "category": "vibe",
-      "precision@10": 0.1,
-      "recall@10": 0.2,
-      "average_precision": 0.04,
-      "ndcg@10": 0.13120507751234178,
-      "ild@10": 0.6278370782916147,
-      "intent_alignment": 0.65,
-      "latency_ms": 224.85
+      "precision@10": 0.2,
+      "recall@10": 0.4,
+      "average_precision": 0.18,
+      "ndcg@10": 0.34519134224686937,
+      "ild@10": 0.6598392796300764,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.93
     },
     {
       "backend": "elasticsearch",
@@ -466,8 +466,8 @@
       "average_precision": 0.0,
       "ndcg@10": 0.0,
       "ild@10": 0.0,
-      "intent_alignment": "",
-      "latency_ms": 82.83
+      "intent_alignment": 0.6,
+      "latency_ms": 3.32
     },
     {
       "backend": "elasticsearch",
@@ -479,9 +479,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.7422193477874064,
-      "intent_alignment": 0.9333333333333332,
-      "latency_ms": 182.01
+      "ild@10": 0.7063473236836226,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.44
     },
     {
       "backend": "elasticsearch",
@@ -493,9 +493,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.721471359752753,
+      "ild@10": 0.7177690984344116,
       "intent_alignment": 1.0,
-      "latency_ms": 111.42
+      "latency_ms": 4.33
     },
     {
       "backend": "elasticsearch",
@@ -509,7 +509,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.0,
       "intent_alignment": "",
-      "latency_ms": 44.09
+      "latency_ms": 32.06
     },
     {
       "backend": "elasticsearch",
@@ -517,13 +517,13 @@
       "query": "French romance movies from the 2000s",
       "query_id": "q0030_07b49798",
       "category": "constraint",
-      "precision@10": 0.0,
-      "recall@10": 0.0,
-      "average_precision": 0.0,
-      "ndcg@10": 0.0,
-      "ild@10": 0.8003534379560778,
-      "intent_alignment": 0.6857142857142857,
-      "latency_ms": 155.26
+      "precision@10": 0.1,
+      "recall@10": 0.25,
+      "average_precision": 0.25,
+      "ndcg@10": 0.3903800499921017,
+      "ild@10": 0.5646975324608424,
+      "intent_alignment": 1.0,
+      "latency_ms": 3.44
     },
     {
       "backend": "elasticsearch",
@@ -535,9 +535,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.6567879794328252,
+      "ild@10": 0.6463797259129375,
       "intent_alignment": 1.0,
-      "latency_ms": 144.33
+      "latency_ms": 4.4
     },
     {
       "backend": "elasticsearch",
@@ -547,11 +547,11 @@
       "category": "constraint",
       "precision@10": 0.0,
       "recall@10": 0.0,
-      "average_precision": 0.01818181818181818,
+      "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.6621598857621219,
+      "ild@10": 0.662340457006442,
       "intent_alignment": 1.0,
-      "latency_ms": 155.19
+      "latency_ms": 3.85
     },
     {
       "backend": "elasticsearch",
@@ -561,11 +561,11 @@
       "category": "constraint",
       "precision@10": 0.0,
       "recall@10": 0.0,
-      "average_precision": 0.0,
+      "average_precision": 0.019230769230769232,
       "ndcg@10": 0.0,
-      "ild@10": 0.730910039844155,
-      "intent_alignment": 0.9666666666666666,
-      "latency_ms": 340.24
+      "ild@10": 0.7600346224984557,
+      "intent_alignment": 0.9333333333333332,
+      "latency_ms": 4.81
     },
     {
       "backend": "elasticsearch",
@@ -577,9 +577,9 @@
       "recall@10": 0.5,
       "average_precision": 0.5,
       "ndcg@10": 0.6366824387328317,
-      "ild@10": 0.6499519204132796,
-      "intent_alignment": 0.7333333333333333,
-      "latency_ms": 157.3
+      "ild@10": 0.5984290512874898,
+      "intent_alignment": 0.9333333333333332,
+      "latency_ms": 3.83
     },
     {
       "backend": "elasticsearch",
@@ -593,7 +593,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.0,
       "intent_alignment": "",
-      "latency_ms": 46.78
+      "latency_ms": 49.12
     },
     {
       "backend": "elasticsearch",
@@ -605,9 +605,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.7107790199750017,
+      "ild@10": 0.7279583884533035,
       "intent_alignment": 1.0,
-      "latency_ms": 145.02
+      "latency_ms": 4.33
     },
     {
       "backend": "elasticsearch",
@@ -615,13 +615,13 @@
       "query": "time-travel thrillers",
       "query_id": "q0037_cd5d108d",
       "category": "constraint",
-      "precision@10": 0.2,
-      "recall@10": 0.4,
-      "average_precision": 0.16666666666666666,
-      "ndcg@10": 0.3347975674340217,
-      "ild@10": 0.6226716403125458,
+      "precision@10": 0.0,
+      "recall@10": 0.0,
+      "average_precision": 0.0,
+      "ndcg@10": 0.0,
+      "ild@10": 0.6643986818012282,
       "intent_alignment": 1.0,
-      "latency_ms": 241.8
+      "latency_ms": 4.26
     },
     {
       "backend": "elasticsearch",
@@ -629,13 +629,13 @@
       "query": "neo-noir crime movies",
       "query_id": "q0038_b0a3283d",
       "category": "constraint",
-      "precision@10": 0.2,
-      "recall@10": 0.2222222222222222,
-      "average_precision": 0.19696969696969696,
-      "ndcg@10": 0.33627415762678553,
-      "ild@10": 0.5971317161618561,
+      "precision@10": 0.3,
+      "recall@10": 0.3333333333333333,
+      "average_precision": 0.2101139601139601,
+      "ndcg@10": 0.37994992542064054,
+      "ild@10": 0.5666623599204399,
       "intent_alignment": 1.0,
-      "latency_ms": 171.47
+      "latency_ms": 4.33
     },
     {
       "backend": "elasticsearch",
@@ -647,9 +647,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.7415671777756542,
-      "intent_alignment": 0.45,
-      "latency_ms": 155.92
+      "ild@10": 0.6422955258057136,
+      "intent_alignment": 0.65,
+      "latency_ms": 4.03
     },
     {
       "backend": "elasticsearch",
@@ -661,9 +661,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.0,
-      "intent_alignment": 1.0,
-      "latency_ms": 86.5
+      "ild@10": 0.6957024502660759,
+      "intent_alignment": 0.0,
+      "latency_ms": 4.42
     },
     {
       "backend": "elasticsearch",
@@ -671,13 +671,13 @@
       "query": "cold_start: uplifting feel-good crowdpleasers",
       "query_id": "q0041_89d5e85a",
       "category": "cold_start",
-      "precision@10": 0.0,
-      "recall@10": 0.0,
-      "average_precision": 0.0,
-      "ndcg@10": 0.0,
-      "ild@10": 0.7743756556625682,
-      "intent_alignment": 0.95,
-      "latency_ms": 174.56
+      "precision@10": 0.1,
+      "recall@10": 0.25,
+      "average_precision": 0.027777777777777776,
+      "ndcg@10": 0.11751610475642714,
+      "ild@10": 0.772577940934384,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.24
     },
     {
       "backend": "elasticsearch",
@@ -689,9 +689,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.6504957978789729,
-      "intent_alignment": 0.9,
-      "latency_ms": 206.13
+      "ild@10": 0.6710191170088828,
+      "intent_alignment": 0.75,
+      "latency_ms": 4.19
     },
     {
       "backend": "elasticsearch",
@@ -701,11 +701,11 @@
       "category": "cold_start",
       "precision@10": 0.1,
       "recall@10": 0.25,
-      "average_precision": 0.041666666666666664,
-      "ndcg@10": 0.13905617951077562,
-      "ild@10": 0.6199818124769991,
+      "average_precision": 0.09821428571428571,
+      "ndcg@10": 0.16812753627111746,
+      "ild@10": 0.6525467171723954,
       "intent_alignment": 1.0,
-      "latency_ms": 207.12
+      "latency_ms": 4.03
     },
     {
       "backend": "elasticsearch",
@@ -717,9 +717,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.6478657612638171,
+      "ild@10": 0.6861217342738611,
       "intent_alignment": 1.0,
-      "latency_ms": 159.62
+      "latency_ms": 4.02
     },
     {
       "backend": "elasticsearch",
@@ -729,11 +729,11 @@
       "category": "cold_start",
       "precision@10": 0.0,
       "recall@10": 0.0,
-      "average_precision": 0.020833333333333332,
+      "average_precision": 0.016666666666666666,
       "ndcg@10": 0.0,
-      "ild@10": 0.5607439537857961,
-      "intent_alignment": 0.75,
-      "latency_ms": 205.64
+      "ild@10": 0.5906707311340057,
+      "intent_alignment": 0.8,
+      "latency_ms": 4.77
     },
     {
       "backend": "elasticsearch",
@@ -741,13 +741,13 @@
       "query": "cold_start: dark comedy crime series",
       "query_id": "q0046_34384351",
       "category": "cold_start",
-      "precision@10": 0.1,
-      "recall@10": 0.25,
-      "average_precision": 0.025,
-      "ndcg@10": 0.11284514134893527,
-      "ild@10": 0.6690599588188738,
+      "precision@10": 0.2,
+      "recall@10": 0.5,
+      "average_precision": 0.19642857142857142,
+      "ndcg@10": 0.3764290720714305,
+      "ild@10": 0.6965639858602557,
       "intent_alignment": 1.0,
-      "latency_ms": 200.78
+      "latency_ms": 4.36
     },
     {
       "backend": "elasticsearch",
@@ -759,9 +759,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.7087507481738207,
+      "ild@10": 0.7049460842499522,
       "intent_alignment": 1.0,
-      "latency_ms": 466.54
+      "latency_ms": 4.3
     },
     {
       "backend": "elasticsearch",
@@ -771,11 +771,11 @@
       "category": "cold_start",
       "precision@10": 0.3,
       "recall@10": 1.0,
-      "average_precision": 0.5873015873015873,
-      "ndcg@10": 0.7928654229965442,
-      "ild@10": 0.6640994273017508,
+      "average_precision": 0.6666666666666666,
+      "ndcg@10": 0.8385465274895063,
+      "ild@10": 0.7041569538830604,
       "intent_alignment": 0.9,
-      "latency_ms": 217.95
+      "latency_ms": 3.99
     },
     {
       "backend": "elasticsearch",
@@ -785,11 +785,11 @@
       "category": "cold_start",
       "precision@10": 0.1,
       "recall@10": 0.3333333333333333,
-      "average_precision": 0.05555555555555555,
-      "ndcg@10": 0.16716045496620227,
-      "ild@10": 0.6923409921771805,
-      "intent_alignment": 1.0,
-      "latency_ms": 171.73
+      "average_precision": 0.08333333333333333,
+      "ndcg@10": 0.20210734650054757,
+      "ild@10": 0.6764263405700582,
+      "intent_alignment": 0.95,
+      "latency_ms": 4.38
     },
     {
       "backend": "elasticsearch",
@@ -797,13 +797,13 @@
       "query": "cold_start: animated coming-of-age gems",
       "query_id": "q0050_f085a98d",
       "category": "cold_start",
-      "precision@10": 0.0,
-      "recall@10": 0.0,
-      "average_precision": 0.0,
-      "ndcg@10": 0.0,
-      "ild@10": 0.6297949636755328,
-      "intent_alignment": 0.7,
-      "latency_ms": 203.38
+      "precision@10": 0.1,
+      "recall@10": 0.3333333333333333,
+      "average_precision": 0.11794871794871796,
+      "ndcg@10": 0.18154179253735267,
+      "ild@10": 0.7360307011946603,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.63
     },
     {
       "backend": "elasticsearch",
@@ -813,11 +813,11 @@
       "category": "entity",
       "precision@10": 0.4,
       "recall@10": 1.0,
-      "average_precision": 1.0,
-      "ndcg@10": 1.0,
-      "ild@10": 0.6379242416013376,
+      "average_precision": 0.95,
+      "ndcg@10": 0.9828920819566879,
+      "ild@10": 0.6859659923559527,
       "intent_alignment": 1.0,
-      "latency_ms": 153.46
+      "latency_ms": 3.36
     },
     {
       "backend": "elasticsearch",
@@ -825,13 +825,13 @@
       "query": "Quentin Tarantino crime classics",
       "query_id": "q0052_6bc276fc",
       "category": "entity",
-      "precision@10": 0.0,
-      "recall@10": 0.0,
-      "average_precision": 0.0,
-      "ndcg@10": 0.0,
-      "ild@10": 0.0,
-      "intent_alignment": "",
-      "latency_ms": 125.51
+      "precision@10": 0.3,
+      "recall@10": 0.6,
+      "average_precision": 0.6,
+      "ndcg@10": 0.7227265726449519,
+      "ild@10": 0.5485248722742901,
+      "intent_alignment": 1.0,
+      "latency_ms": 3.77
     },
     {
       "backend": "elasticsearch",
@@ -839,13 +839,13 @@
       "query": "Hayao Miyazaki studio ghibli anime",
       "query_id": "q0053_69df3aed",
       "category": "entity",
-      "precision@10": 0.1,
-      "recall@10": 0.25,
-      "average_precision": 0.25,
-      "ndcg@10": 0.3903800499921017,
-      "ild@10": 0.0,
-      "intent_alignment": 1.0,
-      "latency_ms": 147.39
+      "precision@10": 0.4,
+      "recall@10": 1.0,
+      "average_precision": 0.8166666666666667,
+      "ndcg@10": 0.9267582364714126,
+      "ild@10": 0.6036404826028784,
+      "intent_alignment": 0.9285714285714286,
+      "latency_ms": 3.36
     },
     {
       "backend": "elasticsearch",
@@ -853,13 +853,13 @@
       "query": "Denis Villeneuve sci-fi movies",
       "query_id": "q0054_486890f1",
       "category": "entity",
-      "precision@10": 0.1,
-      "recall@10": 0.3333333333333333,
-      "average_precision": 0.3333333333333333,
-      "ndcg@10": 0.46927872602275644,
-      "ild@10": 0.0,
+      "precision@10": 0.3,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.7495875506125603,
       "intent_alignment": 1.0,
-      "latency_ms": 141.02
+      "latency_ms": 3.68
     },
     {
       "backend": "elasticsearch",
@@ -867,13 +867,13 @@
       "query": "Tom Cruise high-octane action movies",
       "query_id": "q0055_3374884d",
       "category": "entity",
-      "precision@10": 0.1,
-      "recall@10": 0.3333333333333333,
-      "average_precision": 0.1111111111111111,
-      "ndcg@10": 0.23463936301137822,
-      "ild@10": 0.5851869956926653,
+      "precision@10": 0.2,
+      "recall@10": 0.6666666666666666,
+      "average_precision": 0.19444444444444442,
+      "ndcg@10": 0.38268031849431083,
+      "ild@10": 0.6482729685478336,
       "intent_alignment": 1.0,
-      "latency_ms": 165.1
+      "latency_ms": 3.67
     },
     {
       "backend": "elasticsearch",
@@ -881,13 +881,13 @@
       "query": "Spidr-man multiverse animated",
       "query_id": "q0056_d2877914",
       "category": "typo",
-      "precision@10": 0.1,
-      "recall@10": 0.5,
-      "average_precision": 0.5,
-      "ndcg@10": 0.6131471927654584,
-      "ild@10": 0.6470085637901077,
+      "precision@10": 0.2,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.6252499952229158,
       "intent_alignment": 0.7,
-      "latency_ms": 202.25
+      "latency_ms": 5.04
     },
     {
       "backend": "elasticsearch",
@@ -897,11 +897,11 @@
       "category": "typo",
       "precision@10": 0.1,
       "recall@10": 1.0,
-      "average_precision": 0.5,
-      "ndcg@10": 0.6309297535714575,
-      "ild@10": 0.6855124594673125,
+      "average_precision": 0.3333333333333333,
+      "ndcg@10": 0.5,
+      "ild@10": 0.6466845205939108,
       "intent_alignment": 0.75,
-      "latency_ms": 204.73
+      "latency_ms": 4.16
     },
     {
       "backend": "elasticsearch",
@@ -913,9 +913,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.6326486379536832,
-      "intent_alignment": 0.3,
-      "latency_ms": 212.91
+      "ild@10": 0.6545181385020122,
+      "intent_alignment": 0.0,
+      "latency_ms": 4.35
     },
     {
       "backend": "elasticsearch",
@@ -923,13 +923,13 @@
       "query": "Quentin Tarantno violent gangster movies",
       "query_id": "q0059_63eca670",
       "category": "typo",
-      "precision@10": 0.1,
-      "recall@10": 0.5,
-      "average_precision": 0.5,
-      "ndcg@10": 0.6131471927654584,
-      "ild@10": 0.6696041105190961,
-      "intent_alignment": 1.0,
-      "latency_ms": 210.66
+      "precision@10": 0.2,
+      "recall@10": 1.0,
+      "average_precision": 1.0,
+      "ndcg@10": 1.0,
+      "ild@10": 0.6921134821340428,
+      "intent_alignment": 0.9,
+      "latency_ms": 3.56
     },
     {
       "backend": "elasticsearch",
@@ -941,9 +941,9 @@
       "recall@10": 0.5,
       "average_precision": 0.5,
       "ndcg@10": 0.6131471927654584,
-      "ild@10": 0.6112932909006816,
+      "ild@10": 0.6071620824935136,
       "intent_alignment": 1.0,
-      "latency_ms": 88.56
+      "latency_ms": 4.35
     },
     {
       "backend": "elasticsearch",
@@ -951,13 +951,13 @@
       "query": "90s sci-fi action blockbusters",
       "query_id": "q0061_d8e6f04f",
       "category": "multi_constraint",
-      "precision@10": 0.0,
-      "recall@10": 0.0,
-      "average_precision": 0.0,
-      "ndcg@10": 0.0,
-      "ild@10": 0.0,
-      "intent_alignment": "",
-      "latency_ms": 57.48
+      "precision@10": 0.3,
+      "recall@10": 0.75,
+      "average_precision": 0.26964285714285713,
+      "ndcg@10": 0.44927383782962327,
+      "ild@10": 0.7576695361593576,
+      "intent_alignment": 0.5,
+      "latency_ms": 4.13
     }
   ]
 }

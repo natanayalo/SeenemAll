@@ -29,4 +29,7 @@ ELASTICSEARCH_KNN_NUM_CANDIDATES = int(
 # Set false to restore the legacy SQL allowlist. Hybrid ranking always uses the
 # client-side weighted RRF implementation, which works with every ES license.
 RETRIEVAL_CONSOLIDATED_FILTERS = _env_bool("RETRIEVAL_CONSOLIDATED_FILTERS", "false")
+RETRIEVAL_PREFILTER_BOOSTS_ENABLED = _env_bool(
+    "RETRIEVAL_PREFILTER_BOOSTS_ENABLED", "true"
+)
 ANN_BACKEND = os.getenv("ANN_BACKEND", "elasticsearch").strip().lower()

@@ -34,6 +34,34 @@ class Intent(BaseModel):
     include_people: Optional[List[str]] = Field(
         None, description="List of person names or IDs to include."
     )
+    include_actors: Optional[List[str]] = Field(
+        None, description="List of actor names to include."
+    )
+    include_directors: Optional[List[str]] = Field(
+        None, description="List of director names to include."
+    )
+    include_producers: Optional[List[str]] = Field(
+        None, description="List of producer names to include."
+    )
+    include_writers: Optional[List[str]] = Field(
+        None, description="List of writer names to include."
+    )
     streaming_providers: Optional[List[str]] = Field(
         None, description="Preferred streaming providers (normalized identifiers)."
+    )
+    reference_titles: Optional[List[str]] = Field(
+        None,
+        description="List of referenced movie/show titles (e.g., 'Arrival', 'The Matrix').",
+    )
+    franchises: Optional[List[str]] = Field(
+        None,
+        description="List of referenced franchises or series (e.g., 'Star Wars', 'Avatar').",
+    )
+    keywords: Optional[List[str]] = Field(
+        None,
+        description="List of thematic or mood keywords (e.g., 'existentialism', 'cyberpunk').",
+    )
+    is_vibe: Optional[bool] = Field(
+        None,
+        description="Whether the query expresses a mood or vibe intent.",
     )

@@ -152,6 +152,9 @@ class QueryUnderstanding:
     backend_override_normalized: str | None = None
     preferred_services: Set[str] = field(default_factory=set)
     prefilter_kwargs: Dict[str, Any] = field(default_factory=dict)
+    matched_collection_ids: List[int] = field(default_factory=list)
+    collection_item_ids: List[int] = field(default_factory=list)
+    is_chronological_requested: bool = False
 
 
 @dataclass

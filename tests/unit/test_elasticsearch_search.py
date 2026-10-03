@@ -84,9 +84,13 @@ def test_knn_search_builds_body(monkeypatch: pytest.MonkeyPatch) -> None:
     text_body = text_call["body"]
     assert "knn" not in text_body
     text_bool = text_body["query"]["bool"]
-    assert any("multi_match" in clause for clause in text_bool["must"])
+    assert any("multi_match" in clause for clause in text_bool["should"])
     assert {"terms": {"genres": ["sci-fi"]}} in text_bool["filter"]
-    assert text_bool["should"] == [{"terms": {"keywords": ["space"]}}]
+    assert any(
+        clause.get("terms", {}).get("keywords") == ["space"]
+        for clause in text_bool["should"]
+    )
+    assert text_bool["minimum_should_match"] == 1
     assert text_call["_source"]["includes"] == ["title"]
 
 

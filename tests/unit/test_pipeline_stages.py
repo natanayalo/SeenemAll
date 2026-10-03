@@ -168,6 +168,84 @@ async def test_resolve_query_intent(monkeypatch):
     assert intent.candidate_limit >= 10
 
 
+@pytest.mark.asyncio
+async def test_resolve_query_intent_with_roles(monkeypatch):
+    from api.core.intent_parser import Intent
+
+    mock_request = MagicMock(spec=Request)
+    mock_request.app.state.entity_linker = None
+    mock_db = MagicMock()
+    mock_db.execute.return_value.all.return_value = []
+
+    mock_llm_intent = Intent(
+        include_directors=["Christopher Nolan"],
+        include_actors=["Keanu Reeves"],
+        include_producers=["Steven Spielberg"],
+        include_writers=["Quentin Tarantino"],
+        include_people=["Tom Cruise"],
+        reference_titles=["Arrival"],
+        franchises=["Star Wars"],
+        languages=["fr"],
+    )
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "_parse_llm_intent",
+        lambda query, user_context, linked_entities: mock_llm_intent,
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "get_query_filters",
+        lambda q: MagicMock(
+            languages=(),
+            keywords=(),
+            genres=(),
+            media_types=(),
+            cast=(),
+            directors=(),
+            producers=(),
+            writers=(),
+            residual_text=q or "",
+            reference_titles=(),
+        ),
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "encode_texts",
+        lambda texts: np.ones((len(texts), 384), dtype=np.float32),
+    )
+
+    ctx = UserContext(
+        canonical_id="u1",
+        user_id="u1",
+        profile=None,
+        long_v=None,
+        short_v=None,
+        exclude_set=set(),
+        profile_meta={},
+        cold_start=True,
+        provider_alias_map={},
+        top_query_keywords=set(),
+    )
+    params = RecommendParams(
+        user_id="u1",
+        query="film by Nolan with Keanu",
+        limit=10,
+        use_llm_intent=True,
+    )
+    intent = await resolve_query_intent(mock_request, params, ctx, mock_db)
+    assert intent.structured_search_filters is not None
+    assert intent.structured_search_filters.directors == ("Christopher Nolan",)
+    assert intent.structured_search_filters.cast == ("Keanu Reeves", "Tom Cruise")
+    assert intent.structured_search_filters.producers == ("Steven Spielberg",)
+    assert intent.structured_search_filters.writers == ("Quentin Tarantino",)
+    assert "fr" in intent.structured_search_filters.languages
+    assert "Arrival" in intent.intent_filters.reference_titles
+    assert "Star Wars" in intent.intent_filters.reference_titles
+    assert "Science Fiction" in intent.structured_search_filters.genres
+    assert "Adventure" in intent.structured_search_filters.genres
+
+
 def test_retriever_helpers():
     assert ordered_unique([1, 2, 2, 3, 1, 4]) == [1, 2, 3, 4]
     assert filter_excluded_candidate_ids([1, 2, 3, 4], {2, 4}) == [1, 3]
@@ -209,6 +287,10 @@ def test_diversity_and_presentation():
     capped = apply_franchise_cap(items, cap=2)
     assert len(capped) == 3
     assert [i["id"] for i in capped] == [1, 2, 4]
+
+    exempt_capped = apply_franchise_cap(items, cap=2, exempt_collection_ids={100})
+    assert len(exempt_capped) == 4
+    assert [i["id"] for i in exempt_capped] == [1, 2, 3, 4]
 
     assert serendipity_target(10) >= 1
     assert serendipity_target(2) == 0

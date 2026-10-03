@@ -392,6 +392,23 @@ def test_item_matches_people_filters():
     filters_dir = SearchFilters(directors=("Christopher McQuarrie",))
     assert item_matches_people_filters(mock_item, filters_dir) is True
 
+    # Multi-role filter for the same person: matches if person is in any of their specified roles
+    filters_multi_role = SearchFilters(cast=("Tom Cruise",), producers=("Tom Cruise",))
+    assert item_matches_people_filters(mock_item, filters_multi_role) is True
+
+    # Multi-person filter: both different people must be satisfied
+    filters_two_people = SearchFilters(
+        cast=("Tom Cruise",), directors=("Christopher McQuarrie",)
+    )
+    assert item_matches_people_filters(mock_item, filters_two_people) is True
+
+    filters_two_people_missing_one = SearchFilters(
+        cast=("Tom Cruise",), directors=("Steven Spielberg",)
+    )
+    assert (
+        item_matches_people_filters(mock_item, filters_two_people_missing_one) is False
+    )
+
 
 # --- 7. End-to-End score_candidates Integration Test ---
 

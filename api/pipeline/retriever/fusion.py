@@ -56,7 +56,10 @@ def retrieve_candidates(
     )
 
     allowlist = prefilter.allowed_ids
-    boost_ids = prefilter.boost_ids or []
+    boost_ids = list(getattr(intent, "collection_item_ids", ()) or [])
+    for bid in prefilter.boost_ids or []:
+        if bid not in boost_ids:
+            boost_ids.append(bid)
     enforce_genres = prefilter.enforce_genres
     candidate_limit = intent.candidate_limit
     exclude = list(context.exclude_set)
@@ -143,15 +146,16 @@ def retrieve_candidates(
         if priority:
             combined: List[int] = list(priority)
             seen_all = set(priority)
+            pool_cap = max(candidate_limit, len(priority) + candidate_limit)
             for candidate in ids:
                 if candidate in seen_all:
                     continue
                 combined.append(candidate)
                 seen_all.add(candidate)
-                if len(combined) >= candidate_limit:
+                if len(combined) >= pool_cap:
                     break
 
-            ids = combined[:candidate_limit]
+            ids = combined[:pool_cap]
             for idx, candidate in enumerate(priority):
                 if candidate not in ids:
                     continue
