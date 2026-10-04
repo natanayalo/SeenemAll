@@ -58,16 +58,19 @@ COPY --from=builder /app/requirements.txt /app/requirements-openvino.txt /app/re
 RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip,sharing=locked \
     pip install --no-index --find-links=/wheels -r requirements-docker.txt
 
+ENV HF_HOME=/opt/models/huggingface \
+    SENTENCE_TRANSFORMERS_HOME=/opt/models/sentence-transformers
+
 # Pre-download default sentence-transformers model and cross-encoder to eliminate first-request cold start
 RUN python -c "from sentence_transformers import SentenceTransformer, CrossEncoder; SentenceTransformer('all-MiniLM-L6-v2'); CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')"
 
-# Copy application code
-COPY . .
-
 # Export the pinned GLiNER checkpoint into the OpenVINO IR used by the request path.
-# Keep the source checkpoint cache out of the final image layer.
-RUN HF_HOME=/tmp/gliner-hf-cache python scripts/export_gliner_openvino.py \
-    && rm -rf /tmp/gliner-hf-cache
+COPY scripts/export_gliner_openvino.py scripts/export_gliner_openvino.py
+RUN --mount=type=cache,id=gliner-hf-cache,target=/tmp/gliner-hf-cache \
+    HF_HOME=/tmp/gliner-hf-cache python scripts/export_gliner_openvino.py
+
+# Copy application code after model preparation to preserve those cached layers.
+COPY . .
 
 EXPOSE 8000
 ENTRYPOINT ["/opt/venv/bin/uvicorn"]

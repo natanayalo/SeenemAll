@@ -56,7 +56,22 @@ def retrieve_candidates(
     )
 
     allowlist = prefilter.allowed_ids
-    boost_ids = prefilter.boost_ids or []
+    raw_collection_ids = list(getattr(intent, "collection_item_ids", ()) or [])
+    allow_set: set[int] | None = None
+    if allowlist is not None:
+        valid_set = set(allowlist)
+        allow_set = valid_set
+        collection_ids = [cid for cid in raw_collection_ids if cid in valid_set]
+        boost_ids = list(collection_ids)
+        for bid in prefilter.boost_ids or []:
+            if bid not in boost_ids and bid in valid_set:
+                boost_ids.append(bid)
+    else:
+        collection_ids = raw_collection_ids
+        boost_ids = list(collection_ids)
+        for bid in prefilter.boost_ids or []:
+            if bid not in boost_ids:
+                boost_ids.append(bid)
     enforce_genres = prefilter.enforce_genres
     candidate_limit = intent.candidate_limit
     exclude = list(context.exclude_set)
@@ -137,21 +152,24 @@ def retrieve_candidates(
         for candidate in boost_ids:
             if candidate in context.exclude_set or candidate in seen_priority:
                 continue
+            if allow_set is not None and candidate not in allow_set:
+                continue
             priority.append(candidate)
             seen_priority.add(candidate)
 
         if priority:
             combined: List[int] = list(priority)
             seen_all = set(priority)
+            pool_cap = max(candidate_limit, len(priority) + candidate_limit)
             for candidate in ids:
                 if candidate in seen_all:
                     continue
                 combined.append(candidate)
                 seen_all.add(candidate)
-                if len(combined) >= candidate_limit:
+                if len(combined) >= pool_cap:
                     break
 
-            ids = combined[:candidate_limit]
+            ids = combined[:pool_cap]
             for idx, candidate in enumerate(priority):
                 if candidate not in ids:
                     continue

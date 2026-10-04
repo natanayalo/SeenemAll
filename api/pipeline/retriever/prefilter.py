@@ -21,6 +21,24 @@ from api.pipeline.models import PrefilterDecision
 
 logger = logging.getLogger("api.routes.recommend")
 
+LANGUAGE_TO_ISO: Dict[str, str] = {
+    "french": "fr",
+    "korean": "ko",
+    "japanese": "ja",
+    "spanish": "es",
+    "german": "de",
+    "italian": "it",
+    "english": "en",
+    "chinese": "zh",
+    "mandarin": "zh",
+    "hindi": "hi",
+    "tamil": "ta",
+    "swedish": "sv",
+    "danish": "da",
+    "norwegian": "no",
+    "finnish": "fi",
+}
+
 
 def relax_filters_for_people(filters: SearchFilters | None) -> SearchFilters | None:
     if not filters:
@@ -41,6 +59,33 @@ def relax_filters_for_people(filters: SearchFilters | None) -> SearchFilters | N
         runtime_gte=filters.runtime_gte,
         runtime_lte=filters.runtime_lte,
         exclude_item_ids=filters.exclude_item_ids,
+        is_vibe=filters.is_vibe,
+    )
+
+
+def relax_people_filters(filters: SearchFilters | None) -> SearchFilters | None:
+    """Drop people constraints when person names fail to match catalog entities."""
+    if not filters:
+        return None
+    return SearchFilters(
+        include_item_ids=filters.include_item_ids,
+        media_types=filters.media_types,
+        providers=filters.providers,
+        maturity=filters.maturity,
+        languages=filters.languages,
+        keywords=filters.keywords,
+        genres=filters.genres,
+        cast=(),
+        directors=(),
+        producers=(),
+        writers=(),
+        release_year_gte=filters.release_year_gte,
+        release_year_lte=filters.release_year_lte,
+        runtime_gte=filters.runtime_gte,
+        runtime_lte=filters.runtime_lte,
+        exclude_item_ids=filters.exclude_item_ids,
+        strict_genres=filters.strict_genres,
+        is_vibe=filters.is_vibe,
     )
 
 
@@ -414,7 +459,11 @@ def prefilter_allowed_ids(
 
     keyword_boost_ids: List[int] = []
     keyword_boost_active = False
-    if intent_keywords:
+    if (
+        config.RETRIEVAL_PREFILTER_BOOSTS_ENABLED
+        and intent_keywords
+        and not getattr(intent, "is_vibe", False)
+    ):
         keyword_boost_ids.extend(
             run_query_fn(
                 db,
@@ -452,10 +501,19 @@ def prefilter_allowed_ids(
     keyword_min = max(1, boost_cap // 2)
 
     def _resolve_boost_ids(primary: Sequence[int]) -> List[int]:
+        if not config.RETRIEVAL_PREFILTER_BOOSTS_ENABLED:
+            return []
+        if not strict_genres and not keyword_boost_ids:
+            return []
+        if getattr(intent, "reference_titles", None) or getattr(
+            intent, "is_vibe", False
+        ):
+            return []
         if keyword_boost_ids:
             combined = list(keyword_boost_ids)
             if len(combined) < boost_cap or len(keyword_boost_ids) < keyword_min:
-                combined.extend(primary)
+                if strict_genres:
+                    combined.extend(primary)
             return _unique_slice(combined, boost_cap)
         return _unique_slice(primary, boost_cap)
 

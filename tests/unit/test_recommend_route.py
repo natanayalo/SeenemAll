@@ -1470,6 +1470,7 @@ def test_prefilter_prefers_keyword_boosts(monkeypatch):
     from api import config
 
     monkeypatch.setattr(config, "RETRIEVAL_CONSOLIDATED_FILTERS", True)
+    monkeypatch.setattr(config, "RETRIEVAL_PREFILTER_BOOSTS_ENABLED", True)
 
     class PrefilterSession:
         def __init__(self):
@@ -1514,6 +1515,52 @@ def test_prefilter_prefers_keyword_boosts(monkeypatch):
     assert result.allowed_ids is None
     assert result.boost_ids[:3] == [10, 11, 12]
     assert len(result.boost_ids) <= 10
+
+
+def test_prefilter_boost_flag_preserves_strict_allowlist(monkeypatch):
+    from api import config
+
+    monkeypatch.setattr(config, "RETRIEVAL_CONSOLIDATED_FILTERS", False)
+    monkeypatch.setattr(config, "RETRIEVAL_PREFILTER_BOOSTS_ENABLED", False)
+
+    class PrefilterSession:
+        bind = SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+
+    intent = IntentFilters(
+        raw_query="fun tv show",
+        keywords=["fun"],
+        media_types=["tv"],
+    )
+
+    def fake_run_prefilter(
+        db,
+        intent,
+        *,
+        fetch_limit,
+        include_genres,
+        required_services=None,
+        prefer_top_rated=False,
+        require_all_genres=False,
+        genres_override=None,
+        include_keywords=False,
+        require_all_keywords=False,
+        keywords_override=None,
+    ):
+        if include_keywords:
+            return [90]
+        if include_genres:
+            return list(range(1, 15))
+        return list(range(101, 115))
+
+    monkeypatch.setattr(
+        recommend_routes, "_run_prefilter_query", fake_run_prefilter, raising=False
+    )
+
+    result = ORIGINAL_PREFILTER(PrefilterSession(), intent, limit=10)
+
+    assert result.allowed_ids == list(range(1, 15))
+    assert result.boost_ids == []
+    assert result.keyword_boosted is False
 
 
 def test_float_from_env_parses_values(monkeypatch):

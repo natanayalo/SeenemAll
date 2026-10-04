@@ -264,7 +264,7 @@ Elasticsearch documents include the above fields so both ANN and the reranker ca
 - **Backfill embeddings**: `make embed EMBED_VERSION=v2`
 - **Run cold-start milestone**: use `--resolve-titles` to test natural-language queries against sparse catalogs.
 - **Switch ANN backend**: set `ANN_BACKEND=pgvector` in `.env` to force Postgres retrieval (useful for benchmarking).
-- **Elasticsearch hybrid retrieval**: lexical and vector results are fused by the client with weighted RRF (lexical weight 1.5), so hybrid search works with the Basic license. Set `RETRIEVAL_CONSOLIDATED_FILTERS=1` to apply structured filters in retrieval and skip the full SQL ANN allowlist; set it to `0` to roll back that consolidation. `make es-sync` drains the Postgres change queue; catalog ETL targets drain it automatically after each run.
+- **Elasticsearch hybrid retrieval**: lexical and vector results are fused by the client with weighted RRF (lexical weight 1.5), so hybrid search works with the Basic license. Set `RETRIEVAL_CONSOLIDATED_FILTERS=1` to apply structured filters in retrieval and skip the full SQL ANN allowlist; set it to `0` to roll back that consolidation. Set `RETRIEVAL_PREFILTER_BOOSTS_ENABLED=0` to disable SQL prefilter candidate boosts while retaining eligibility filters. `make es-sync` drains the Postgres change queue; catalog ETL targets drain it automatically after each run.
 - **Reranker small model**: `RERANK_PROVIDER=small` selects the local MiniLM alternative. The default is the Cross-Encoder.
 
 ---

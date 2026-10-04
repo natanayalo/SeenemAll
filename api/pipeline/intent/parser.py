@@ -31,12 +31,15 @@ def intent_filters_from_llm(query: str | None, llm_intent: Intent) -> IntentFilt
         raw_query=query or "",
         genres=list(genres),
         moods=[],
-        media_types=[],
+        media_types=list(llm_intent.media_types or []),
         min_runtime=llm_intent.runtime_minutes_min,
         max_runtime=llm_intent.runtime_minutes_max,
         maturity_rating_max=llm_intent.maturity_rating_max,
         required_genres=[],
+        keywords=list(getattr(llm_intent, "keywords", None) or []),
     )
+    if getattr(llm_intent, "is_vibe", False):
+        setattr(filters, "is_vibe", True)
     return filters
 
 

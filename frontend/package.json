@@ -30,7 +30,8 @@
   "scripts": {
     "start": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "audit": "node audit-ci.js"
   },
   "browserslist": {
     "production": [

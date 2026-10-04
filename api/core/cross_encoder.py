@@ -271,6 +271,7 @@ def build_candidate_document(item: Dict[str, Any]) -> str:
     genres = _extract_names(item.get("genres"))
     directors = _extract_names(item.get("directors"))
     cast = _extract_names(item.get("cast"))
+    keywords = _extract_names(item.get("keywords"))
 
     parts: List[str] = []
     header_bits: List[str] = []
@@ -289,6 +290,8 @@ def build_candidate_document(item: Dict[str, Any]) -> str:
         parts.append("Directed by " + ", ".join(directors[:3]))
     if cast:
         parts.append("Starring " + ", ".join(cast[:4]))
+    if keywords:
+        parts.append("Keywords: " + ", ".join(keywords[:8]))
     if overview:
         parts.append(overview)
 

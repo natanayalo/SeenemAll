@@ -42,6 +42,7 @@ class SearchFilters:
     runtime_lte: Optional[int] = None
     strict_genres: bool = False
     exclude_item_ids: Sequence[str] = ()
+    is_vibe: bool = False
 
 
 class ElasticsearchSearchError(RuntimeError):
@@ -105,9 +106,21 @@ def _build_filter_clauses(
             if genre_clause:
                 clauses.append(genre_clause)
 
-    keyword_clause = _terms_filter("keywords", filters.keywords)
-    if keyword_clause:
-        keyword_should.append(keyword_clause)
+    if filters.keywords:
+        kw_list = [k for k in filters.keywords if k]
+        if kw_list:
+            keyword_should.append({"terms": {"keywords": kw_list, "boost": 6.0}})
+            kw_text = " ".join(kw_list)
+            keyword_should.append(
+                {
+                    "multi_match": {
+                        "query": kw_text,
+                        "fields": ["keywords.text^6", "overview^2"],
+                        "operator": "or",
+                        "boost": 3.0,
+                    }
+                }
+            )
 
     range_clause = _range_filter(
         "release_year",
@@ -258,15 +271,15 @@ def knn_search(
             sample_ids,
         )
 
-    if text_query:
-        text_bool: Dict[str, List[Mapping[str, Any]]] = {
+    keyword_should = bool_filters.get("keyword_should", [])
+    if text_query or keyword_should:
+        text_bool: Dict[str, Any] = {
             key: list(value) for key, value in bool_filters.items()
         }
-        keyword_should = text_bool.pop("keyword_should", [])
-        if keyword_should:
-            text_bool.setdefault("should", []).extend(keyword_should)
-        text_bool.setdefault("must", []).append(
-            {
+        keyword_should_list = text_bool.pop("keyword_should", [])
+        text_multi_match: Optional[Dict[str, Any]] = None
+        if text_query:
+            text_multi_match = {
                 "multi_match": {
                     "query": text_query,
                     "type": "cross_fields",
@@ -274,7 +287,7 @@ def knn_search(
                         "title^3",
                         "directors.text^8",
                         "cast.text^4",
-                        "keywords.text^2",
+                        "keywords.text^4",
                         "overview",
                         "producers.text",
                         "writers.text",
@@ -282,7 +295,20 @@ def knn_search(
                     "operator": "or",
                 }
             }
-        )
+        is_vibe = bool(filters and getattr(filters, "is_vibe", False))
+        if keyword_should_list:
+            should_clauses: List[Mapping[str, Any]] = list(keyword_should_list)
+            if is_vibe:
+                if text_multi_match:
+                    should_clauses.insert(0, text_multi_match)
+                text_bool.setdefault("should", []).extend(should_clauses)
+                text_bool["minimum_should_match"] = 1
+            else:
+                if text_multi_match:
+                    text_bool.setdefault("must", []).append(text_multi_match)
+                text_bool.setdefault("should", []).extend(should_clauses)
+        elif text_multi_match:
+            text_bool.setdefault("must", []).append(text_multi_match)
         text_body: Dict[str, Any] = {
             "size": search_size,
             "query": {"bool": text_bool},

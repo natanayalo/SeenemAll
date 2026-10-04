@@ -392,6 +392,23 @@ def test_item_matches_people_filters():
     filters_dir = SearchFilters(directors=("Christopher McQuarrie",))
     assert item_matches_people_filters(mock_item, filters_dir) is True
 
+    # Multi-role filter for the same person: matches if person is in any of their specified roles
+    filters_multi_role = SearchFilters(cast=("Tom Cruise",), producers=("Tom Cruise",))
+    assert item_matches_people_filters(mock_item, filters_multi_role) is True
+
+    # Multi-person filter: both different people must be satisfied
+    filters_two_people = SearchFilters(
+        cast=("Tom Cruise",), directors=("Christopher McQuarrie",)
+    )
+    assert item_matches_people_filters(mock_item, filters_two_people) is True
+
+    filters_two_people_missing_one = SearchFilters(
+        cast=("Tom Cruise",), directors=("Steven Spielberg",)
+    )
+    assert (
+        item_matches_people_filters(mock_item, filters_two_people_missing_one) is False
+    )
+
 
 # --- 7. End-to-End score_candidates Integration Test ---
 
@@ -477,3 +494,74 @@ def test_score_candidates_integration():
     assert "features" in item
     assert item["features"]["semantic_affinity"] > 0.7
     assert item["features"]["bayesian_vote"] > 0.8
+
+
+def test_score_candidates_vibe_handles_string_release_year_and_vote_count():
+    mock_item = MagicMock(spec=Item)
+    mock_item.id = 101
+    mock_item.title = "Midsommar 2"
+    mock_item.media_type = "movie"
+    mock_item.genres = ["Horror"]
+    mock_item.release_year = "2026"
+    mock_item.runtime = 140
+    mock_item.maturity_rating = "R"
+    mock_item.popularity = 50.0
+    mock_item.vote_average = 7.5
+    mock_item.vote_count = "100"
+    mock_item.popular_rank = None
+    mock_item.trending_rank = 10
+    mock_item.top_rated_rank = None
+    mock_item.directors = []
+    mock_item.cast = []
+    mock_item.keywords = ["dread"]
+
+    vec = np.ones(384, dtype=np.float32) / np.sqrt(384)
+    watch_opts = []
+
+    pool = CandidatePool(
+        ids=[101],
+        merged_scores={101: {"ann": 0.9, "collab": 0.0}},
+        prefilter=PrefilterDecision(
+            allowed_ids=None, boost_ids=[], enforce_genres=False
+        ),
+        items_with_data={101: (mock_item, vec, watch_opts)},
+        boost_ids=[],
+        enforce_genres=False,
+        structured_search_filters=None,
+    )
+
+    filters = IntentFilters("sun-drenched dread")
+    filters.is_vibe = True
+    intent = QueryUnderstanding(
+        query="sun-drenched dread",
+        llm_intent=MagicMock(),
+        intent_filters=filters,
+        structured_search_filters=None,
+        es_text_query=None,
+        query_vec=vec,
+        prefer_top_rated=False,
+        custom_genres=[],
+        has_people_filters=False,
+        candidate_limit=10,
+        backend_override_normalized=None,
+        preferred_services=set(),
+        prefilter_kwargs={},
+    )
+    context = UserContext(
+        canonical_id="u1",
+        user_id="u1",
+        profile=None,
+        long_v=None,
+        short_v=vec,
+        exclude_set=set(),
+        profile_meta={},
+        cold_start=False,
+        provider_alias_map={},
+        top_query_keywords=set(),
+        preferred_services=set(),
+        taste_clusters=[],
+    )
+    params = RecommendParams(user_id="u1", query="sun-drenched dread", limit=10)
+    scored = score_candidates(pool, intent, params, context)
+    assert len(scored.ordered) == 1
+    assert scored.ordered[0]["id"] == 101
