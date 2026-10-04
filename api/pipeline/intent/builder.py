@@ -36,16 +36,17 @@ logger = logging.getLogger("api.routes.recommend")
 
 _SUPPORTED_ANN_BACKENDS = {"elasticsearch", "pgvector"}
 
-_STRONG_CHRONO_RE = re.compile(
-    r"\b(?:chronological(?:ly)?(?:\s+order)?|in\s+order|release\s+order|timeline(?:\s+order)?|watch\s+order)\b",
+_UNAMBIGUOUS_CHRONO_RE = re.compile(
+    r"\b(?:chronological(?:ly)?(?:\s+order)?|release\s+order|timeline(?:\s+order)?|watch\s+order)\b",
     re.IGNORECASE,
 )
+_IN_ORDER_RE = re.compile(r"\bin\s+order\b", re.IGNORECASE)
 _SEQUENCE_CUE_RE = re.compile(
     r"\b(?:trilogy|saga|series|phase|era)\b",
     re.IGNORECASE,
 )
 _RANKING_INTENT_RE = re.compile(
-    r"\b(?:best|top|highest\s+rated|greatest|favorite|favourites?|rank(?:ed|ing)?)\b",
+    r"\b(?:best|top|highest\s+rated|greatest|favorite|favourites?|rank(?:ed|ing)?|worst)\b",
     re.IGNORECASE,
 )
 
@@ -408,13 +409,15 @@ async def resolve_query_intent(
                 matched_coll_ids.append(r_coll_id)
 
     has_collection = bool(matched_coll_ids) or bool(collection_item_ids)
-    has_strong_chrono = bool(_STRONG_CHRONO_RE.search(query_lower))
+    has_unambiguous_chrono = bool(_UNAMBIGUOUS_CHRONO_RE.search(query_lower))
+    has_in_order = bool(_IN_ORDER_RE.search(query_lower))
     has_sequence_cue = bool(_SEQUENCE_CUE_RE.search(query_lower))
     has_ranking_intent = (
         bool(_RANKING_INTENT_RE.search(query_lower)) or prefer_top_rated
     )
     is_chronological = has_collection and (
-        has_strong_chrono or (has_sequence_cue and not has_ranking_intent)
+        has_unambiguous_chrono
+        or ((has_in_order or has_sequence_cue) and not has_ranking_intent)
     )
 
     if ref_names_lower:

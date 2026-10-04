@@ -308,12 +308,14 @@ async def test_resolve_query_intent_chronological_detection(monkeypatch):
         intent = await resolve_query_intent(mock_request, params, ctx, mock_db)
         assert intent.is_chronological_requested is True, f"Failed for {q}"
 
-    # 3. Sequence cues WITH explicit ranking intent (ranking intent MUST override chronological)
+    # 3. Sequence cues WITH explicit ranking intent (ranking intent MUST override chronological / 'in order')
     for q in (
         "best star wars movies",
         "best Mission Impossible series",
         "best films from the Daniel Craig era",
         "top Batman trilogy movies",
+        "Mission Impossible in order from best to worst",
+        "best Mission Impossible in order",
     ):
         params = RecommendParams(user_id="u1", query=q, limit=10)
         intent = await resolve_query_intent(mock_request, params, ctx, mock_db)
