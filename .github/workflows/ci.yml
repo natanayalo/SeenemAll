@@ -110,10 +110,12 @@ jobs:
       - name: Audit Python dependencies
         run: |
           pip-audit -r requirements.txt
-          # CVE-2026-9856 requires an attacker-controlled chat template followed
+          # CVE-2026-9856 / PYSEC-2026-3929 requires an attacker-controlled chat template followed
           # by save_pretrained(). api/core/model_security.py validates the path
           # using the upstream fix before either application save call.
-          pip-audit -r requirements-openvino.txt --ignore-vuln PYSEC-2026-3929
+          # PYSEC-2026-4174 (GHSA-x9r9-c232-4q39) affects GenerativePreTrainedModel.load_custom_generate()
+          # in transformers <= 5.8.1; SeenemAll uses embedding and classification models only.
+          pip-audit -r requirements-openvino.txt --ignore-vuln PYSEC-2026-3929 --ignore-vuln PYSEC-2026-4174
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
