@@ -68,6 +68,11 @@ _REFERENCE_GENERIC_MEDIA = {
     "story",
 }
 
+_FRANCHISE_SUFFIX_RE = re.compile(
+    r"\s+(?:collection|trilogy|saga|series|movies|films)$", re.IGNORECASE
+)
+_PAREN_RE = re.compile(r"\s*\([^)]*\)")
+
 
 @dataclass(frozen=True)
 class QueryFiltersResult:
@@ -227,12 +232,7 @@ class QueryFilterMatcher:
                     lower = cname_clean.lower()
                     _add_collection_term(lower, entry)
 
-                    base = re.sub(
-                        r"\s+(?:collection|trilogy|saga|series|movies|films)$",
-                        "",
-                        lower,
-                        flags=re.IGNORECASE,
-                    ).strip()
+                    base = _FRANCHISE_SUFFIX_RE.sub("", lower).strip()
                     if base:
                         _add_collection_term(base, entry)
                         if base.startswith("the "):
@@ -240,7 +240,7 @@ class QueryFilterMatcher:
 
                         no_paren = ""
                         if "(tv)" not in base:
-                            no_paren = re.sub(r"\s*\([^)]*\)", "", base).strip()
+                            no_paren = _PAREN_RE.sub("", base).strip()
                             if no_paren and no_paren != base:
                                 _add_collection_term(no_paren, entry)
                                 if no_paren.startswith("the "):
@@ -549,6 +549,9 @@ class QueryFilterMatcher:
             if len(key) >= 4 and (key in clean or clean in key):
                 return val
 
+        if len(clean) < 4:
+            return None
+
         matches = difflib.get_close_matches(
             clean, self._collection_map.keys(), n=1, cutoff=threshold
         )
@@ -613,6 +616,8 @@ class QueryFilterMatcher:
         lower = clean.lower()
         if lower in self._people_roles:
             return self._canonical_people.get(lower, clean), self._people_roles[lower]
+        if len(lower) < 4:
+            return None, set()
         matches = difflib.get_close_matches(
             lower, self._people_roles.keys(), n=1, cutoff=threshold
         )

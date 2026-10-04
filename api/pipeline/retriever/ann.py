@@ -265,6 +265,7 @@ class ANNRetriever(BaseRetriever):
             logger.info("Using ANN candidates for user %s", canonical_id)
             clusters = context.active_taste_clusters
             query_vec = intent.query_vec
+            active_query_vec: Sequence[float] | None = query_vec
 
             # Multi-interest retrieval when user has >= 2 active taste clusters
             if clusters and len(clusters) > 1:
@@ -292,6 +293,7 @@ class ANNRetriever(BaseRetriever):
                     q_vec = (alpha * best_c_vec) + ((1 - alpha) * query_vec)
                     q_norm = float(np.linalg.norm(q_vec))
                     q_vec = q_vec / q_norm if q_norm > 0 else q_vec
+                    active_query_vec = q_vec
 
                     cl_id = (
                         best_cluster.cluster_id
@@ -390,8 +392,8 @@ class ANNRetriever(BaseRetriever):
                     intent.structured_search_filters = relaxed_filters
                     structured_search_filters = relaxed_filters
                     fallback_vec = (
-                        q_vec
-                        if "q_vec" in locals()
+                        active_query_vec
+                        if active_query_vec is not None
                         else (
                             _extract_centroid(clusters[0])
                             if clusters
@@ -436,8 +438,8 @@ class ANNRetriever(BaseRetriever):
                         intent.structured_search_filters = no_people_filters
                         structured_search_filters = no_people_filters
                         fallback_vec = (
-                            q_vec
-                            if "q_vec" in locals()
+                            active_query_vec
+                            if active_query_vec is not None
                             else (
                                 _extract_centroid(clusters[0])
                                 if clusters
