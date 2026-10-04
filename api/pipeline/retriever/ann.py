@@ -371,8 +371,10 @@ class ANNRetriever(BaseRetriever):
                     q_vec = (alpha * short_v) + ((1 - alpha) * query_vec)
                     q_norm = float(np.linalg.norm(q_vec))
                     q_vec = q_vec / q_norm if q_norm > 0 else q_vec
+                    active_query_vec = q_vec
                 else:
                     q_vec = short_v
+                    active_query_vec = q_vec
 
                 ids = _run_ann_query(
                     ann_candidates_fn,

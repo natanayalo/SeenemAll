@@ -520,3 +520,311 @@ def test_prefilter_relaxation_and_helpers():
     assert relaxed is not None
     assert relaxed.cast == ("Tom Cruise",)
     assert relaxed.genres == ()  # genres relaxed
+
+
+@pytest.mark.asyncio
+async def test_franchise_relevance_ordering_preserved_without_chronological_sort(
+    monkeypatch,
+):
+    """Verify franchise items are promoted to top while strictly preserving reranker relevance ordering."""
+    pipeline = get_pipeline()
+    mock_request = MagicMock(spec=Request)
+    mock_request.app.state.entity_linker = None
+    mock_db = MagicMock()
+    mock_db.execute.return_value.all.return_value = []
+    mock_db.execute.return_value.scalars.return_value.all.return_value = []
+
+    # Suppose reranker scores Star Wars 2015 higher than Star Wars 1977
+    reranked_output = [
+        {
+            "id": 200,
+            "collection_id": 10,
+            "release_year": 2015,
+            "title": "The Force Awakens",
+        },
+        {"id": 100, "collection_id": 10, "release_year": 1977, "title": "A New Hope"},
+        {
+            "id": 300,
+            "collection_id": None,
+            "release_year": 2020,
+            "title": "Unrelated Movie",
+        },
+    ]
+    monkeypatch.setattr(
+        "api.pipeline.runner.rerank_candidates", lambda *a, **kw: list(reranked_output)
+    )
+
+    from api.pipeline.models import CandidatePool, PrefilterDecision, QueryUnderstanding
+    from api.core.legacy_intent_parser import IntentFilters
+
+    intent = QueryUnderstanding(
+        query="best star wars movies",
+        llm_intent=MagicMock(),
+        intent_filters=IntentFilters("best star wars movies"),
+        structured_search_filters=None,
+        es_text_query=None,
+        query_vec=None,
+        prefer_top_rated=False,
+        custom_genres=[],
+        has_people_filters=False,
+        candidate_limit=10,
+        matched_collection_ids=[10],
+        collection_item_ids=[100, 200],
+    )
+
+    mock_item_1 = MagicMock(
+        id=100,
+        tmdb_id=100,
+        media_type="movie",
+        title="A New Hope",
+        overview="",
+        genres=[],
+        release_year=1977,
+        runtime=120,
+        original_language="en",
+        collection_id=10,
+        collection_name="Star Wars",
+        poster_url=None,
+        popularity=10.0,
+        vote_average=8.6,
+        vote_count=1000,
+        popular_rank=None,
+        trending_rank=None,
+        top_rated_rank=None,
+        directors=[],
+        cast=[],
+        keywords=[],
+    )
+    mock_item_2 = MagicMock(
+        id=200,
+        tmdb_id=200,
+        media_type="movie",
+        title="The Force Awakens",
+        overview="",
+        genres=[],
+        release_year=2015,
+        runtime=135,
+        original_language="en",
+        collection_id=10,
+        collection_name="Star Wars",
+        poster_url=None,
+        popularity=12.0,
+        vote_average=7.8,
+        vote_count=1500,
+        popular_rank=None,
+        trending_rank=None,
+        top_rated_rank=None,
+        directors=[],
+        cast=[],
+        keywords=[],
+    )
+    mock_item_3 = MagicMock(
+        id=300,
+        tmdb_id=300,
+        media_type="movie",
+        title="Unrelated Movie",
+        overview="",
+        genres=[],
+        release_year=2020,
+        runtime=90,
+        original_language="en",
+        collection_id=None,
+        collection_name=None,
+        poster_url=None,
+        popularity=5.0,
+        vote_average=6.0,
+        vote_count=100,
+        popular_rank=None,
+        trending_rank=None,
+        top_rated_rank=None,
+        directors=[],
+        cast=[],
+        keywords=[],
+    )
+
+    def fake_retrieve(db, ctx, it):
+        return CandidatePool(
+            ids=[200, 100, 300],
+            merged_scores={
+                200: {"ann": 0.9},
+                100: {"ann": 0.8},
+                300: {"ann": 0.5},
+            },
+            prefilter=PrefilterDecision(
+                allowed_ids=None, boost_ids=[], enforce_genres=False
+            ),
+            items_with_data={
+                100: (mock_item_1, np.ones(384, dtype=np.float32), []),
+                200: (mock_item_2, np.ones(384, dtype=np.float32), []),
+                300: (mock_item_3, np.ones(384, dtype=np.float32), []),
+            },
+            boost_ids=[100, 200],
+            enforce_genres=False,
+            structured_search_filters=None,
+        )
+
+    monkeypatch.setattr("api.pipeline.runner.retrieve_candidates", fake_retrieve)
+
+    async def fake_resolve(req, p, u, db):
+        return intent
+
+    monkeypatch.setattr("api.pipeline.runner.resolve_query_intent", fake_resolve)
+
+    params = RecommendParams(user_id="u_sw", query="best star wars movies", limit=5)
+    res = await pipeline.run(mock_request, params, mock_db)
+
+    # Franchise items must be at the front, but in reranker relevance order
+    # (id=200 before id=100, NOT sorted by release_year 1977 before 2015)
+    returned_ids = [it["id"] for it in res.items]
+    assert returned_ids == [200, 100, 300]
+
+
+def test_franchise_collection_boosts_respect_provider_allowlist_in_fusion(monkeypatch):
+    """Verify collection item IDs outside the prefilter allowlist are not boosted."""
+    from api.pipeline.retriever.fusion import retrieve_candidates
+    from api.pipeline.models import PrefilterDecision, QueryUnderstanding, UserContext
+    from api.core.legacy_intent_parser import IntentFilters
+
+    mock_db = MagicMock()
+    mock_db.execute.return_value.scalars.return_value.all.return_value = []
+
+    # Prefilter allows only items 10 and 20 (e.g. available on Netflix)
+    fake_prefilter = PrefilterDecision(
+        allowed_ids=[10, 20], boost_ids=[10], enforce_genres=False
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "_prefilter_allowed_ids",
+        lambda *a, **kw: fake_prefilter,
+    )
+    monkeypatch.setattr(
+        "api.pipeline.retriever.fusion.prefilter_allowed_ids",
+        lambda *a, **kw: fake_prefilter,
+    )
+    monkeypatch.setattr(
+        "api.pipeline.retriever.fusion.ANNRetriever.retrieve",
+        lambda self, db, ctx, intent, allowlist: ([10], False),
+    )
+    monkeypatch.setattr(
+        "api.pipeline.retriever.fusion.collaborative_candidates",
+        lambda *a, **kw: [],
+    )
+    monkeypatch.setattr(
+        "api.pipeline.retriever.fusion.trending_prior_candidates",
+        lambda *a, **kw: [],
+    )
+
+    ctx = UserContext(
+        canonical_id="u1",
+        user_id="u1",
+        profile=None,
+        long_v=None,
+        short_v=np.ones(384, dtype=np.float32),
+        exclude_set=set(),
+        profile_meta={},
+        cold_start=False,
+        provider_alias_map={},
+        top_query_keywords=set(),
+    )
+
+    # Intent has collection_item_ids containing 10, 20, 30, 40 (where 30, 40 are not in allowlist)
+    intent = QueryUnderstanding(
+        query="harry potter movies on netflix",
+        llm_intent=MagicMock(),
+        intent_filters=IntentFilters("harry potter movies on netflix"),
+        structured_search_filters=None,
+        es_text_query=None,
+        query_vec=np.ones(384, dtype=np.float32),
+        prefer_top_rated=False,
+        custom_genres=[],
+        has_people_filters=False,
+        candidate_limit=10,
+        preferred_services={"netflix"},
+        matched_collection_ids=[1241],
+        collection_item_ids=[10, 20, 30, 40],
+    )
+
+    pool = retrieve_candidates(mock_db, ctx, intent)
+
+    # boost_ids in pool must NOT contain items 30 or 40
+    assert 30 not in pool.boost_ids
+    assert 40 not in pool.boost_ids
+    assert pool.boost_ids == [10, 20]
+
+
+def test_single_vector_people_fallback_preserves_blended_active_query_vec(monkeypatch):
+    """Verify that in single-vector personalized mode, people-filter fallback uses blended q_vec rather than query_vec alone."""
+    from api.pipeline.retriever.ann import ANNRetriever
+    from api.pipeline.models import QueryUnderstanding, UserContext
+    from api.core.legacy_intent_parser import IntentFilters
+    from api.core.elasticsearch_search import SearchFilters
+
+    mock_db = MagicMock()
+    vec_calls = []
+
+    def fake_ann_candidates(db, query_vec, exclude, **kw):
+        vec_calls.append(np.array(query_vec, copy=True))
+        # First call (with people filters) returns empty to trigger fallback
+        if len(vec_calls) == 1:
+            return []
+        # Fallback call returns item 999
+        return [999]
+
+    retriever = ANNRetriever()
+    short_v = np.zeros(384, dtype=np.float32)
+    short_v[0] = 1.0  # Unit vector along axis 0 (user taste)
+
+    query_v = np.zeros(384, dtype=np.float32)
+    query_v[1] = 1.0  # Unit vector along axis 1 (query)
+
+    ctx = UserContext(
+        canonical_id="u1",
+        user_id="u1",
+        profile=None,
+        long_v=None,
+        short_v=short_v,
+        exclude_set=set(),
+        profile_meta={},
+        cold_start=False,
+        provider_alias_map={},
+        top_query_keywords=set(),
+    )
+
+    search_filters = SearchFilters(
+        cast=("Nonexistent Actor",),
+        genres=("Action",),
+    )
+
+    intent = QueryUnderstanding(
+        query="action with Nonexistent Actor",
+        llm_intent=MagicMock(),
+        intent_filters=IntentFilters("action with Nonexistent Actor"),
+        structured_search_filters=search_filters,
+        es_text_query=None,
+        query_vec=query_v,
+        prefer_top_rated=False,
+        custom_genres=[],
+        has_people_filters=True,
+        candidate_limit=10,
+    )
+
+    monkeypatch.setattr(recommend_routes, "ann_candidates", fake_ann_candidates)
+    monkeypatch.setattr(
+        "api.pipeline.retriever.ann.ann_candidates", fake_ann_candidates
+    )
+
+    ids, rewrite_used = retriever.retrieve(mock_db, ctx, intent, allowlist=None)
+
+    assert ids == [999]
+    assert len(vec_calls) == 2
+
+    # The first call uses the blended vector
+    first_vec = vec_calls[0]
+    # The fallback call MUST also use the blended vector (active_query_vec), NOT raw query_v!
+    fallback_vec = vec_calls[1]
+
+    np.testing.assert_allclose(fallback_vec, first_vec, rtol=1e-5, atol=1e-5)
+    # Ensure it's not just query_v (taste contribution must be present)
+    assert (
+        fallback_vec[0] > 0.0
+    ), "User taste vector contribution (axis 0) was lost in fallback vector!"

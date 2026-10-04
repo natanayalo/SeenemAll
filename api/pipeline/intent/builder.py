@@ -8,7 +8,8 @@ from fastapi import HTTPException, Request
 from sqlalchemy import cast, select, String
 from sqlalchemy.orm import Session
 
-from api.db.models import Item
+from api.config import COUNTRY_DEFAULT
+from api.db.models import Availability, Item
 from api.core.elasticsearch_search import SearchFilters
 from api.core.filter_matcher import get_filter_matcher, get_query_filters
 from api.core.legacy_intent_parser import parse_intent as legacy_parse_intent
@@ -337,6 +338,15 @@ async def resolve_query_intent(
                 coll_stmt = coll_stmt.where(~cast(Item.genres, String).ilike(f"%{ex}%"))
         if "movie" in media_type_filters or "movie" in (intent.media_types or []):
             coll_stmt = coll_stmt.where(Item.media_type == "movie")
+        if providers_list:
+            coll_stmt = coll_stmt.where(
+                Item.id.in_(
+                    select(Availability.item_id).where(
+                        Availability.country == COUNTRY_DEFAULT,
+                        Availability.service.in_(providers_list),
+                    )
+                )
+            )
         coll_stmt = coll_stmt.order_by(Item.release_year.asc().nulls_last())
         coll_rows = db.execute(coll_stmt).all()
         collection_item_ids = [r.id for r in coll_rows]
@@ -358,6 +368,15 @@ async def resolve_query_intent(
             mcu_stmt = mcu_stmt.where(Item.release_year <= llm_intent.year_max)
         if "movie" in media_type_filters or "movie" in (intent.media_types or []):
             mcu_stmt = mcu_stmt.where(Item.media_type == "movie")
+        if providers_list:
+            mcu_stmt = mcu_stmt.where(
+                Item.id.in_(
+                    select(Availability.item_id).where(
+                        Availability.country == COUNTRY_DEFAULT,
+                        Availability.service.in_(providers_list),
+                    )
+                )
+            )
         mcu_stmt = mcu_stmt.order_by(Item.release_year.asc().nulls_last())
         mcu_rows = db.execute(mcu_stmt).all()
         for r in mcu_rows:
@@ -365,22 +384,6 @@ async def resolve_query_intent(
                 collection_item_ids.append(r.id)
             if r.collection_id and r.collection_id not in matched_coll_ids:
                 matched_coll_ids.append(r.collection_id)
-
-    chronological_cues = (
-        "chronological",
-        "in order",
-        "release order",
-        "timeline",
-        "order",
-        "trilogy",
-        "saga",
-        "series",
-        "phase",
-        "era",
-    )
-    is_chronological = (bool(matched_coll_ids) or bool(collection_item_ids)) and any(
-        cue in query_lower for cue in chronological_cues
-    )
 
     if ref_names_lower:
         cast_filters = [
@@ -532,5 +535,4 @@ async def resolve_query_intent(
         prefilter_kwargs=prefilter_kwargs,
         matched_collection_ids=matched_coll_ids,
         collection_item_ids=collection_item_ids,
-        is_chronological_requested=is_chronological,
     )
