@@ -251,12 +251,9 @@ async def test_resolve_query_intent_chronological_detection(monkeypatch):
     mock_request = MagicMock(spec=Request)
     mock_request.app.state.entity_linker = None
     mock_db = MagicMock()
-    # Mock collection resolution returning collection_id 10 and item IDs 100, 200
-    mock_db.execute.return_value.all.side_effect = [
-        [(10,)],  # collection_ids from title search
-        [MagicMock(id=100), MagicMock(id=200)],  # collection items
-        [(10,)],  # second query collection_ids
-        [MagicMock(id=100), MagicMock(id=200)],  # second query items
+    mock_db.execute.return_value.all.return_value = [
+        (100, 1977),
+        (200, 2015),
     ]
 
     monkeypatch.setattr(
@@ -295,19 +292,39 @@ async def test_resolve_query_intent_chronological_detection(monkeypatch):
         top_query_keywords=set(),
     )
 
-    # 1. Query with chronological cue
-    params_chrono = RecommendParams(
-        user_id="u1", query="Star Wars chronological", limit=10
-    )
-    intent_chrono = await resolve_query_intent(
-        mock_request, params_chrono, ctx, mock_db
-    )
-    assert intent_chrono.is_chronological_requested is True
+    # 1. Queries with explicit strong chronological cues
+    for q in (
+        "Star Wars chronological",
+        "Star Wars in order",
+        "release order Star Wars",
+    ):
+        params = RecommendParams(user_id="u1", query=q, limit=10)
+        intent = await resolve_query_intent(mock_request, params, ctx, mock_db)
+        assert intent.is_chronological_requested is True, f"Failed for {q}"
 
-    # 2. Query without chronological cue
-    params_best = RecommendParams(user_id="u1", query="best star wars movies", limit=10)
-    intent_best = await resolve_query_intent(mock_request, params_best, ctx, mock_db)
-    assert intent_best.is_chronological_requested is False
+    # 2. Sequence cues without ranking intent (e.g. browsing a trilogy / saga)
+    for q in ("The Lord of the Rings trilogy", "The Godfather saga"):
+        params = RecommendParams(user_id="u1", query=q, limit=10)
+        intent = await resolve_query_intent(mock_request, params, ctx, mock_db)
+        assert intent.is_chronological_requested is True, f"Failed for {q}"
+
+    # 3. Sequence cues WITH explicit ranking intent (ranking intent MUST override chronological)
+    for q in (
+        "best star wars movies",
+        "best Mission Impossible series",
+        "best films from the Daniel Craig era",
+        "top Batman trilogy movies",
+    ):
+        params = RecommendParams(user_id="u1", query=q, limit=10)
+        intent = await resolve_query_intent(mock_request, params, ctx, mock_db)
+        assert intent.is_chronological_requested is False, f"Failed for {q}"
+
+    # 4. Phrases containing 'order' without chronological intent (avoid false positives)
+    params_hp = RecommendParams(
+        user_id="u1", query="Harry Potter and the Order of the Phoenix", limit=10
+    )
+    intent_hp = await resolve_query_intent(mock_request, params_hp, ctx, mock_db)
+    assert intent_hp.is_chronological_requested is False
 
 
 def test_retriever_helpers():
