@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-03T22:46:00.687355+00:00",
+  "timestamp": "2026-10-04T09:43:43.991226+00:00",
   "backend": "elasticsearch",
   "config": "default",
   "k": 10,
@@ -13,9 +13,9 @@
     "coverage_ratio": 0.0,
     "gini": 0.14164145019636656,
     "intent_alignment": 0.8949206349206349,
-    "latency_mean": 42.273687095955886,
-    "latency_p50": 4.369949994725175,
-    "latency_p95": 5.875030007155143,
+    "latency_mean": 726.749947644543,
+    "latency_p50": 625.7048914994812,
+    "latency_p95": 1090.7378328418413,
     "count": 62,
     "category_metrics": {
       "franchise": {
@@ -103,7 +103,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.4187458780616607,
       "intent_alignment": 0.9,
-      "latency_ms": 2281.64
+      "latency_ms": 6116.41
     },
     {
       "backend": "elasticsearch",
@@ -117,7 +117,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.47184688786149187,
       "intent_alignment": 1.0,
-      "latency_ms": 5.92
+      "latency_ms": 1097.29
     },
     {
       "backend": "elasticsearch",
@@ -131,7 +131,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.5610750349829317,
       "intent_alignment": 0.8,
-      "latency_ms": 4.74
+      "latency_ms": 943.11
     },
     {
       "backend": "elasticsearch",
@@ -145,7 +145,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.5110615892141379,
       "intent_alignment": 0.7,
-      "latency_ms": 5.0
+      "latency_ms": 1190.48
     },
     {
       "backend": "elasticsearch",
@@ -159,7 +159,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.650414908029228,
       "intent_alignment": 1.0,
-      "latency_ms": 5.03
+      "latency_ms": 696.96
     },
     {
       "backend": "elasticsearch",
@@ -173,7 +173,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.6448800687134746,
       "intent_alignment": 1.0,
-      "latency_ms": 3.9
+      "latency_ms": 292.05
     },
     {
       "backend": "elasticsearch",
@@ -187,7 +187,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.5934802376416416,
       "intent_alignment": 0.6,
-      "latency_ms": 4.62
+      "latency_ms": 689.11
     },
     {
       "backend": "elasticsearch",
@@ -201,7 +201,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.5719250130220205,
       "intent_alignment": 0.95,
-      "latency_ms": 5.0
+      "latency_ms": 839.6
     },
     {
       "backend": "elasticsearch",
@@ -215,7 +215,7 @@
       "ndcg@10": 0.8696762340896295,
       "ild@10": 0.3232740623683165,
       "intent_alignment": 0.9,
-      "latency_ms": 4.45
+      "latency_ms": 856.48
     },
     {
       "backend": "elasticsearch",
@@ -229,7 +229,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.5413725503791909,
       "intent_alignment": 0.85,
-      "latency_ms": 4.67
+      "latency_ms": 570.51
     },
     {
       "backend": "elasticsearch",
@@ -243,7 +243,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.5121223958509152,
       "intent_alignment": 1.0,
-      "latency_ms": 4.69
+      "latency_ms": 614.59
     },
     {
       "backend": "elasticsearch",
@@ -257,7 +257,7 @@
       "ndcg@10": 0.9896062251871525,
       "ild@10": 0.41689009784977893,
       "intent_alignment": 1.0,
-      "latency_ms": 4.97
+      "latency_ms": 718.79
     },
     {
       "backend": "elasticsearch",
@@ -271,7 +271,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.6235383949666413,
       "intent_alignment": 0.7,
-      "latency_ms": 4.98
+      "latency_ms": 879.14
     },
     {
       "backend": "elasticsearch",
@@ -285,7 +285,7 @@
       "ndcg@10": 0.4371994911049732,
       "ild@10": 0.6978896471150854,
       "intent_alignment": 1.0,
-      "latency_ms": 4.21
+      "latency_ms": 888.15
     },
     {
       "backend": "elasticsearch",
@@ -299,7 +299,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.677954123207702,
       "intent_alignment": 1.0,
-      "latency_ms": 5.06
+      "latency_ms": 610.76
     },
     {
       "backend": "elasticsearch",
@@ -313,7 +313,7 @@
       "ndcg@10": 0.3391602052736161,
       "ild@10": 0.666752640920614,
       "intent_alignment": 1.0,
-      "latency_ms": 4.35
+      "latency_ms": 813.39
     },
     {
       "backend": "elasticsearch",
@@ -327,7 +327,7 @@
       "ndcg@10": 0.369453583111095,
       "ild@10": 0.6386462041925158,
       "intent_alignment": 1.0,
-      "latency_ms": 4.36
+      "latency_ms": 791.36
     },
     {
       "backend": "elasticsearch",
@@ -341,7 +341,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.7401454309377401,
       "intent_alignment": 1.0,
-      "latency_ms": 3.99
+      "latency_ms": 815.15
     },
     {
       "backend": "elasticsearch",
@@ -355,7 +355,7 @@
       "ndcg@10": 0.36005461457723403,
       "ild@10": 0.6652511215224525,
       "intent_alignment": 1.0,
-      "latency_ms": 4.72
+      "latency_ms": 806.37
     },
     {
       "backend": "elasticsearch",
@@ -369,7 +369,7 @@
       "ndcg@10": 0.11305340175787204,
       "ild@10": 0.7614548648382814,
       "intent_alignment": 1.0,
-      "latency_ms": 4.92
+      "latency_ms": 894.49
     },
     {
       "backend": "elasticsearch",
@@ -383,7 +383,7 @@
       "ndcg@10": 0.24816574496561808,
       "ild@10": 0.681344778197585,
       "intent_alignment": 1.0,
-      "latency_ms": 4.51
+      "latency_ms": 621.1
     },
     {
       "backend": "elasticsearch",
@@ -397,7 +397,7 @@
       "ndcg@10": 0.4371994911049732,
       "ild@10": 0.7188204416115288,
       "intent_alignment": 1.0,
-      "latency_ms": 4.87
+      "latency_ms": 518.43
     },
     {
       "backend": "elasticsearch",
@@ -411,7 +411,7 @@
       "ndcg@10": 0.23330247263525344,
       "ild@10": 0.6606729337945063,
       "intent_alignment": 1.0,
-      "latency_ms": 4.51
+      "latency_ms": 673.53
     },
     {
       "backend": "elasticsearch",
@@ -425,7 +425,7 @@
       "ndcg@10": 0.6366824387328317,
       "ild@10": 0.6218330966904795,
       "intent_alignment": 1.0,
-      "latency_ms": 4.78
+      "latency_ms": 587.55
     },
     {
       "backend": "elasticsearch",
@@ -439,7 +439,7 @@
       "ndcg@10": 0.2188505885308512,
       "ild@10": 0.6433538032327554,
       "intent_alignment": 1.0,
-      "latency_ms": 4.81
+      "latency_ms": 585.55
     },
     {
       "backend": "elasticsearch",
@@ -453,7 +453,7 @@
       "ndcg@10": 0.34519134224686937,
       "ild@10": 0.6598392796300764,
       "intent_alignment": 1.0,
-      "latency_ms": 4.93
+      "latency_ms": 444.22
     },
     {
       "backend": "elasticsearch",
@@ -467,7 +467,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.0,
       "intent_alignment": 0.6,
-      "latency_ms": 3.32
+      "latency_ms": 295.83
     },
     {
       "backend": "elasticsearch",
@@ -481,7 +481,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.7063473236836226,
       "intent_alignment": 1.0,
-      "latency_ms": 4.44
+      "latency_ms": 598.42
     },
     {
       "backend": "elasticsearch",
@@ -495,7 +495,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.7177690984344116,
       "intent_alignment": 1.0,
-      "latency_ms": 4.33
+      "latency_ms": 514.0
     },
     {
       "backend": "elasticsearch",
@@ -509,7 +509,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.0,
       "intent_alignment": "",
-      "latency_ms": 32.06
+      "latency_ms": 138.59
     },
     {
       "backend": "elasticsearch",
@@ -523,7 +523,7 @@
       "ndcg@10": 0.3903800499921017,
       "ild@10": 0.5646975324608424,
       "intent_alignment": 1.0,
-      "latency_ms": 3.44
+      "latency_ms": 655.07
     },
     {
       "backend": "elasticsearch",
@@ -537,7 +537,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.6463797259129375,
       "intent_alignment": 1.0,
-      "latency_ms": 4.4
+      "latency_ms": 408.95
     },
     {
       "backend": "elasticsearch",
@@ -551,7 +551,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.662340457006442,
       "intent_alignment": 1.0,
-      "latency_ms": 3.85
+      "latency_ms": 537.21
     },
     {
       "backend": "elasticsearch",
@@ -565,7 +565,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.7600346224984557,
       "intent_alignment": 0.9333333333333332,
-      "latency_ms": 4.81
+      "latency_ms": 800.62
     },
     {
       "backend": "elasticsearch",
@@ -579,7 +579,7 @@
       "ndcg@10": 0.6366824387328317,
       "ild@10": 0.5984290512874898,
       "intent_alignment": 0.9333333333333332,
-      "latency_ms": 3.83
+      "latency_ms": 484.06
     },
     {
       "backend": "elasticsearch",
@@ -593,7 +593,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.0,
       "intent_alignment": "",
-      "latency_ms": 49.12
+      "latency_ms": 182.02
     },
     {
       "backend": "elasticsearch",
@@ -607,7 +607,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.7279583884533035,
       "intent_alignment": 1.0,
-      "latency_ms": 4.33
+      "latency_ms": 682.03
     },
     {
       "backend": "elasticsearch",
@@ -621,7 +621,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.6643986818012282,
       "intent_alignment": 1.0,
-      "latency_ms": 4.26
+      "latency_ms": 725.77
     },
     {
       "backend": "elasticsearch",
@@ -635,7 +635,7 @@
       "ndcg@10": 0.37994992542064054,
       "ild@10": 0.5666623599204399,
       "intent_alignment": 1.0,
-      "latency_ms": 4.33
+      "latency_ms": 966.25
     },
     {
       "backend": "elasticsearch",
@@ -649,7 +649,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.6422955258057136,
       "intent_alignment": 0.65,
-      "latency_ms": 4.03
+      "latency_ms": 469.22
     },
     {
       "backend": "elasticsearch",
@@ -663,7 +663,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.6957024502660759,
       "intent_alignment": 0.0,
-      "latency_ms": 4.42
+      "latency_ms": 593.7
     },
     {
       "backend": "elasticsearch",
@@ -677,7 +677,7 @@
       "ndcg@10": 0.11751610475642714,
       "ild@10": 0.772577940934384,
       "intent_alignment": 1.0,
-      "latency_ms": 4.24
+      "latency_ms": 555.49
     },
     {
       "backend": "elasticsearch",
@@ -691,7 +691,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.6710191170088828,
       "intent_alignment": 0.75,
-      "latency_ms": 4.19
+      "latency_ms": 444.28
     },
     {
       "backend": "elasticsearch",
@@ -705,7 +705,7 @@
       "ndcg@10": 0.16812753627111746,
       "ild@10": 0.6525467171723954,
       "intent_alignment": 1.0,
-      "latency_ms": 4.03
+      "latency_ms": 542.62
     },
     {
       "backend": "elasticsearch",
@@ -719,7 +719,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.6861217342738611,
       "intent_alignment": 1.0,
-      "latency_ms": 4.02
+      "latency_ms": 448.34
     },
     {
       "backend": "elasticsearch",
@@ -733,7 +733,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.5906707311340057,
       "intent_alignment": 0.8,
-      "latency_ms": 4.77
+      "latency_ms": 872.78
     },
     {
       "backend": "elasticsearch",
@@ -747,7 +747,7 @@
       "ndcg@10": 0.3764290720714305,
       "ild@10": 0.6965639858602557,
       "intent_alignment": 1.0,
-      "latency_ms": 4.36
+      "latency_ms": 755.64
     },
     {
       "backend": "elasticsearch",
@@ -761,7 +761,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.7049460842499522,
       "intent_alignment": 1.0,
-      "latency_ms": 4.3
+      "latency_ms": 1172.97
     },
     {
       "backend": "elasticsearch",
@@ -775,7 +775,7 @@
       "ndcg@10": 0.8385465274895063,
       "ild@10": 0.7041569538830604,
       "intent_alignment": 0.9,
-      "latency_ms": 3.99
+      "latency_ms": 847.41
     },
     {
       "backend": "elasticsearch",
@@ -789,7 +789,7 @@
       "ndcg@10": 0.20210734650054757,
       "ild@10": 0.6764263405700582,
       "intent_alignment": 0.95,
-      "latency_ms": 4.38
+      "latency_ms": 685.46
     },
     {
       "backend": "elasticsearch",
@@ -803,7 +803,7 @@
       "ndcg@10": 0.18154179253735267,
       "ild@10": 0.7360307011946603,
       "intent_alignment": 1.0,
-      "latency_ms": 4.63
+      "latency_ms": 916.24
     },
     {
       "backend": "elasticsearch",
@@ -817,7 +817,7 @@
       "ndcg@10": 0.9828920819566879,
       "ild@10": 0.6859659923559527,
       "intent_alignment": 1.0,
-      "latency_ms": 3.36
+      "latency_ms": 293.16
     },
     {
       "backend": "elasticsearch",
@@ -831,7 +831,7 @@
       "ndcg@10": 0.7227265726449519,
       "ild@10": 0.5485248722742901,
       "intent_alignment": 1.0,
-      "latency_ms": 3.77
+      "latency_ms": 344.39
     },
     {
       "backend": "elasticsearch",
@@ -845,7 +845,7 @@
       "ndcg@10": 0.9267582364714126,
       "ild@10": 0.6036404826028784,
       "intent_alignment": 0.9285714285714286,
-      "latency_ms": 3.36
+      "latency_ms": 356.72
     },
     {
       "backend": "elasticsearch",
@@ -859,7 +859,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.7495875506125603,
       "intent_alignment": 1.0,
-      "latency_ms": 3.68
+      "latency_ms": 220.52
     },
     {
       "backend": "elasticsearch",
@@ -873,7 +873,7 @@
       "ndcg@10": 0.38268031849431083,
       "ild@10": 0.6482729685478336,
       "intent_alignment": 1.0,
-      "latency_ms": 3.67
+      "latency_ms": 367.39
     },
     {
       "backend": "elasticsearch",
@@ -887,7 +887,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.6252499952229158,
       "intent_alignment": 0.7,
-      "latency_ms": 5.04
+      "latency_ms": 528.51
     },
     {
       "backend": "elasticsearch",
@@ -901,7 +901,7 @@
       "ndcg@10": 0.5,
       "ild@10": 0.6466845205939108,
       "intent_alignment": 0.75,
-      "latency_ms": 4.16
+      "latency_ms": 668.9
     },
     {
       "backend": "elasticsearch",
@@ -915,7 +915,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.6545181385020122,
       "intent_alignment": 0.0,
-      "latency_ms": 4.35
+      "latency_ms": 744.01
     },
     {
       "backend": "elasticsearch",
@@ -929,7 +929,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.6921134821340428,
       "intent_alignment": 0.9,
-      "latency_ms": 3.56
+      "latency_ms": 527.34
     },
     {
       "backend": "elasticsearch",
@@ -943,7 +943,7 @@
       "ndcg@10": 0.6131471927654584,
       "ild@10": 0.6071620824935136,
       "intent_alignment": 1.0,
-      "latency_ms": 4.35
+      "latency_ms": 529.69
     },
     {
       "backend": "elasticsearch",
@@ -957,7 +957,7 @@
       "ndcg@10": 0.44927383782962327,
       "ild@10": 0.7576695361593576,
       "intent_alignment": 0.5,
-      "latency_ms": 4.13
+      "latency_ms": 630.31
     }
   ]
 }

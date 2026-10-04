@@ -349,7 +349,7 @@ async def resolve_query_intent(
             )
         coll_stmt = coll_stmt.order_by(Item.release_year.asc().nulls_last())
         coll_rows = db.execute(coll_stmt).all()
-        collection_item_ids = [r.id for r in coll_rows]
+        collection_item_ids = [getattr(r, "id", r[0]) for r in coll_rows]
 
     # MCU franchise handling
     is_mcu_query = any(
@@ -380,10 +380,35 @@ async def resolve_query_intent(
         mcu_stmt = mcu_stmt.order_by(Item.release_year.asc().nulls_last())
         mcu_rows = db.execute(mcu_stmt).all()
         for r in mcu_rows:
-            if r.id not in collection_item_ids:
-                collection_item_ids.append(r.id)
-            if r.collection_id and r.collection_id not in matched_coll_ids:
-                matched_coll_ids.append(r.collection_id)
+            r_id = getattr(r, "id", r[0])
+            r_coll_id = (
+                getattr(r, "collection_id", r[1])
+                if (
+                    hasattr(r, "collection_id")
+                    or (isinstance(r, (tuple, list)) and len(r) > 1)
+                )
+                else None
+            )
+            if r_id not in collection_item_ids:
+                collection_item_ids.append(r_id)
+            if r_coll_id and r_coll_id not in matched_coll_ids:
+                matched_coll_ids.append(r_coll_id)
+
+    chronological_cues = (
+        "chronological",
+        "in order",
+        "release order",
+        "timeline",
+        "order",
+        "trilogy",
+        "saga",
+        "series",
+        "phase",
+        "era",
+    )
+    is_chronological = (bool(matched_coll_ids) or bool(collection_item_ids)) and any(
+        cue in query_lower for cue in chronological_cues
+    )
 
     if ref_names_lower:
         cast_filters = [
@@ -535,4 +560,5 @@ async def resolve_query_intent(
         prefilter_kwargs=prefilter_kwargs,
         matched_collection_ids=matched_coll_ids,
         collection_item_ids=collection_item_ids,
+        is_chronological_requested=is_chronological,
     )

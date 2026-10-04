@@ -246,6 +246,70 @@ async def test_resolve_query_intent_with_roles(monkeypatch):
     assert "Adventure" in intent.structured_search_filters.genres
 
 
+@pytest.mark.asyncio
+async def test_resolve_query_intent_chronological_detection(monkeypatch):
+    mock_request = MagicMock(spec=Request)
+    mock_request.app.state.entity_linker = None
+    mock_db = MagicMock()
+    # Mock collection resolution returning collection_id 10 and item IDs 100, 200
+    mock_db.execute.return_value.all.side_effect = [
+        [(10,)],  # collection_ids from title search
+        [MagicMock(id=100), MagicMock(id=200)],  # collection items
+        [(10,)],  # second query collection_ids
+        [MagicMock(id=100), MagicMock(id=200)],  # second query items
+    ]
+
+    monkeypatch.setattr(
+        recommend_routes,
+        "get_query_filters",
+        lambda q: MagicMock(
+            languages=(),
+            keywords=(),
+            genres=(),
+            media_types=(),
+            cast=(),
+            directors=(),
+            producers=(),
+            writers=(),
+            residual_text=q or "",
+            reference_titles=(),
+            matched_collections=((10, "Star Wars Collection"),),
+        ),
+    )
+    monkeypatch.setattr(
+        recommend_routes,
+        "encode_texts",
+        lambda texts: np.ones((len(texts), 384), dtype=np.float32),
+    )
+
+    ctx = UserContext(
+        canonical_id="u1",
+        user_id="u1",
+        profile=None,
+        long_v=None,
+        short_v=None,
+        exclude_set=set(),
+        profile_meta={},
+        cold_start=True,
+        provider_alias_map={},
+        top_query_keywords=set(),
+    )
+
+    # 1. Query with chronological cue
+    params_chrono = RecommendParams(
+        user_id="u1", query="Star Wars chronological", limit=10
+    )
+    intent_chrono = await resolve_query_intent(
+        mock_request, params_chrono, ctx, mock_db
+    )
+    assert intent_chrono.is_chronological_requested is True
+
+    # 2. Query without chronological cue
+    params_best = RecommendParams(user_id="u1", query="best star wars movies", limit=10)
+    intent_best = await resolve_query_intent(mock_request, params_best, ctx, mock_db)
+    assert intent_best.is_chronological_requested is False
+
+
 def test_retriever_helpers():
     assert ordered_unique([1, 2, 2, 3, 1, 4]) == [1, 2, 3, 4]
     assert filter_excluded_candidate_ids([1, 2, 3, 4], {2, 4}) == [1, 3]
@@ -677,6 +741,161 @@ async def test_franchise_relevance_ordering_preserved_without_chronological_sort
     # (id=200 before id=100, NOT sorted by release_year 1977 before 2015)
     returned_ids = [it["id"] for it in res.items]
     assert returned_ids == [200, 100, 300]
+
+
+@pytest.mark.asyncio
+async def test_franchise_chronological_sort_when_requested(monkeypatch):
+    """Verify franchise items are sorted in release-year order when is_chronological_requested is True."""
+    pipeline = get_pipeline()
+    mock_request = MagicMock(spec=Request)
+    mock_request.app.state.entity_linker = None
+    mock_db = MagicMock()
+    mock_db.execute.return_value.all.return_value = []
+    mock_db.execute.return_value.scalars.return_value.all.return_value = []
+
+    # Suppose reranker scores Star Wars 2015 higher than Star Wars 1977
+    reranked_output = [
+        {
+            "id": 200,
+            "collection_id": 10,
+            "release_year": 2015,
+            "title": "The Force Awakens",
+        },
+        {"id": 100, "collection_id": 10, "release_year": 1977, "title": "A New Hope"},
+        {
+            "id": 300,
+            "collection_id": None,
+            "release_year": 2020,
+            "title": "Unrelated Movie",
+        },
+    ]
+    monkeypatch.setattr(
+        "api.pipeline.runner.rerank_candidates", lambda *a, **kw: list(reranked_output)
+    )
+
+    from api.pipeline.models import CandidatePool, PrefilterDecision, QueryUnderstanding
+    from api.core.legacy_intent_parser import IntentFilters
+
+    intent = QueryUnderstanding(
+        query="Star Wars chronological",
+        llm_intent=MagicMock(),
+        intent_filters=IntentFilters("Star Wars chronological"),
+        structured_search_filters=None,
+        es_text_query=None,
+        query_vec=None,
+        prefer_top_rated=False,
+        custom_genres=[],
+        has_people_filters=False,
+        candidate_limit=10,
+        matched_collection_ids=[10],
+        collection_item_ids=[100, 200],
+        is_chronological_requested=True,
+    )
+
+    mock_item_1 = MagicMock(
+        id=100,
+        tmdb_id=100,
+        media_type="movie",
+        title="A New Hope",
+        overview="",
+        genres=[],
+        release_year=1977,
+        runtime=120,
+        original_language="en",
+        collection_id=10,
+        collection_name="Star Wars",
+        poster_url=None,
+        popularity=10.0,
+        vote_average=8.6,
+        vote_count=1000,
+        popular_rank=None,
+        trending_rank=None,
+        top_rated_rank=None,
+        directors=[],
+        cast=[],
+        keywords=[],
+    )
+    mock_item_2 = MagicMock(
+        id=200,
+        tmdb_id=200,
+        media_type="movie",
+        title="The Force Awakens",
+        overview="",
+        genres=[],
+        release_year=2015,
+        runtime=135,
+        original_language="en",
+        collection_id=10,
+        collection_name="Star Wars",
+        poster_url=None,
+        popularity=12.0,
+        vote_average=7.8,
+        vote_count=1500,
+        popular_rank=None,
+        trending_rank=None,
+        top_rated_rank=None,
+        directors=[],
+        cast=[],
+        keywords=[],
+    )
+    mock_item_3 = MagicMock(
+        id=300,
+        tmdb_id=300,
+        media_type="movie",
+        title="Unrelated Movie",
+        overview="",
+        genres=[],
+        release_year=2020,
+        runtime=90,
+        original_language="en",
+        collection_id=None,
+        collection_name=None,
+        poster_url=None,
+        popularity=5.0,
+        vote_average=6.0,
+        vote_count=100,
+        popular_rank=None,
+        trending_rank=None,
+        top_rated_rank=None,
+        directors=[],
+        cast=[],
+        keywords=[],
+    )
+
+    def fake_retrieve(db, ctx, it):
+        return CandidatePool(
+            ids=[200, 100, 300],
+            merged_scores={
+                200: {"ann": 0.9},
+                100: {"ann": 0.8},
+                300: {"ann": 0.5},
+            },
+            prefilter=PrefilterDecision(
+                allowed_ids=None, boost_ids=[], enforce_genres=False
+            ),
+            items_with_data={
+                100: (mock_item_1, np.ones(384, dtype=np.float32), []),
+                200: (mock_item_2, np.ones(384, dtype=np.float32), []),
+                300: (mock_item_3, np.ones(384, dtype=np.float32), []),
+            },
+            boost_ids=[100, 200],
+            enforce_genres=False,
+            structured_search_filters=None,
+        )
+
+    monkeypatch.setattr("api.pipeline.runner.retrieve_candidates", fake_retrieve)
+
+    async def fake_resolve(req, p, u, db):
+        return intent
+
+    monkeypatch.setattr("api.pipeline.runner.resolve_query_intent", fake_resolve)
+
+    params = RecommendParams(user_id="u_sw", query="Star Wars chronological", limit=5)
+    res = await pipeline.run(mock_request, params, mock_db)
+
+    # Franchise items must be sorted in release_year order (id=100 in 1977 before id=200 in 2015)
+    returned_ids = [it["id"] for it in res.items]
+    assert returned_ids == [100, 200, 300]
 
 
 def test_franchise_collection_boosts_respect_provider_allowlist_in_fusion(monkeypatch):

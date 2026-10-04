@@ -94,6 +94,13 @@ class RecommendationPipeline:
                 if it.get("collection_id") not in matched_coll_ids
                 and it.get("id") not in coll_item_ids
             ]
+            if getattr(intent, "is_chronological_requested", False):
+                franchise_items.sort(
+                    key=lambda it: (
+                        it.get("release_year") is None,
+                        it.get("release_year") or 0,
+                    )
+                )
             reranked = franchise_items + other_items
 
         pipeline_ms = (time.perf_counter() - _pipeline_start) * 1000

@@ -154,6 +154,7 @@ class QueryUnderstanding:
     prefilter_kwargs: Dict[str, Any] = field(default_factory=dict)
     matched_collection_ids: List[int] = field(default_factory=list)
     collection_item_ids: List[int] = field(default_factory=list)
+    is_chronological_requested: bool = False
 
 
 @dataclass
