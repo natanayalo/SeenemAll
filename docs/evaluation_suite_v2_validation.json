@@ -2,12 +2,12 @@
   "verified_date": "2026-10-08",
   "test_runtime": "Windows / Python 3.12.10",
   "unit_verification": {
-    "tests_passed": 777,
+    "tests_passed": 786,
     "dependency_warnings": 6,
-    "elapsed_seconds": 44.65,
-    "covered_statements": 10423,
+    "elapsed_seconds": 38.21,
+    "covered_statements": 10433,
     "statements": 12004,
-    "unrounded_coverage": 86.82939020326558,
+    "unrounded_coverage": 86.91269576807731,
     "modified_modules": [
       {
         "module": "api/core/cross_encoder.py",
@@ -47,9 +47,9 @@
       },
       {
         "module": "api/db/session.py",
-        "covered_statements": 61,
+        "covered_statements": 71,
         "statements": 71,
-        "unrounded_coverage": 85.91549295774648
+        "unrounded_coverage": 100.0
       },
       {
         "module": "api/pipeline/context.py",
@@ -387,5 +387,11 @@
     "Legacy stored-snapshot timing is not the primary cache-cold ABBA/BAAB experiment.",
     "Complete real MovieLens/Tag Genome, personalization and private-holdout promotion were not run.",
     "Raw traces, cleanup recovery archive and full logs are local-only ignored artifacts."
-  ]
+  ],
+  "ci_portability_repair": {
+    "initial_failure": "All 777 tests passed on Linux, but database-session module coverage was 56/71 (78.87323944%) below the unchanged 85% gate.",
+    "initial_ci_run": 37757510262,
+    "repair": "Nine deterministic tests cover SQL logging, listener registration, environment precedence and DNS success/failure, with isolated global state and no external database.",
+    "production_behavior_changed": false
+  }
 }

@@ -38,7 +38,13 @@ Seven superseded experiment folders, six historical review documents, retired ju
 
 Windows denies reading, deleting or moving 49 older temporary test folders under `.cache`. They remain, and their unreadable contents are not claimed to be archived. No ownership or access-control changes were made. The installed Ollama model weights were not uninstalled; this cleanup removes unused repository integrations.
 
-## Verification
+## CI portability repair
+
+The first Linux CI run passed all 777 tests but failed the unchanged per-module coverage gate: `api/db/session.py` covered 56/71 statements (78.87323944%). SQL logging coverage had depended on incidental host logging and initialization state. Nine explicit tests now cover listener registration without duplicate logs, parameter-free query logging, SQL errors, missing timing and bounded statement summaries, disabled logging, evaluation/database URL precedence, and Docker hostname resolution/fallback. Tests isolate global state and environment settings and use an in-memory SQLite database or controlled substitutes.
+
+The corrected local suite passes **786 tests**, with six dependency warnings, in **38.21 seconds**. Overall coverage is **10433/12004 = 86.9126957680773%**, with all **36 modified production modules** meeting the unrounded 85% gate. Database-session coverage is **71/71 = 100%**. Production behavior, recommendation configuration, Nimble's frozen prompt and qualification are unchanged. The committed [validation summary](evaluation_suite_v2_validation.json) records this follow-up; the earlier cleanup verification below remains historical evidence.
+
+## Verification before the CI portability repair
 
 The cleaned source passes **777 tests**, with six dependency warnings, in **44.65 seconds**. Exact overall statement coverage across API, ETL and evaluation is **10423/12004 = 86.82939020326558%**. All **36 remaining modified production modules** pass the unrounded 85% threshold. The evaluation entrypoint covers **913/1037 = 88.04243009%**; qualification covers **267/279 = 95.69892473%**; the Ollama and System One modules each cover 100%.
 
