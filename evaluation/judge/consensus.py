@@ -332,6 +332,10 @@ class ConsensusJudgeEngine:
     def get_query_qrels(self, query: str) -> Dict[str, float]:
         return self._qrels.get(self._query_key(query), {})
 
+    def seed_query_qrels(self, query: str, qrels: Dict[str, float]) -> None:
+        """Seed independently verified reference labels before judging a new pool."""
+        self._qrels[self._query_key(query)] = dict(qrels)
+
     def label_pool(
         self,
         query: str,

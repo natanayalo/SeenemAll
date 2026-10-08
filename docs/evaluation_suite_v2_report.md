@@ -2,6 +2,12 @@
 
 Updated 8 October 2026 after the Nimble-only cleanup.
 
+## Production reference migration
+
+The new immutable v2 snapshot workflow records current production separately from the historical legacy baseline. It supports frozen-ranking comparisons on the unchanged full product dataset or its development/regression subsets, verifies catalog/index/judge fingerprints, and keeps unresolved evidence explicit as provisional scores. The separate cache-cold latency measurement records the host/model runtime and cannot be compared against cached historical timings. No recommendation weights change. See [the workflow and query budget](evaluation_v2_baseline.md).
+
+Snapshot-support validation passes **840 tests**, with six dependency warnings, in **56.85 seconds**. Exact coverage is **10638/12205 = 87.161%**, with all **37 changed production modules** meeting the unrounded 85% gate. The snapshot module covers **151/158 = 95.56962025%**; 33 new regression cases check immutable references, recorded quality defects, explicit evidence gaps, incompatible/tampered inputs, index drift, execution/latency failures, and frozen-ranking/subset comparisons. The full real Nimble capture is in progress; its measured snapshot and final counts will be added when complete. Earlier verification below remains historical evidence.
+
 ## PR #39 review fixes
 
 The seven review findings are fixed. Cached and consensus judgment records preserve each model's execution status, so failed, malformed or over-limit judgments invalidate a comparison. Both systems' top-K and declared recall references must have resolved judgments in single-judge and consensus modes; insufficient evidence produces an inconclusive decision.

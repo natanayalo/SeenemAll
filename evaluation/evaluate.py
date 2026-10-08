@@ -1496,9 +1496,21 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     # Evaluation Suite v2 Flags
     parser.add_argument(
+        "--save-v2-baseline",
+        type=Path,
+        default=None,
+        help="Record an immutable full-product production v2 reference with qualified judging and cache-cold latency.",
+    )
+    parser.add_argument(
         "--v2",
         action="store_true",
         help="Enable Seen'emAll Evaluation Suite v2 (automated judging, reproducible gates).",
+    )
+    parser.add_argument(
+        "--baseline-judge-workers",
+        type=int,
+        default=2,
+        help="Independent judging workers for baseline capture (1-4); cache writes remain sequential.",
     )
     parser.add_argument(
         "--track",
@@ -1654,6 +1666,10 @@ def _comparison_params(
 
 def run_evaluation_v2(args: argparse.Namespace) -> int:
     """Execute Evaluation Suite v2 workflow."""
+    if getattr(args, "save_v2_baseline", None):
+        from evaluation.baseline_v2 import capture_baseline
+
+        return capture_baseline(args)
     # 1. Hardware Inspection Mode
     if args.hardware_inspect:
         hw_info = inspect_local_hardware()
@@ -2017,6 +2033,17 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
         s_judge = None
         t_judge = None
 
+    reference = None
+    if getattr(args, "baseline_file", None):
+        from evaluation.baseline_v2 import load_reference
+
+        try:
+            reference = load_reference(args.baseline_file, cases, p_judge, args)
+        except (ValueError, KeyError, TypeError, OSError) as exc:
+            print(f"Invalid v2 production reference: {exc}")
+            return int(EvaluationStatus.INVALID)
+        args.baseline = reference["config"]
+
     if priv_harness is not None:
         priv_cache = JudgmentCache(priv_harness.benchmark_dir / ".judgment_cache.json")
         adjudicator = PoolAdjudicator(
@@ -2041,6 +2068,14 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
 
     exec_runner = EvaluationRunner(in_process=True)
     base_params, cand_params = _comparison_params(args)
+    reference_rows = {}
+    if reference is not None:
+        reference_rows = {
+            row["case"]["case_id"]: row for row in reference["per_query_results"]
+        }
+        # Retain independently judged reference positives in the shared denominator.
+        for row in reference_rows.values():
+            engine.seed_query_qrels(row["case"]["query"], row["qrels"])
 
     gain_mode = GainMode(args.gain_mode)
 
@@ -2071,13 +2106,22 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
         k_fetch = max(args.k, 100)
 
         # Run baseline
-        base_items, base_trace = exec_runner.run_case(
-            case, params=base_params, k=k_fetch
-        )
-        if base_trace.errors:
-            exec_failures += 1
-        if base_trace.fallbacks:
-            unexpected_fallbacks += 1
+        if reference is not None:
+            base_items = [
+                {
+                    "tmdb_id": TypedId.parse(identifier).id,
+                    "media_type": TypedId.parse(identifier).media_type,
+                }
+                for identifier in reference_rows[case.case_id]["ranked_ids"]
+            ]
+        else:
+            base_items, base_trace = exec_runner.run_case(
+                case, params=base_params, k=k_fetch
+            )
+            if base_trace.errors:
+                exec_failures += 1
+            if base_trace.fallbacks:
+                unexpected_fallbacks += 1
 
         # Run candidate
         cand_items, cand_trace = exec_runner.run_case(
@@ -2313,6 +2357,9 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
         "track": args.track,
         "split": args.split,
         "baseline": args.baseline,
+        "baseline_source": (
+            str(args.baseline_file) if reference is not None else "live configuration"
+        ),
         "candidate": args.candidate,
         "gain_mode": args.gain_mode,
         "judgment_mode": args.judgment_mode,
@@ -2333,6 +2380,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     if (
         args.v2
+        or args.save_v2_baseline
         or args.qualify_judges
         or args.hardware_inspect
         or args.latency_benchmark

@@ -2,12 +2,12 @@
   "verified_date": "2026-10-08",
   "test_runtime": "Windows / Python 3.12.10",
   "unit_verification": {
-    "tests_passed": 807,
+    "tests_passed": 840,
     "dependency_warnings": 6,
-    "elapsed_seconds": 52.41,
-    "covered_statements": 10458,
-    "statements": 12024,
-    "unrounded_coverage": 86.97604790419162,
+    "elapsed_seconds": 56.85,
+    "covered_statements": 10638,
+    "statements": 12205,
+    "unrounded_coverage": 87.16099959033183,
     "modified_modules": [
       {
         "module": "api/core/cross_encoder.py",
@@ -88,6 +88,12 @@
         "unrounded_coverage": 92.36842105263158
       },
       {
+        "module": "evaluation/baseline_v2.py",
+        "covered_statements": 151,
+        "statements": 158,
+        "unrounded_coverage": 95.56962025316456
+      },
+      {
         "module": "evaluation/build_dataset_splits.py",
         "covered_statements": 101,
         "statements": 103,
@@ -119,9 +125,9 @@
       },
       {
         "module": "evaluation/evaluate.py",
-        "covered_statements": 922,
-        "statements": 1046,
-        "unrounded_coverage": 88.14531548757171
+        "covered_statements": 943,
+        "statements": 1067,
+        "unrounded_coverage": 88.37863167760075
       },
       {
         "module": "evaluation/evidence.py",
@@ -143,9 +149,9 @@
       },
       {
         "module": "evaluation/judge/consensus.py",
-        "covered_statements": 182,
-        "statements": 186,
-        "unrounded_coverage": 97.84946236559139
+        "covered_statements": 184,
+        "statements": 188,
+        "unrounded_coverage": 97.87234042553192
       },
       {
         "module": "evaluation/judge/ollama.py",
@@ -185,9 +191,9 @@
       },
       {
         "module": "evaluation/metrics.py",
-        "covered_statements": 179,
+        "covered_statements": 185,
         "statements": 193,
-        "unrounded_coverage": 92.74611398963731
+        "unrounded_coverage": 95.85492227979275
       },
       {
         "module": "evaluation/models.py",
@@ -514,5 +520,122 @@
       ".cache/pr39-ab.log",
       ".cache/pr39-regression.log"
     ]
+  },
+  "production_v2_baseline": {
+    "status": "capture_in_progress",
+    "path": "evaluation/baseline_v2.json",
+    "configuration": "default",
+    "backend": "elasticsearch",
+    "full_queries": 101,
+    "dev_queries": 51,
+    "regression_queries": 50,
+    "declared_reference_entries": 379,
+    "maximum_capture_judgments": 1389,
+    "latency_queries": 10,
+    "timed_latency_requests": 400,
+    "latency_warmup_requests": 10,
+    "added_unit_regression_cases": 33,
+    "snapshot_module_coverage": {
+      "module": "evaluation/baseline_v2.py",
+      "covered_statements": 151,
+      "statements": 158,
+      "unrounded_coverage": 95.56962025316456
+    },
+    "latest_legacy_ab": {
+      "backend": "elasticsearch",
+      "baseline_param": "default",
+      "candidate_param": "default",
+      "k": 10,
+      "comparisons": {
+        "ndcg": {
+          "metric": "nDCG@10",
+          "baseline": 0.4430057236653608,
+          "candidate": 0.449395261630625,
+          "delta": 0.006389537965264203,
+          "lift_percent": 1.4423149914177529
+        },
+        "map": {
+          "metric": "MAP",
+          "baseline": 0.38340237570076274,
+          "candidate": 0.38742649674101287,
+          "delta": 0.004024121040250128,
+          "lift_percent": 1.049581665448747
+        },
+        "precision": {
+          "metric": "Precision@10",
+          "baseline": 0.19354838709677416,
+          "candidate": 0.19677419354838704,
+          "delta": 0.0032258064516128837,
+          "lift_percent": 1.666666666666657
+        },
+        "recall": {
+          "metric": "Recall@10",
+          "baseline": 0.4725806451612903,
+          "candidate": 0.4782258064516129,
+          "delta": 0.005645161290322609,
+          "lift_percent": 1.194539249146764
+        },
+        "ild": {
+          "metric": "Intra-List Diversity",
+          "baseline": 0.6086782359700724,
+          "candidate": 0.608624611465243,
+          "delta": -5.3624504829374864e-05,
+          "lift_percent": -0.008809992153557381
+        },
+        "unique_count": {
+          "metric": "Unique Items Rec'd",
+          "baseline": 469.0,
+          "candidate": 467.0,
+          "delta": -2.0,
+          "lift_percent": -0.42643923240938164
+        },
+        "intent_alignment": {
+          "metric": "Intent Adherence",
+          "baseline": 0.8949206349206349,
+          "candidate": 0.8932539682539683,
+          "delta": -0.0016666666666665941,
+          "lift_percent": -0.1862362539907688
+        },
+        "latency_mean": {
+          "metric": "Latency Mean (ms)",
+          "baseline": 42.273687095955886,
+          "candidate": 1145.6367967785486,
+          "delta": 1103.3631096825927,
+          "lift_percent": 2610.0470185581376
+        },
+        "latency_p50": {
+          "metric": "Latency P50 (ms)",
+          "baseline": 4.369949994725175,
+          "candidate": 842.5373500213027,
+          "delta": 838.1674000265775,
+          "lift_percent": 19180.2515140517
+        },
+        "latency_p95": {
+          "metric": "Latency P95 (ms)",
+          "baseline": 5.875030007155143,
+          "candidate": 1500.6425699975805,
+          "delta": 1494.7675399904253,
+          "lift_percent": 25442.721793249773
+        }
+      },
+      "quality_gate": {
+        "enabled": true,
+        "passed": false,
+        "checks": {
+          "latency_mean_improved": false,
+          "latency_p95_improved": false,
+          "ndcg_non_regression": true,
+          "map_non_regression": true
+        }
+      }
+    },
+    "legacy_regression": {
+      "ndcg_at_10": 0.449395261630625,
+      "ndcg_threshold": 0.72,
+      "ild_at_10": 0.608624611465243,
+      "ild_threshold": 0.45,
+      "passed": false,
+      "timing_note": "Historical cached baseline is not a comparable performance experiment"
+    }
   }
 }
