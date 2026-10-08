@@ -16,6 +16,8 @@ Capture requests current production once per quality query. It stores typed rank
 
 Successful evidence abstentions are stored as unresolved, without invented grades. A snapshot with these gaps has `quality_status: inconclusive` and `judgments_complete: false`; its arithmetic scores are provisional because unknown grades count as zero. Recording production's defects does not certify it for promotion. Execution failures prevent a usable reference and leave a diagnostic report.
 
+Successful empty responses are recorded as quality defects with zero retrieval scores. Completeness is capped at 100%. The judge's conservative input guard accepts up to 4,096 characters without truncating evidence; a cached resource rejection is retried only when its unchanged input now fits that guard.
+
 ## Compare
 
 ```text

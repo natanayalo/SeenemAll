@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Pinned public Nimble tokenizer artifact fingerprint in evaluation provenance"
+regexTarget = "line"
+regexes = [
+  '''^\s*"tokenizer_revision"\s*:\s*"9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",?\s*$''',
+]

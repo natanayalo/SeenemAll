@@ -1,10 +1,10 @@
 {
-  "verified_date": "2026-10-08",
+  "verified_date": "2026-10-09",
   "test_runtime": "Windows / Python 3.12.10",
   "unit_verification": {
-    "tests_passed": 840,
+    "tests_passed": 843,
     "dependency_warnings": 6,
-    "elapsed_seconds": 56.85,
+    "elapsed_seconds": 69.26,
     "covered_statements": 10638,
     "statements": 12205,
     "unrounded_coverage": 87.16099959033183,
@@ -89,9 +89,9 @@
       },
       {
         "module": "evaluation/baseline_v2.py",
-        "covered_statements": 151,
-        "statements": 158,
-        "unrounded_coverage": 95.56962025316456
+        "covered_statements": 149,
+        "statements": 156,
+        "unrounded_coverage": 95.51282051282051
       },
       {
         "module": "evaluation/build_dataset_splits.py",
@@ -149,9 +149,9 @@
       },
       {
         "module": "evaluation/judge/consensus.py",
-        "covered_statements": 184,
-        "statements": 188,
-        "unrounded_coverage": 97.87234042553192
+        "covered_statements": 186,
+        "statements": 190,
+        "unrounded_coverage": 97.89473684210526
       },
       {
         "module": "evaluation/judge/ollama.py",
@@ -522,7 +522,7 @@
     ]
   },
   "production_v2_baseline": {
-    "status": "capture_in_progress",
+    "status": "captured",
     "path": "evaluation/baseline_v2.json",
     "configuration": "default",
     "backend": "elasticsearch",
@@ -534,12 +534,12 @@
     "latency_queries": 10,
     "timed_latency_requests": 400,
     "latency_warmup_requests": 10,
-    "added_unit_regression_cases": 33,
+    "added_unit_regression_cases": 36,
     "snapshot_module_coverage": {
       "module": "evaluation/baseline_v2.py",
-      "covered_statements": 151,
-      "statements": 158,
-      "unrounded_coverage": 95.56962025316456
+      "covered_statements": 149,
+      "statements": 156,
+      "unrounded_coverage": 95.51282051282051
     },
     "latest_legacy_ab": {
       "backend": "elasticsearch",
@@ -636,6 +636,82 @@
       "ild_threshold": 0.45,
       "passed": false,
       "timing_note": "Historical cached baseline is not a comparable performance experiment"
-    }
+    },
+    "quality_status": "inconclusive",
+    "judgments_complete": false,
+    "snapshot_sha256": "6994907dbe82d11d8e279c14c4e72a8228934f3e89710c7bfe721d40ea710d0d",
+    "created_at": "2026-10-08T22:09:15.890185+00:00",
+    "started_at": "2026-10-08T22:06:51.134016+00:00",
+    "actual_pooled_judgment_records": 1084,
+    "unresolved_judgments": 94,
+    "queries_with_unresolved_judgments": 38,
+    "queries_with_constraint_violations": 26,
+    "queries_with_canonical_prefix_defects": 2,
+    "execution_failures": [],
+    "quality_defects": {
+      "unexpected_empty_queries": 5
+    },
+    "quality_metrics": {
+      "ndcg_at_k": 0.7328765270544918,
+      "precision_at_k": 0.5237623762376237,
+      "ap_at_k": 0.6633677358447513,
+      "known_positive_recall_100": 0.852950322504778,
+      "completeness": 0.8643564356435645
+    },
+    "latency": {
+      "passed": true,
+      "errors": [],
+      "error_count": 0,
+      "actual_inferences_performed": 400,
+      "cache_hits": 0,
+      "median_paired_ratio": 0.9943,
+      "median_paired_ratio_pass": true,
+      "threshold_median_ratio": 1.1,
+      "p95_ratio": 1.0037,
+      "p95_ratio_pass": true,
+      "threshold_p95_ratio": 1.15,
+      "baseline_p50_ms": 137.83,
+      "baseline_p95_ms": 248.35,
+      "candidate_p50_ms": 137.83,
+      "candidate_p95_ms": 249.28,
+      "total_measurements": 400,
+      "queries": [
+        "Star Wars chronological",
+        "mind-bending sci-fi movies like Inception",
+        "Korean horror movies under 2h on Netflix",
+        "Christopher Nolan sci-fi mind-bending movies",
+        "cozy autumn mystery",
+        "90s action movies under 100 minutes",
+        "Hayao Miyazaki studio ghibli anime",
+        "The Lord of the Rings trilogy",
+        "melancholy coming-of-age dramas",
+        "French romance movies from the 2000s"
+      ],
+      "policy": "warm models; result caches bypassed; five ABBA/BAAB repetitions; same production config in both arms",
+      "runtime_note": "Hardware and API runtime are deployment-specific; rerun both configurations together for future latency comparisons"
+    },
+    "runtime": {
+      "platform": "Windows-11-10.0.26300-SP0",
+      "python": "3.12.10",
+      "cpu": "Intel64 Family 6 Model 189 Stepping 1, GenuineIntel",
+      "logical_cpus": 8,
+      "execution": "in_process",
+      "cross_encoder_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+      "cross_encoder_backend": "openvino",
+      "cross_encoder_device": "GPU",
+      "note": "Locally executed production configuration; timings are specific to this host and model runtime"
+    },
+    "index_artifact_checksum": "e1f9bbb717931215283e17defe58415f621da5326fd5863af03385e4b06524f8",
+    "judge_fingerprint": "1f005ca2ac68f282d51b2dd9ccc9a8ded5b01a34c0dd8e25e25888e2ecd860cd",
+    "code_identity": {
+      "revision": "8e2cf88d59006f2b8bb2acf8f625b9f4f1310e78",
+      "tracked_diff_sha256": "61548e9d1010f0c67ba02e40663f8c38335e5c0ef39b0e37a19bfd7f9970962a",
+      "production_source_sha256": "7f70bd5d7ee8a7981e6be5498341aef7f9b3fd4d68629745f0cacd06613840c7"
+    },
+    "limitations": [
+      "The quality arithmetic is provisional when evidence remains unresolved; comparison coverage gates remain enforced.",
+      "This is the initial production reference for the v2 contract. Legacy scores and cached timings are not comparable.",
+      "Latency describes this host and runtime. Rerun baseline and candidate together for future speed comparisons."
+    ]
   }
 }

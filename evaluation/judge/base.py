@@ -37,7 +37,8 @@ STANDARD_RUBRIC_TEXT = (
 )
 
 
-MAX_INPUT_CHARS = 4000
+# A conservative character guard, separate from the model's token context.
+MAX_INPUT_CHARS = 4096
 
 
 class LocalJudgeAdapter(ABC):

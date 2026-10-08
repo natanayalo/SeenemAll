@@ -1,12 +1,27 @@
 # Evaluation Suite v2 delivery report
 
-Updated 8 October 2026 after the Nimble-only cleanup.
+Updated 9 October 2026 with the measured production reference.
 
 ## Production reference migration
 
 The new immutable v2 snapshot workflow records current production separately from the historical legacy baseline. It supports frozen-ranking comparisons on the unchanged full product dataset or its development/regression subsets, verifies catalog/index/judge fingerprints, and keeps unresolved evidence explicit as provisional scores. The separate cache-cold latency measurement records the host/model runtime and cannot be compared against cached historical timings. No recommendation weights change. See [the workflow and query budget](evaluation_v2_baseline.md).
 
-Snapshot-support validation passes **840 tests**, with six dependency warnings, in **56.85 seconds**. Exact coverage is **10638/12205 = 87.161%**, with all **37 changed production modules** meeting the unrounded 85% gate. The snapshot module covers **151/158 = 95.56962025%**; 33 new regression cases check immutable references, recorded quality defects, explicit evidence gaps, incompatible/tampered inputs, index drift, execution/latency failures, and frozen-ranking/subset comparisons. The full real Nimble capture is in progress; its measured snapshot and final counts will be added when complete. Earlier verification below remains historical evidence.
+Final validation passes **843 tests**, with six dependency warnings, in **69.26 seconds**. Exact coverage is **10638/12205 = 87.161%**, with all **37 changed production modules** meeting the unrounded 85% gate. The snapshot module covers **149/156 = 95.51282051%**. Regression cases cover immutable references, recorded quality defects, explicit evidence gaps, incompatible/tampered inputs, index drift, execution/latency failures, and frozen-ranking/subset comparisons. The real production snapshot is committed at `evaluation/baseline_v2.json`: 101 queries, 1084 pooled judgments, 94 unresolved judgments across 38 queries, and no execution failures. Five provider queries returned empty lists; these remain recorded quality defects. Its quality status is **inconclusive**; scores remain provisional where evidence is unresolved. Earlier verification below remains historical evidence.
+
+
+### Measured initial v2 reference
+
+| Metric | Current production (`default`) |
+| --- | ---: |
+| nDCG@10 | 0.732877 |
+| MAP@10 (all known positives denominator) | 0.663368 |
+| Precision@10 | 0.523762 |
+| Known-positive Recall@100 | 0.852950 |
+| Completeness ratio | 0.864356 |
+| Latency arm A P50 / P95, ms | 137.83 / 248.35 |
+| Latency arm B P50 / P95, ms | 137.83 / 249.28 |
+
+Both latency arms use the same production configuration: 400 timed requests across ten queries, ten warmup requests, 400 actual scoring calls and zero result-cache hits. Models are warm; result caches are bypassed. These are descriptive host/runtime measurements, not deltas against the historical cached baseline. The capture records 26 queries with constraint-violation reasons and 2 with canonical-prefix defects; recording those defects does not waive promotion checks. Dataset, catalog, search-index and judge fingerprints are frozen in the snapshot.
 
 ## PR #39 review fixes
 
@@ -18,7 +33,7 @@ Comparison, latency and personalization requests carry the selected ANN backend.
 
 Validation adds 21 regression cases and passes **807 tests**, with six dependency warnings, in **52.41 seconds**. Exact overall statement coverage is **10458/12024 = 86.97604790419162%**. All 36 modified production modules pass the unrounded 85% gate, and repository-wide hooks pass. Tests exercise the real adjudicator and comparison gate with controlled judges and recommendation responses; they are separate from the previously recorded real Nimble qualification.
 
-The required 62-query legacy Elasticsearch checks were rerun. Against the stored baseline, nDCG@10 changes from 0.443006 to 0.449395 (+0.006390), MAP from 0.383402 to 0.387426 (+0.004024), and Precision@10 from 0.193548 to 0.196774 (+0.003226). Mean latency changes from 42.274 to 694.358 ms (+652.084 ms), and P95 from 5.875 to 941.610 ms (+935.735 ms). Quality non-regression passes but the latency gate fails. The subsequent regression check fails nDCG@10 (0.4494 versus 0.72); diversity passes (0.6086 versus 0.45). These legacy timing measurements are not a cache-cold ABBA/BAAB comparison. No baseline or weights are promoted, and the PR remains draft.
+The required 62-query legacy Elasticsearch checks were rerun. Against the stored baseline, nDCG@10 changes from 0.443006 to 0.449395 (+0.006390), MAP from 0.383402 to 0.387426 (+0.004024), and Precision@10 from 0.193548 to 0.196774 (+0.003226). Mean latency changes from 42.274 to 694.358 ms (+652.084 ms), and P95 from 5.875 to 941.610 ms (+935.735 ms). Quality non-regression passes but the latency gate fails. The subsequent regression check fails nDCG@10 (0.4494 versus 0.72); diversity passes (0.6086 versus 0.45). These legacy timing measurements are not a cache-cold ABBA/BAAB comparison. These historical results did not promote a system; the current v2 reference is recorded separately and the PR remains draft.
 
 Latest exact counters and deltas are in `evaluation_suite_v2_validation.json` under `unit_verification` and `pr39_review_fixes`. Local run logs are under `.cache/pr39-*.log`; earlier sections below remain historical evidence.
 

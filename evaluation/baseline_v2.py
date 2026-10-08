@@ -198,8 +198,6 @@ def capture_baseline(args: Any) -> int:
         items, trace = runner.run_case(case, params=params, k=max(100, args.k))
         ranked = [str(TypedId.parse(item)) for item in items]
         failures.extend(trace.errors + trace.fallbacks)
-        if not items and not case.expected_empty:
-            failures.append(f"Unexpected empty output: {case.case_id}")
         if check_for_duplicates(items, k=args.k):
             failures.append(f"Duplicate output: {case.case_id}")
         references = case.golden_set or case.golden_ids or []
@@ -267,6 +265,7 @@ def capture_baseline(args: Any) -> int:
                 "judgments": records,
                 "metrics": metrics,
                 "unresolved_judgments": case_unresolved,
+                "unexpected_empty_output": not items and not case.expected_empty,
                 "constraint_violations": violations,
                 "canonical_order": (
                     check_canonical_order(
@@ -327,6 +326,11 @@ def capture_baseline(args: Any) -> int:
         "reference_valid": not failures,
         "judgments_complete": unresolved == 0,
         "quality_status": "complete" if unresolved == 0 else "inconclusive",
+        "quality_defects": {
+            "unexpected_empty_queries": sum(
+                row["unexpected_empty_output"] for row in rows
+            ),
+        },
         "unjudged_policy": "Unknown grades count as zero only for provisional arithmetic; unresolved evidence prevents a conclusive comparison",
         "per_query_results": rows,
     }

@@ -200,7 +200,7 @@ def calculate_completeness(
         return 0.0
     target_count = min(k, eligible_catalog_count)
     unique_items = {str(TypedId.parse(it)) for it in recommended_items[:k]}
-    return len(unique_items) / target_count
+    return min(len(unique_items), target_count) / target_count
 
 
 def check_for_duplicates(recommended_items: Sequence[Any], k: int = 10) -> bool:

@@ -9,7 +9,7 @@ import time
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from evaluation.deterministic import apply_deterministic_override
-from evaluation.judge.base import LocalJudgeAdapter
+from evaluation.judge.base import LocalJudgeAdapter, MAX_INPUT_CHARS
 from evaluation.models import (
     DeterministicConstraint,
     ItemEvidence,
@@ -113,6 +113,14 @@ class PoolAdjudicator:
     ) -> Tuple[int, Dict[int, float], bool, Any, str]:
         """Run judge or retrieve from persistent cache."""
         cached = self.cache.get(judge_input, judge)
+        # Retry a prior resource rejection only if the input now fits the guard.
+        # Successful judgments and other failures retain their cache semantics.
+        if (
+            cached
+            and cached.get("execution_status") == "over_limit"
+            and len(judge.build_prompt(judge_input)) <= MAX_INPUT_CHARS
+        ):
+            cached = None
         if cached:
             probs = {int(k): float(v) for k, v in cached["probabilities"].items()}
             return (

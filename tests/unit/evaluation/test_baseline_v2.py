@@ -158,7 +158,6 @@ def test_reference_rejects_incompatible_or_tampered_contract(
     [
         "errors",
         "fallbacks",
-        "empty",
         "duplicates",
         "judge_failed",
         "latency",
@@ -303,3 +302,26 @@ def test_full_reference_can_serve_unchanged_subset(setup):
     baseline.capture_baseline(args)
     loaded = baseline.load_reference(args.save_v2_baseline, cases[:1], judge, args)
     assert loaded["query_count"] == 2
+
+
+def test_successful_empty_results_are_recorded_as_production_defects(setup):
+    args, judge, cases, items, runner, _ = setup
+    runner.run_case.side_effect = lambda case, **kw: (
+        [],
+        EvaluationTrace(case.query, case.user_id),
+    )
+    assert baseline.capture_baseline(args) == 0
+    snapshot = baseline.load_reference(args.save_v2_baseline, cases, judge, args)
+    assert snapshot["quality_defects"]["unexpected_empty_queries"] == 1
+    assert snapshot["quality"]["ndcg_at_k"] == 0
+    assert snapshot["quality"]["completeness"] == 0
+    assert snapshot["execution_failures"] == []
+
+
+def test_completeness_does_not_inflate_when_output_exceeds_required_size():
+    from evaluation.metrics import calculate_completeness
+
+    assert (
+        calculate_completeness(["movie:1", "movie:2", "movie:3", "movie:4"], 2, 10)
+        == 1.0
+    )
