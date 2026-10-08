@@ -162,6 +162,38 @@ def test_load_media_genres(monkeypatch):
     assert genres2 is genres
 
 
+def test_mask_preferences_cannot_restore_clusters_or_reranker_preferences(monkeypatch):
+    from api.pipeline.scorer import compute_semantic_affinity
+    from api.pipeline.models import UserContext
+
+    metadata = {
+        "taste_clusters": [{"centroid": [1.0, 0.0]}],
+        "genre_prefs": {"Drama": 1.0},
+        "neighbors": [{"user_id": "neighbor"}],
+        "negative_items": [99],
+    }
+    monkeypatch.setattr(
+        "api.pipeline.context.load_user_state",
+        lambda *a: ([1, 0], [1, 0], [98, 99], metadata),
+    )
+    monkeypatch.setattr("api.pipeline.context.get_streaming_alias_map", lambda db: {})
+    monkeypatch.setattr("api.pipeline.context.get_top_query_keywords", lambda db: set())
+    context = load_user_context(MagicMock(), "persona", None, mask_preferences=True)
+    assert isinstance(context, UserContext)
+    assert context.active_taste_clusters == []
+    assert context.long_v is context.short_v is None
+    assert context.exclude_set == {98, 99}
+    assert context.profile_meta == {"negative_items": [99]}
+    assert metadata["taste_clusters"] and metadata["neighbors"]
+    scores = [
+        compute_semantic_affinity(
+            v, taste_clusters=context.active_taste_clusters, ann_rank=1
+        )
+        for v in ([1, 0], [-1, 0])
+    ]
+    assert scores[0] == scores[1]
+
+
 def test_context_cache_and_lifecycle(monkeypatch):
     clear_recommend_cache_for_tests()
     params = RecommendParams(user_id="u1", limit=10)

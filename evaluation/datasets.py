@@ -40,6 +40,15 @@ def load_evaluation_cases(
     path: Optional[Path] = None,
 ) -> List[TestCase]:
     """Load test cases from unified dataset files or explicit path."""
+    if path is None and (track.lower(), split.lower()) == ("product", "full"):
+        d_dir = base_dir or DATASETS_DIR
+        if not all(
+            (d_dir / name).exists() for name in ("product_dev.json", "product_reg.json")
+        ):
+            return []
+        return load_evaluation_cases(track, "dev", d_dir) + load_evaluation_cases(
+            track, "regression", d_dir
+        )
     target_file: Optional[Path] = None
     if path is not None:
         target_file = path
@@ -98,6 +107,9 @@ def load_evaluation_cases(
                     )
                 ),
                 require_all_genres=bool(constraints_data.get("require_all_genres")),
+                seen_ids=constraints_data.get("seen_ids"),
+                disliked_ids=constraints_data.get("disliked_ids"),
+                canonical_sequence_id=constraints_data.get("canonical_sequence_id"),
             )
 
         default_media = (

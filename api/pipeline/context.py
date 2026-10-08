@@ -279,6 +279,11 @@ def load_user_context(
         long_v = None
         short_v = None
         taste_clusters: List[Any] = []
+        profile_meta = {
+            key: value
+            for key, value in (profile_meta or {}).items()
+            if key not in {"taste_clusters", "genre_prefs", "neighbors"}
+        }
         cold_start = True
     else:
         cold_start = short_v is None

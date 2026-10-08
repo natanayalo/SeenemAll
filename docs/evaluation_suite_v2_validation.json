@@ -2,12 +2,12 @@
   "verified_date": "2026-10-08",
   "test_runtime": "Windows / Python 3.12.10",
   "unit_verification": {
-    "tests_passed": 786,
+    "tests_passed": 807,
     "dependency_warnings": 6,
-    "elapsed_seconds": 38.21,
-    "covered_statements": 10433,
-    "statements": 12004,
-    "unrounded_coverage": 86.91269576807731,
+    "elapsed_seconds": 52.41,
+    "covered_statements": 10458,
+    "statements": 12024,
+    "unrounded_coverage": 86.97604790419162,
     "modified_modules": [
       {
         "module": "api/core/cross_encoder.py",
@@ -53,9 +53,9 @@
       },
       {
         "module": "api/pipeline/context.py",
-        "covered_statements": 218,
-        "statements": 225,
-        "unrounded_coverage": 96.88888888888889
+        "covered_statements": 219,
+        "statements": 226,
+        "unrounded_coverage": 96.90265486725664
       },
       {
         "module": "api/pipeline/models.py",
@@ -107,9 +107,9 @@
       },
       {
         "module": "evaluation/datasets.py",
-        "covered_statements": 167,
-        "statements": 177,
-        "unrounded_coverage": 94.35028248587571
+        "covered_statements": 172,
+        "statements": 182,
+        "unrounded_coverage": 94.50549450549451
       },
       {
         "module": "evaluation/deterministic.py",
@@ -119,9 +119,9 @@
       },
       {
         "module": "evaluation/evaluate.py",
-        "covered_statements": 913,
-        "statements": 1037,
-        "unrounded_coverage": 88.04243008678881
+        "covered_statements": 922,
+        "statements": 1046,
+        "unrounded_coverage": 88.14531548757171
       },
       {
         "module": "evaluation/evidence.py",
@@ -143,9 +143,9 @@
       },
       {
         "module": "evaluation/judge/consensus.py",
-        "covered_statements": 178,
-        "statements": 182,
-        "unrounded_coverage": 97.8021978021978
+        "covered_statements": 182,
+        "statements": 186,
+        "unrounded_coverage": 97.84946236559139
       },
       {
         "module": "evaluation/judge/ollama.py",
@@ -185,15 +185,15 @@
       },
       {
         "module": "evaluation/metrics.py",
-        "covered_statements": 178,
+        "covered_statements": 179,
         "statements": 193,
-        "unrounded_coverage": 92.2279792746114
+        "unrounded_coverage": 92.74611398963731
       },
       {
         "module": "evaluation/models.py",
-        "covered_statements": 285,
-        "statements": 299,
-        "unrounded_coverage": 95.31772575250837
+        "covered_statements": 290,
+        "statements": 300,
+        "unrounded_coverage": 96.66666666666667
       },
       {
         "module": "evaluation/personalization.py",
@@ -393,5 +393,126 @@
     "initial_ci_run": 37757510262,
     "repair": "Nine deterministic tests cover SQL logging, listener registration, environment precedence and DNS success/failure, with isolated global state and no external database.",
     "production_behavior_changed": false
+  },
+  "pr39_review_fixes": {
+    "regression_tests_added": 21,
+    "corrected_contracts": [
+      "Failed/malformed/over-limit judge executions are propagated through cached and consensus records and invalidate comparison runs.",
+      "Both systems' top-K and declared recall references require resolved judgments in every judging mode; insufficient evidence is inconclusive.",
+      "Masked user metadata cannot restore taste clusters, genre preferences or collaborative neighbors; seen/disliked exclusions remain intact.",
+      "Declared typed references are judged from catalog evidence independently of top-K retrieval; grades are never assumed from benchmark annotations.",
+      "Candidate hard constraints are checked independently of judge acceptance, and baseline-only violations do not penalize the candidate.",
+      "Comparison, latency and personalization requests propagate the selected ANN backend to both systems.",
+      "The full product split combines the 51 development and 50 regression cases and preserves their constraints; missing v2 files do not fall back to legacy data.",
+      "Dataset loading preserves explicit seen/disliked lists and canonical sequence IDs."
+    ],
+    "legacy_stored_baseline_ab": {
+      "backend": "elasticsearch",
+      "baseline_param": "default",
+      "candidate_param": "default",
+      "k": 10,
+      "comparisons": {
+        "ndcg": {
+          "metric": "nDCG@10",
+          "baseline": 0.4430057236653608,
+          "candidate": 0.449395261630625,
+          "delta": 0.006389537965264203,
+          "lift_percent": 1.4423149914177529
+        },
+        "map": {
+          "metric": "MAP",
+          "baseline": 0.38340237570076274,
+          "candidate": 0.38742649674101287,
+          "delta": 0.004024121040250128,
+          "lift_percent": 1.049581665448747
+        },
+        "precision": {
+          "metric": "Precision@10",
+          "baseline": 0.19354838709677416,
+          "candidate": 0.19677419354838704,
+          "delta": 0.0032258064516128837,
+          "lift_percent": 1.666666666666657
+        },
+        "recall": {
+          "metric": "Recall@10",
+          "baseline": 0.4725806451612903,
+          "candidate": 0.4782258064516129,
+          "delta": 0.005645161290322609,
+          "lift_percent": 1.194539249146764
+        },
+        "ild": {
+          "metric": "Intra-List Diversity",
+          "baseline": 0.6086782359700724,
+          "candidate": 0.608624611465243,
+          "delta": -5.3624504829374864e-05,
+          "lift_percent": -0.008809992153557381
+        },
+        "unique_count": {
+          "metric": "Unique Items Rec'd",
+          "baseline": 469.0,
+          "candidate": 467.0,
+          "delta": -2.0,
+          "lift_percent": -0.42643923240938164
+        },
+        "intent_alignment": {
+          "metric": "Intent Adherence",
+          "baseline": 0.8949206349206349,
+          "candidate": 0.8932539682539683,
+          "delta": -0.0016666666666665941,
+          "lift_percent": -0.1862362539907688
+        },
+        "latency_mean": {
+          "metric": "Latency Mean (ms)",
+          "baseline": 42.273687095955886,
+          "candidate": 694.3580483916336,
+          "delta": 652.0843612956777,
+          "lift_percent": 1542.530131841893
+        },
+        "latency_p50": {
+          "metric": "Latency P50 (ms)",
+          "baseline": 4.369949994725175,
+          "candidate": 609.0601500472985,
+          "delta": 604.6902000525733,
+          "lift_percent": 13837.462689103428
+        },
+        "latency_p95": {
+          "metric": "Latency P95 (ms)",
+          "baseline": 5.875030007155143,
+          "candidate": 941.6099300608038,
+          "delta": 935.7349000536486,
+          "lift_percent": 15927.321203704934
+        }
+      },
+      "quality_gate": {
+        "enabled": true,
+        "passed": false,
+        "checks": {
+          "latency_mean_improved": false,
+          "latency_p95_improved": false,
+          "ndcg_non_regression": true,
+          "map_non_regression": true
+        }
+      }
+    },
+    "legacy_regression": {
+      "passed": false,
+      "ndcg_at_10_approximate": 0.4494,
+      "ndcg_threshold": 0.72,
+      "ild_approximate": 0.6086,
+      "ild_threshold": 0.45,
+      "latency_mean_ms_approximate": 46.9,
+      "latency_p50_ms_approximate": 4.8,
+      "latency_p95_ms_approximate": 6.7
+    },
+    "baseline_promoted": false,
+    "real_nimble_qualification_rerun": false,
+    "notes": "Earlier model qualification and comparison fields remain historical evidence. Latest recommendation timing is a legacy stored-snapshot comparison, not cache-cold causal performance evidence. The PR remains draft.",
+    "local_logs": [
+      ".cache/pr39-pytest.log",
+      ".cache/pr39-coverage-gate.log",
+      ".cache/pr39-hooks.log",
+      ".cache/pr39-ab.log",
+      ".cache/pr39-regression.log"
+    ]
   }
 }

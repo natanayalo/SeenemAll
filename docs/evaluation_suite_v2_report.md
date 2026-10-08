@@ -2,6 +2,20 @@
 
 Updated 8 October 2026 after the Nimble-only cleanup.
 
+## PR #39 review fixes
+
+The seven review findings are fixed. Cached and consensus judgment records preserve each model's execution status, so failed, malformed or over-limit judgments invalidate a comparison. Both systems' top-K and declared recall references must have resolved judgments in single-judge and consensus modes; insufficient evidence produces an inconclusive decision.
+
+Masked requests remove taste clusters, genre preferences and neighbors from profile metadata while retaining seen/disliked exclusions. Recall@100 now includes declared typed reference items even when neither system retrieves them in its top-K; catalog evidence is judged, and benchmark annotations never supply assumed grades. Candidate constraints are verified independently of judgment acceptance, with no penalty for baseline-only violations.
+
+Comparison, latency and personalization requests carry the selected ANN backend. The full product split combines the 51 development and 50 regression cases with their constraints, and missing v2 files cannot silently replace that split with legacy cases. Dataset loading retains seen/disliked exclusions and canonical sequence IDs.
+
+Validation adds 21 regression cases and passes **807 tests**, with six dependency warnings, in **52.41 seconds**. Exact overall statement coverage is **10458/12024 = 86.97604790419162%**. All 36 modified production modules pass the unrounded 85% gate, and repository-wide hooks pass. Tests exercise the real adjudicator and comparison gate with controlled judges and recommendation responses; they are separate from the previously recorded real Nimble qualification.
+
+The required 62-query legacy Elasticsearch checks were rerun. Against the stored baseline, nDCG@10 changes from 0.443006 to 0.449395 (+0.006390), MAP from 0.383402 to 0.387426 (+0.004024), and Precision@10 from 0.193548 to 0.196774 (+0.003226). Mean latency changes from 42.274 to 694.358 ms (+652.084 ms), and P95 from 5.875 to 941.610 ms (+935.735 ms). Quality non-regression passes but the latency gate fails. The subsequent regression check fails nDCG@10 (0.4494 versus 0.72); diversity passes (0.6086 versus 0.45). These legacy timing measurements are not a cache-cold ABBA/BAAB comparison. No baseline or weights are promoted, and the PR remains draft.
+
+Latest exact counters and deltas are in `evaluation_suite_v2_validation.json` under `unit_verification` and `pr39_review_fixes`. Local run logs are under `.cache/pr39-*.log`; earlier sections below remain historical evidence.
+
 Reviewers can inspect the committed [validation summary](evaluation_suite_v2_validation.json), including exact module coverage, real qualification totals, reference agreement and legacy recommendation deltas. Links into `evaluation/artifacts/` below refer to local audit evidence, intentionally excluded from Git; raw logs and the recovery archive are not part of the PR.
 
 ## Current judge

@@ -366,6 +366,7 @@ def test_run_evaluation_v2_latency_benchmark():
         latency_benchmark=True,
         baseline="default",
         candidate="cross_encoder",
+        backend="elasticsearch",
     )
     mock_harness = MagicMock()
     mock_harness.benchmark_paired_latency.return_value = {
@@ -383,6 +384,11 @@ def test_run_evaluation_v2_latency_benchmark():
         with patch("evaluation.evaluate.LatencyHarness", return_value=mock_harness):
             code = run_evaluation_v2(args)
             assert code == 0
+            _, baseline, candidate = (
+                mock_harness.benchmark_paired_latency.call_args.args
+            )
+            assert baseline["ann_backend_override"] == "elasticsearch"
+            assert candidate["ann_backend_override"] == "elasticsearch"
 
 
 def test_run_evaluation_v2_personalization_test():
@@ -393,6 +399,7 @@ def test_run_evaluation_v2_personalization_test():
         personalization_test=True,
         baseline="default",
         candidate="cross_encoder",
+        backend="pgvector",
         k=10,
     )
     mock_pers_harness = MagicMock()
@@ -420,6 +427,9 @@ def test_run_evaluation_v2_personalization_test():
         ):
             code = run_evaluation_v2(args)
             assert code == 0
+            params = mock_pers_harness.run_personalization_benchmark.call_args.kwargs
+            assert params["baseline_params"]["ann_backend_override"] == "pgvector"
+            assert params["candidate_params"]["ann_backend_override"] == "pgvector"
 
 
 def test_run_evaluation_v2_verify_index_and_private_eval(tmp_path):
@@ -977,7 +987,9 @@ def test_run_evaluation_v2_panel_judges_and_loop_branches(tmp_path, monkeypatch)
             mock_case.family_id = "fam_1"
             mock_case.slice_tags = ["franchise"]
             mock_case.query = "complex query"
-            mock_case.constraints = MagicMock(disliked_ids=[101])
+            from evaluation.models import DeterministicConstraint
+
+            mock_case.constraints = DeterministicConstraint(disliked_ids=[101])
             mock_case.canonical_sequence = [101, 102, 103]
             mock_case.eligible_catalog_count = None
             mock_case.expected_empty = True

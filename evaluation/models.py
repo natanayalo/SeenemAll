@@ -323,12 +323,13 @@ class JudgmentRecord:
     query: str
     typed_id: str
     grade: Optional[int]  # None if UNJUDGED
-    status: str  # "ACCEPTED", "UNJUDGED", "CONFLICT", "INSUFFICIENT_EVIDENCE"
+    status: str  # ACCEPTED, UNJUDGED, CONFLICT, INSUFFICIENT_EVIDENCE, JUDGE_FAILED
     provenances: List[JudgeProvenance] = field(default_factory=list)
     consensus_model_count: int = 1
     probabilities: Optional[Dict[int, float]] = None
     deterministic_override: bool = False
     violation_reasons: List[str] = field(default_factory=list)
+    execution_statuses: List[str] = field(default_factory=list)
 
     def is_positive(self) -> bool:
         return RubricGrade.is_positive(self.grade)
@@ -342,6 +343,7 @@ class JudgmentRecord:
             "consensus_model_count": self.consensus_model_count,
             "deterministic_override": self.deterministic_override,
             "violation_reasons": self.violation_reasons,
+            "execution_statuses": self.execution_statuses,
             "probabilities": self.probabilities,
             "provenances": [p.to_dict() for p in self.provenances],
         }

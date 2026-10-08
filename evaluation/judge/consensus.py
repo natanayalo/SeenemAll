@@ -110,7 +110,7 @@ class PoolAdjudicator:
         self,
         judge: LocalJudgeAdapter,
         judge_input: JudgeInput,
-    ) -> Tuple[int, Dict[int, float], bool, Any]:
+    ) -> Tuple[int, Dict[int, float], bool, Any, str]:
         """Run judge or retrieve from persistent cache."""
         cached = self.cache.get(judge_input, judge)
         if cached:
@@ -121,6 +121,7 @@ class PoolAdjudicator:
                 cached.get("execution_status") == "success"
                 and bool(cached["evidence_sufficiency"]),
                 judge.get_provenance(judge_input.evidence.content_hash()),
+                cached.get("execution_status", "failed"),
             )
 
         output = judge.judge_pair(judge_input)
@@ -130,6 +131,7 @@ class PoolAdjudicator:
             output.probabilities,
             output.execution_status == "success" and output.evidence_sufficiency,
             output.provenance,
+            output.execution_status,
         )
 
     def adjudicate_pair(
@@ -145,9 +147,13 @@ class PoolAdjudicator:
 
         # 1. Exploratory Single-Judge Mode
         if mode == "single_judge" or self.secondary_judge is None:
-            g1, p1, suff1, prov1 = self._judge_cached(self.primary_judge, judge_input)
+            g1, p1, suff1, prov1, execution_status = self._judge_cached(
+                self.primary_judge, judge_input
+            )
             final_grade = g1 if suff1 else None
             status = "ACCEPTED" if suff1 else "INSUFFICIENT_EVIDENCE"
+            if execution_status not in {"success", "abstain"}:
+                status = "JUDGE_FAILED"
 
             # Apply deterministic constraint checks (authoritative override)
             override = False
@@ -167,14 +173,20 @@ class PoolAdjudicator:
                 probabilities=p1,
                 deterministic_override=override,
                 violation_reasons=violations,
+                execution_statuses=[execution_status],
             )
 
         # 2. Authoritative Multi-Judge Consensus Mode
         # Step 1: Primary and secondary independently label complete item
-        g1, p1, suff1, prov1 = self._judge_cached(self.primary_judge, judge_input)
-        g2, p2, suff2, prov2 = self._judge_cached(self.secondary_judge, judge_input)
+        g1, p1, suff1, prov1, status1 = self._judge_cached(
+            self.primary_judge, judge_input
+        )
+        g2, p2, suff2, prov2, status2 = self._judge_cached(
+            self.secondary_judge, judge_input
+        )
 
         provenances = [prov1, prov2]
+        execution_statuses = [status1, status2]
 
         # Step 2: Exact agreement when both find sufficient evidence
         if suff1 and suff2 and g1 == g2:
@@ -185,10 +197,11 @@ class PoolAdjudicator:
         else:
             # Step 3: Disagreements or evidence conflicts go to 3rd qualifying model
             if self.tie_breaker_judge is not None:
-                g3, p3, suff3, prov3 = self._judge_cached(
+                g3, p3, suff3, prov3, status3 = self._judge_cached(
                     self.tie_breaker_judge, judge_input
                 )
                 provenances.append(prov3)
+                execution_statuses.append(status3)
 
                 # Step 4: Accept a grade only when at least 2 distinct models assign that exact grade
                 valid_votes = []
@@ -237,6 +250,7 @@ class PoolAdjudicator:
             probabilities=merged_probs,
             deterministic_override=override,
             violation_reasons=violations,
+            execution_statuses=execution_statuses,
         )
 
 

@@ -267,7 +267,7 @@ def evaluate_comparison_gates(
 
     Enforces:
       - Execution: 0 failed cases, 0 unexpected fallbacks, no duplicate output, valid non-empty output
-      - Judgment coverage: No unresolved items in authoritative top 10 (otherwise INCONCLUSIVE)
+      - Judgment coverage: No unresolved top-K or recall references (otherwise INCONCLUSIVE)
       - Sample sizes: >= 50 independent families (statistical promotion), >= 10 per critical slice
       - Non-regression: Paired nDCG@10 delta CI lower bound >= -0.01
       - Critical slices: Mean delta >= -0.03 for each slice
@@ -327,7 +327,7 @@ def evaluate_comparison_gates(
             passed=judg_passed,
             observed=authoritative_unresolved_count,
             threshold=0,
-            details="No unresolved items permitted in either system's top ten.",
+            details="No unresolved items permitted in either system's top-K or declared recall references.",
         )
     )
     if not judg_passed:

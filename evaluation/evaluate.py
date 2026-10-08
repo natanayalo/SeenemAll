@@ -35,6 +35,7 @@ from evaluation.datasets import load_evaluation_cases, load_public_dataset
 from evaluation.evidence import load_catalog_metadata, pool_item_evidence
 from evaluation.deterministic import (
     check_canonical_order,
+    check_deterministic_constraints,
 )
 from evaluation.judge.base import LocalJudgeAdapter
 from evaluation.judge.consensus import (
@@ -1639,6 +1640,18 @@ def load_entries_from_args(args: argparse.Namespace) -> List[EvaluationEntry]:
     return entries
 
 
+def _comparison_params(
+    args: argparse.Namespace,
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Resolve both systems with the explicitly selected retrieval backend."""
+    grid = default_param_grid()
+    base_params = grid.get(args.baseline, lambda r: {})({}) or {}
+    cand_params = grid.get(args.candidate, lambda r: {})({}) or {}
+    for params in (base_params, cand_params):
+        params["ann_backend_override"] = args.backend
+    return base_params, cand_params
+
+
 def run_evaluation_v2(args: argparse.Namespace) -> int:
     """Execute Evaluation Suite v2 workflow."""
     # 1. Hardware Inspection Mode
@@ -1770,9 +1783,7 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
             "feel good comedy",
             "neo noir",
         ]
-        grid = default_param_grid()
-        base_p = grid.get(args.baseline, lambda r: {})({}) or {}
-        cand_p = grid.get(args.candidate, lambda r: {})({}) or {}
+        base_p, cand_p = _comparison_params(args)
         print("\n" + "=" * 76)
         print("          WARM-MODEL QUERY-CACHE-COLD LATENCY BENCHMARK")
         print("=" * 76)
@@ -1802,9 +1813,7 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
             db_session_factory=get_sessionmaker(),
             verify_seeding=True,
         )
-        grid = default_param_grid()
-        base_p = grid.get(args.baseline, lambda r: {})({}) or {}
-        cand_p = grid.get(args.candidate, lambda r: {})({}) or {}
+        base_p, cand_p = _comparison_params(args)
         print("\n" + "=" * 76)
         print("          SYNTHETIC PERSONALIZATION BEHAVIORAL GATES")
         print("=" * 76)
@@ -2031,9 +2040,7 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
         engine = ConsensusJudgeEngine(adjudicator=adjudicator)
 
     exec_runner = EvaluationRunner(in_process=True)
-    grid = default_param_grid()
-    base_params = grid.get(args.baseline, lambda r: {})({}) or {}
-    cand_params = grid.get(args.candidate, lambda r: {})({}) or {}
+    base_params, cand_params = _comparison_params(args)
 
     gain_mode = GainMode(args.gain_mode)
 
@@ -2116,10 +2123,18 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
             if not exact_prefix and invs == 0 and missing_count == 0:
                 chronology_violations += 1
 
-        # Build pool of unique candidate items (top 30 deduplicated)
+        # Judge declared references independently of whether either top-K retrieved them.
+        # Reference IDs nominate evidence to judge; their labels never supply grades.
+        references = case.golden_set or case.golden_ids or []
+        default_media = (
+            case.constraints.media_type if case.constraints else None
+        ) or "movie"
+        reference_ids = [str(TypedId.parse(ref, default_media)) for ref in references]
         pool_ids = adjudicator.deduplicate_pool(
-            [base_items[: args.k], cand_items[: args.k]], max_pool_size=30
+            [base_items[: args.k], cand_items[: args.k], reference_ids],
+            max_pool_size=2 * args.k + len(reference_ids),
         )
+        candidate_top_ids = {str(TypedId.parse(it)) for it in cand_items[: args.k]}
         pool_evidence = []
         for pid_str in pool_ids:
             tid = TypedId.parse(pid_str)
@@ -2133,6 +2148,10 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
             )
             ev = pool_item_evidence(tid, match or {}, catalog_metadata)
             pool_evidence.append(ev)
+            if pid_str in candidate_top_ids and case.constraints:
+                valid, _ = check_deterministic_constraints(ev, case.constraints)
+                if not valid:
+                    hard_violations += 1
 
         # Calculate completeness with independently determined catalog eligibility
         eligible_catalog_count = getattr(case, "eligible_catalog_count", None)
@@ -2161,10 +2180,15 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
         )
 
         for rec in records:
-            if rec.deterministic_override:
-                hard_violations += 1
-            if rec.status == "UNJUDGED":
-                unresolved_items += 1
+            if any(
+                status not in {"success", "abstain"}
+                for status in rec.execution_statuses
+            ):
+                exec_failures += 1
+        # Both systems' top-K and the shared recall references require valid judgments,
+        # including single-judge abstentions and insufficient evidence.
+        case_unresolved = len(set(pool_ids) - qrels.keys())
+        unresolved_items += case_unresolved
 
         # Compute nDCG@K on top-K
         b_ndcg = calculate_ndcg_at_k(
@@ -2184,9 +2208,11 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
         total_cand_rec100.append(c_r100)
 
         # Coverage on top-K
-        cov = calculate_coverage(cand_items[: args.k], qrels, k=args.k)
-        if cand_items:
-            exploratory_covs.append(cov)
+        for items in (base_items, cand_items):
+            if items:
+                exploratory_covs.append(
+                    calculate_coverage(items[: args.k], qrels, k=args.k)
+                )
 
         per_query_rows.append(
             {
@@ -2196,6 +2222,9 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
                 "base_ndcg": b_ndcg,
                 "cand_ndcg": c_ndcg,
                 "delta_ndcg": c_ndcg - b_ndcg,
+                "base_recall_100": b_r100,
+                "cand_recall_100": c_r100,
+                "unresolved_judgments": case_unresolved,
             }
         )
 
@@ -2230,9 +2259,7 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
         hard_constraint_violations=hard_violations,
         disliked_violations=disliked_violations,
         exploratory_coverages=exploratory_covs,
-        authoritative_unresolved_count=(
-            unresolved_items if args.judgment_mode == "consensus" else 0
-        ),
+        authoritative_unresolved_count=unresolved_items,
         execution_failures=exec_failures,
         unexpected_fallbacks=unexpected_fallbacks,
         duplicate_outputs_detected=duplicate_detected,
