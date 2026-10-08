@@ -1,0 +1,391 @@
+{
+  "verified_date": "2026-10-08",
+  "test_runtime": "Windows / Python 3.12.10",
+  "unit_verification": {
+    "tests_passed": 777,
+    "dependency_warnings": 6,
+    "elapsed_seconds": 44.65,
+    "covered_statements": 10423,
+    "statements": 12004,
+    "unrounded_coverage": 86.82939020326558,
+    "modified_modules": [
+      {
+        "module": "api/core/cross_encoder.py",
+        "covered_statements": 214,
+        "statements": 240,
+        "unrounded_coverage": 89.16666666666667
+      },
+      {
+        "module": "api/core/elasticsearch_client.py",
+        "covered_statements": 28,
+        "statements": 28,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "api/core/filter_matcher.py",
+        "covered_statements": 409,
+        "statements": 455,
+        "unrounded_coverage": 89.89010989010988
+      },
+      {
+        "module": "api/core/inference_metrics.py",
+        "covered_statements": 47,
+        "statements": 47,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "api/core/persistent_cache.py",
+        "covered_statements": 109,
+        "statements": 109,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "api/core/reranker.py",
+        "covered_statements": 825,
+        "statements": 890,
+        "unrounded_coverage": 92.69662921348315
+      },
+      {
+        "module": "api/db/session.py",
+        "covered_statements": 61,
+        "statements": 71,
+        "unrounded_coverage": 85.91549295774648
+      },
+      {
+        "module": "api/pipeline/context.py",
+        "covered_statements": 218,
+        "statements": 225,
+        "unrounded_coverage": 96.88888888888889
+      },
+      {
+        "module": "api/pipeline/models.py",
+        "covered_statements": 101,
+        "statements": 102,
+        "unrounded_coverage": 99.01960784313725
+      },
+      {
+        "module": "api/pipeline/reranker.py",
+        "covered_statements": 81,
+        "statements": 81,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "api/pipeline/retriever/fusion.py",
+        "covered_statements": 126,
+        "statements": 136,
+        "unrounded_coverage": 92.6470588235294
+      },
+      {
+        "module": "api/pipeline/runner.py",
+        "covered_statements": 64,
+        "statements": 65,
+        "unrounded_coverage": 98.46153846153847
+      },
+      {
+        "module": "api/pipeline/scorer.py",
+        "covered_statements": 351,
+        "statements": 380,
+        "unrounded_coverage": 92.36842105263158
+      },
+      {
+        "module": "evaluation/build_dataset_splits.py",
+        "covered_statements": 101,
+        "statements": 103,
+        "unrounded_coverage": 98.05825242718447
+      },
+      {
+        "module": "evaluation/catalog_references.py",
+        "covered_statements": 17,
+        "statements": 17,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/coverage_gate.py",
+        "covered_statements": 42,
+        "statements": 42,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/datasets.py",
+        "covered_statements": 167,
+        "statements": 177,
+        "unrounded_coverage": 94.35028248587571
+      },
+      {
+        "module": "evaluation/deterministic.py",
+        "covered_statements": 171,
+        "statements": 192,
+        "unrounded_coverage": 89.0625
+      },
+      {
+        "module": "evaluation/evaluate.py",
+        "covered_statements": 913,
+        "statements": 1037,
+        "unrounded_coverage": 88.04243008678881
+      },
+      {
+        "module": "evaluation/evidence.py",
+        "covered_statements": 64,
+        "statements": 64,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/judge/__init__.py",
+        "covered_statements": 6,
+        "statements": 6,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/judge/base.py",
+        "covered_statements": 51,
+        "statements": 54,
+        "unrounded_coverage": 94.44444444444444
+      },
+      {
+        "module": "evaluation/judge/consensus.py",
+        "covered_statements": 178,
+        "statements": 182,
+        "unrounded_coverage": 97.8021978021978
+      },
+      {
+        "module": "evaluation/judge/ollama.py",
+        "covered_statements": 39,
+        "statements": 39,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/judge/qualification.py",
+        "covered_statements": 267,
+        "statements": 279,
+        "unrounded_coverage": 95.6989247311828
+      },
+      {
+        "module": "evaluation/judge/rubric.py",
+        "covered_statements": 31,
+        "statements": 31,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/judge/stub.py",
+        "covered_statements": 56,
+        "statements": 58,
+        "unrounded_coverage": 96.55172413793103
+      },
+      {
+        "module": "evaluation/judge/systemone.py",
+        "covered_statements": 52,
+        "statements": 52,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/latency.py",
+        "covered_statements": 120,
+        "statements": 123,
+        "unrounded_coverage": 97.5609756097561
+      },
+      {
+        "module": "evaluation/metrics.py",
+        "covered_statements": 178,
+        "statements": 193,
+        "unrounded_coverage": 92.2279792746114
+      },
+      {
+        "module": "evaluation/models.py",
+        "covered_statements": 285,
+        "statements": 299,
+        "unrounded_coverage": 95.31772575250837
+      },
+      {
+        "module": "evaluation/personalization.py",
+        "covered_statements": 120,
+        "statements": 132,
+        "unrounded_coverage": 90.9090909090909
+      },
+      {
+        "module": "evaluation/private_benchmark.py",
+        "covered_statements": 34,
+        "statements": 36,
+        "unrounded_coverage": 94.44444444444444
+      },
+      {
+        "module": "evaluation/query_interpretation.py",
+        "covered_statements": 15,
+        "statements": 15,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/runner.py",
+        "covered_statements": 160,
+        "statements": 173,
+        "unrounded_coverage": 92.48554913294798
+      },
+      {
+        "module": "evaluation/trace.py",
+        "covered_statements": 47,
+        "statements": 53,
+        "unrounded_coverage": 88.67924528301887
+      }
+    ],
+    "all_modified_modules_meet_unrounded_85_percent": true,
+    "black_ruff_mypy_and_repository_hooks": "passed"
+  },
+  "real_nimble_qualification": {
+    "model_name": "bespoke-nimble-9b",
+    "runtime": "systemone_ollama",
+    "quantization": "Q8_0",
+    "qualification_protocol": "v2.8",
+    "fingerprint": "1f005ca2ac68f282d51b2dd9ccc9a8ded5b01a34c0dd8e25e25888e2ecd860cd",
+    "qualified": true,
+    "pilot_pairs": 400,
+    "pilot_distinct_pairs": 400,
+    "pilot_families": 20,
+    "repeat_tests": 100,
+    "repeatability_rate": 1.0,
+    "control_tests": 100,
+    "control_accuracy": 1.0,
+    "execution_failures": 0,
+    "malformed_count": 0,
+    "pilot_sufficient_count": 373,
+    "pilot_evidence_coverage": 0.9325,
+    "permutation_tests": 0,
+    "option_permutation_role": "diagnostic",
+    "total_judgments": 600
+  },
+  "real_model_provenance": {
+    "adapter_contract": "v2.7",
+    "qualification_protocol": "v2.8",
+    "model": "nimble:latest",
+    "weight_digest": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+    "quantization": "Q8_0",
+    "runtime_version": "0.35.1",
+    "fingerprint": "1f005ca2ac68f282d51b2dd9ccc9a8ded5b01a34c0dd8e25e25888e2ecd860cd",
+    "catalog_sha256": "16a94583d06a1e931005a2d44affed3d58ac2de4897c9630b14365988d3e753f"
+  },
+  "blinded_reference": {
+    "scope": "Independent blinded LLM agreement diagnostic; not human ground truth or an automatic promotion gate",
+    "expected_pairs": 80,
+    "completed_pairs": 80,
+    "mutually_sufficient": 77,
+    "mutual_exact_grade_agreement": 51,
+    "mutual_within_one_grade": 77,
+    "published_decision_agreement": 51,
+    "sufficiency_agreement": 77,
+    "binary_relevance_agreement": 72,
+    "two_or_more_grade_disagreements": 0,
+    "luna_positive_count": 6,
+    "nimble_agrees_on_luna_positives": 6,
+    "nimble_positive_count": 11,
+    "luna_agrees_on_nimble_positives": 6,
+    "input_sha256": "2fd51bab3f2fa68c9ccaf1f2b49c67f48cae8024da0b38b81993cdc841352f48",
+    "luna_labels_sha256": "1046d91877448cbb6b92d8cd91fcbdc958ef3803ffcf2bb22dddc0fa26a8625a"
+  },
+  "legacy_recommendation_ab": {
+    "backend": "elasticsearch",
+    "baseline_param": "default",
+    "candidate_param": "default",
+    "k": 10,
+    "comparisons": {
+      "ndcg": {
+        "metric": "nDCG@10",
+        "baseline": 0.4430057236653608,
+        "candidate": 0.4495396785102364,
+        "delta": 0.006533954844875622,
+        "lift_percent": 1.474914317317323
+      },
+      "map": {
+        "metric": "MAP",
+        "baseline": 0.38340237570076274,
+        "candidate": 0.3875877870635935,
+        "delta": 0.004185411362830738,
+        "lift_percent": 1.0916498248559003
+      },
+      "precision": {
+        "metric": "Precision@10",
+        "baseline": 0.19354838709677416,
+        "candidate": 0.19677419354838704,
+        "delta": 0.0032258064516128837,
+        "lift_percent": 1.666666666666657
+      },
+      "recall": {
+        "metric": "Recall@10",
+        "baseline": 0.4725806451612903,
+        "candidate": 0.4782258064516129,
+        "delta": 0.005645161290322609,
+        "lift_percent": 1.194539249146764
+      },
+      "ild": {
+        "metric": "Intra-List Diversity",
+        "baseline": 0.6086782359700724,
+        "candidate": 0.6090752025415784,
+        "delta": 0.0003969665715060078,
+        "lift_percent": 0.06521780278102893
+      },
+      "unique_count": {
+        "metric": "Unique Items Rec'd",
+        "baseline": 469.0,
+        "candidate": 467.0,
+        "delta": -2.0,
+        "lift_percent": -0.42643923240938164
+      },
+      "intent_alignment": {
+        "metric": "Intent Adherence",
+        "baseline": 0.8949206349206349,
+        "candidate": 0.8932539682539683,
+        "delta": -0.0016666666666665941,
+        "lift_percent": -0.1862362539907688
+      },
+      "latency_mean": {
+        "metric": "Latency Mean (ms)",
+        "baseline": 42.273687095955886,
+        "candidate": 768.4932193594925,
+        "delta": 726.2195322635366,
+        "lift_percent": 1717.899672709198
+      },
+      "latency_p50": {
+        "metric": "Latency P50 (ms)",
+        "baseline": 4.369949994725175,
+        "candidate": 280.6012500077486,
+        "delta": 276.23130001302343,
+        "lift_percent": 6321.154712215318
+      },
+      "latency_p95": {
+        "metric": "Latency P95 (ms)",
+        "baseline": 5.875030007155143,
+        "candidate": 546.3254799600686,
+        "delta": 540.4504499529135,
+        "lift_percent": 9199.109609562913
+      }
+    },
+    "quality_gate": {
+      "enabled": true,
+      "passed": false,
+      "checks": {
+        "latency_mean_improved": false,
+        "latency_p95_improved": false,
+        "ndcg_non_regression": true,
+        "map_non_regression": true
+      }
+    }
+  },
+  "legacy_awake_regression": {
+    "passed": false,
+    "ndcg_at_10_approximate": 0.4495,
+    "ndcg_threshold": 0.72,
+    "ild_approximate": 0.6091,
+    "ild_threshold": 0.45,
+    "latency_mean_ms_approximate": 532.5,
+    "latency_p50_ms_approximate": 197.8,
+    "latency_p95_ms_approximate": 383.5,
+    "elapsed_seconds": 37.111301099997945,
+    "host_standby_events_during_awake_run": 0
+  },
+  "limitations": [
+    "Unit contracts and local HTTP test servers are not real model execution.",
+    "Nimble qualification is fixed-prompt reliability, not human semantic calibration.",
+    "The blinded Luna reference is an LLM reference with only six positive labels.",
+    "Legacy recommendation A/B and regression gates fail; no baseline or weights promoted.",
+    "Legacy stored-snapshot timing is not the primary cache-cold ABBA/BAAB experiment.",
+    "Complete real MovieLens/Tag Genome, personalization and private-holdout promotion were not run.",
+    "Raw traces, cleanup recovery archive and full logs are local-only ignored artifacts."
+  ]
+}

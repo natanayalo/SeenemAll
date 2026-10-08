@@ -1,0 +1,1525 @@
+[
+  {
+    "query": "Harry Potter wizarding world movies",
+    "category": "franchise",
+    "golden_set": [
+      {
+        "id": 671,
+        "title": "Harry Potter and the Philosopher's Stone"
+      },
+      {
+        "id": 672,
+        "title": "Harry Potter and the Chamber of Secrets"
+      },
+      {
+        "id": 673,
+        "title": "Harry Potter and the Prisoner of Azkaban"
+      },
+      {
+        "id": 674,
+        "title": "Harry Potter and the Goblet of Fire"
+      },
+      {
+        "id": 675,
+        "title": "Harry Potter and the Order of the Phoenix"
+      },
+      {
+        "id": 767,
+        "title": "Harry Potter and the Half-Blood Prince"
+      },
+      {
+        "id": 12444,
+        "title": "Harry Potter and the Deathly Hallows: Part 1"
+      },
+      {
+        "id": 12445,
+        "title": "Harry Potter and the Deathly Hallows: Part 2"
+      }
+    ],
+    "genre_override": "Fantasy",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Fantasy",
+        "Adventure"
+      ]
+    },
+    "case_id": "franchise_2",
+    "family_id": "fam_dee20ade",
+    "track": "product",
+    "task": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "The Dark Knight Batman trilogy",
+    "category": "franchise",
+    "golden_set": [
+      {
+        "id": 272,
+        "title": "Batman Begins"
+      },
+      {
+        "id": 155,
+        "title": "The Dark Knight"
+      },
+      {
+        "id": 49026,
+        "title": "The Dark Knight Rises"
+      }
+    ],
+    "genre_override": "Action",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Action",
+        "Crime"
+      ]
+    },
+    "case_id": "franchise_4",
+    "family_id": "fam_0075ae85",
+    "track": "product",
+    "task": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "James Bond Daniel Craig era",
+    "category": "franchise",
+    "golden_set": [
+      {
+        "id": 36557,
+        "title": "Casino Royale"
+      },
+      {
+        "id": 10764,
+        "title": "Quantum of Solace"
+      },
+      {
+        "id": 37724,
+        "title": "Skyfall"
+      },
+      {
+        "id": 206647,
+        "title": "Spectre"
+      },
+      {
+        "id": 370172,
+        "title": "No Time to Die"
+      }
+    ],
+    "genre_override": "Action",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Action",
+        "Thriller"
+      ]
+    },
+    "case_id": "franchise_6",
+    "family_id": "fam_ea344df1",
+    "track": "product",
+    "task": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "Toy Story animation series",
+    "category": "franchise",
+    "golden_set": [
+      {
+        "id": 862,
+        "title": "Toy Story"
+      },
+      {
+        "id": 863,
+        "title": "Toy Story 2"
+      },
+      {
+        "id": 10193,
+        "title": "Toy Story 3"
+      },
+      {
+        "id": 301528,
+        "title": "Toy Story 4"
+      }
+    ],
+    "genre_override": "Animation",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Animation",
+        "Family"
+      ]
+    },
+    "case_id": "franchise_8",
+    "family_id": "fam_ef8c4a11",
+    "track": "product",
+    "task": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "The Godfather saga",
+    "category": "franchise",
+    "golden_set": [
+      {
+        "id": 238,
+        "title": "The Godfather"
+      },
+      {
+        "id": 240,
+        "title": "The Godfather Part II"
+      },
+      {
+        "id": 242,
+        "title": "The Godfather Part III"
+      }
+    ],
+    "genre_override": "Crime",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Crime",
+        "Drama"
+      ]
+    },
+    "case_id": "franchise_10",
+    "family_id": "fam_e5acd566",
+    "track": "product",
+    "task": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "Spider-Man live action movies",
+    "category": "franchise",
+    "golden_set": [
+      {
+        "id": 557,
+        "title": "Spider-Man"
+      },
+      {
+        "id": 558,
+        "title": "Spider-Man 2"
+      },
+      {
+        "id": 559,
+        "title": "Spider-Man 3"
+      },
+      {
+        "id": 315635,
+        "title": "Spider-Man: Homecoming"
+      },
+      {
+        "id": 634649,
+        "title": "Spider-Man: No Way Home"
+      }
+    ],
+    "genre_override": "Action",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Action",
+        "Adventure"
+      ]
+    },
+    "case_id": "franchise_12",
+    "family_id": "fam_d0200194",
+    "track": "product",
+    "task": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "existential dread indie thrillers",
+    "category": "vibe",
+    "golden_set": [
+      {
+        "id": 503919,
+        "title": "The Lighthouse"
+      },
+      {
+        "id": 181886,
+        "title": "Enemy"
+      }
+    ],
+    "genre_override": "Thriller",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Drama",
+        "Thriller"
+      ]
+    },
+    "case_id": "vibe_2",
+    "family_id": "fam_4a9dda97",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "vibe"
+    ],
+    "split": "regression",
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 440471,
+          "title": "First Reformed"
+        },
+        "reason": "unresolved_title"
+      },
+      {
+        "reference": {
+          "id": 4995,
+          "title": "Melancholia"
+        },
+        "reason": "unresolved_title"
+      },
+      {
+        "reference": {
+          "id": 13688,
+          "title": "Synecdoche, New York"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "neon cyberpunk anime noir",
+    "category": "vibe",
+    "golden_set": [
+      {
+        "id": 149,
+        "title": "Akira"
+      },
+      {
+        "id": 9323,
+        "title": "Ghost in the Shell"
+      },
+      {
+        "id": 335984,
+        "title": "Blade Runner 2049"
+      },
+      {
+        "id": 105248,
+        "title": "Cyberpunk: Edgerunners",
+        "media_type": "tv"
+      }
+    ],
+    "genre_override": "Science Fiction",
+    "constraints": {
+      "genres": [
+        "Animation",
+        "Science Fiction"
+      ]
+    },
+    "case_id": "vibe_4",
+    "family_id": "fam_01c97661",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "vibe"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "surreal slow-burn psychological horror",
+    "category": "vibe",
+    "golden_set": [
+      {
+        "id": 310131,
+        "title": "The Witch"
+      },
+      {
+        "id": 493922,
+        "title": "Hereditary"
+      },
+      {
+        "id": 530385,
+        "title": "Midsommar"
+      },
+      {
+        "id": 694,
+        "title": "The Shining"
+      },
+      {
+        "id": 270303,
+        "title": "It Follows",
+        "media_type": "movie"
+      }
+    ],
+    "genre_override": "Horror",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Horror",
+        "Mystery"
+      ]
+    },
+    "case_id": "vibe_6",
+    "family_id": "fam_b91a98f0",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "vibe"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "dark satirical dystopian black comedy",
+    "category": "vibe",
+    "golden_set": [
+      {
+        "id": 935,
+        "title": "Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb"
+      },
+      {
+        "id": 646380,
+        "title": "Don't Look Up"
+      },
+      {
+        "id": 254320,
+        "title": "The Lobster"
+      },
+      {
+        "id": 424781,
+        "title": "Sorry to Bother You"
+      },
+      {
+        "id": 10774,
+        "title": "Network"
+      }
+    ],
+    "genre_override": "Comedy",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ]
+    },
+    "case_id": "vibe_8",
+    "family_id": "fam_197b44c7",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "vibe"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "whimsical magical realism romance",
+    "category": "vibe",
+    "golden_set": [
+      {
+        "id": 194,
+        "title": "Amélie"
+      },
+      {
+        "id": 59436,
+        "title": "Midnight in Paris"
+      },
+      {
+        "id": 399055,
+        "title": "The Shape of Water"
+      },
+      {
+        "id": 587,
+        "title": "Big Fish"
+      },
+      {
+        "id": 152601,
+        "title": "Her"
+      }
+    ],
+    "genre_override": "Romance",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Romance",
+        "Fantasy",
+        "Comedy"
+      ]
+    },
+    "case_id": "vibe_10",
+    "family_id": "fam_a4575232",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "vibe"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "philosophical hard science fiction",
+    "category": "vibe",
+    "golden_set": [
+      {
+        "id": 62,
+        "title": "2001: A Space Odyssey"
+      },
+      {
+        "id": 593,
+        "title": "Solaris"
+      },
+      {
+        "id": 264660,
+        "title": "Ex Machina"
+      },
+      {
+        "id": 686,
+        "title": "Contact"
+      },
+      {
+        "id": 78,
+        "title": "Blade Runner"
+      }
+    ],
+    "genre_override": "Science Fiction",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Science Fiction",
+        "Drama"
+      ]
+    },
+    "case_id": "vibe_12",
+    "family_id": "fam_5bb9c4c2",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "vibe"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "feel-good comedies under 105 minutes",
+    "category": "constraint",
+    "golden_set": [
+      {
+        "id": 122906,
+        "title": "About Time"
+      },
+      {
+        "id": 212778,
+        "title": "Chef"
+      },
+      {
+        "id": 369557,
+        "title": "Sing Street"
+      },
+      {
+        "id": 120467,
+        "title": "The Grand Budapest Hotel"
+      },
+      {
+        "id": 77338,
+        "title": "The Intouchables"
+      }
+    ],
+    "genre_override": "Comedy",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Comedy"
+      ],
+      "max_runtime": 105
+    },
+    "case_id": "constraint_2",
+    "family_id": "fam_4e36aa33",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "sci-fi series on Apple TV+",
+    "category": "constraint",
+    "golden_set": [
+      {
+        "id": 95396,
+        "title": "Severance",
+        "media_type": "tv"
+      },
+      {
+        "id": 125988,
+        "title": "Silo"
+      },
+      {
+        "id": 93740,
+        "title": "Foundation"
+      },
+      {
+        "id": 87917,
+        "title": "For All Mankind"
+      }
+    ],
+    "genre_override": "Sci-Fi & Fantasy",
+    "constraints": {
+      "media_type": "tv",
+      "genres": [
+        "Sci-Fi & Fantasy"
+      ],
+      "providers": [
+        "Apple TV+"
+      ]
+    },
+    "case_id": "constraint_4",
+    "family_id": "fam_74edecf7",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "animated family movies under 90 minutes",
+    "category": "constraint",
+    "golden_set": [
+      {
+        "id": 8392,
+        "title": "My Neighbor Totoro"
+      },
+      {
+        "id": 10386,
+        "title": "The Iron Giant"
+      },
+      {
+        "id": 10315,
+        "title": "Fantastic Mr. Fox"
+      },
+      {
+        "id": 14836,
+        "title": "Coraline"
+      }
+    ],
+    "genre_override": "Animation",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Animation",
+        "Family"
+      ],
+      "max_runtime": 90
+    },
+    "case_id": "constraint_6",
+    "family_id": "fam_25195392",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "British period drama TV series",
+    "category": "constraint",
+    "golden_set": [
+      {
+        "id": 33907,
+        "title": "Downton Abbey",
+        "media_type": "tv"
+      },
+      {
+        "id": 65494,
+        "title": "The Crown"
+      },
+      {
+        "id": 60574,
+        "title": "Peaky Blinders"
+      }
+    ],
+    "genre_override": "Drama",
+    "constraints": {
+      "media_type": "tv",
+      "genres": [
+        "Drama"
+      ],
+      "language": "en"
+    },
+    "case_id": "constraint_8",
+    "family_id": "fam_26bf9ba1",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "split": "regression",
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 252,
+          "title": "Pride and Prejudice"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "German sci-fi and thriller shows on Netflix",
+    "category": "constraint",
+    "golden_set": [
+      {
+        "id": 70523,
+        "title": "Dark"
+      },
+      {
+        "id": 90669,
+        "title": "1899"
+      }
+    ],
+    "genre_override": "Sci-Fi & Fantasy",
+    "constraints": {
+      "media_type": "tv",
+      "genres": [
+        "Sci-Fi & Fantasy",
+        "Mystery"
+      ],
+      "language": "de",
+      "providers": [
+        "Netflix"
+      ]
+    },
+    "case_id": "constraint_10",
+    "family_id": "fam_c310682b",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "split": "regression",
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 106969,
+          "title": "Biohackers"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "time-travel thrillers",
+    "category": "constraint",
+    "golden_set": [
+      {
+        "id": 59967,
+        "title": "Looper"
+      },
+      {
+        "id": 137113,
+        "title": "Edge of Tomorrow"
+      },
+      {
+        "id": 45612,
+        "title": "Source Code"
+      },
+      {
+        "id": 1954,
+        "title": "The Butterfly Effect"
+      }
+    ],
+    "genre_override": "Science Fiction",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Science Fiction",
+        "Thriller"
+      ]
+    },
+    "case_id": "constraint_12",
+    "family_id": "fam_d664e43b",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "split": "regression",
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 60948,
+          "title": "12 Monkeys"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "Quentin Tarantino crime classics",
+    "category": "entity",
+    "golden_set": [
+      {
+        "id": 680,
+        "title": "Pulp Fiction"
+      },
+      {
+        "id": 500,
+        "title": "Reservoir Dogs"
+      },
+      {
+        "id": 16869,
+        "title": "Inglourious Basterds"
+      },
+      {
+        "id": 68718,
+        "title": "Django Unchained"
+      },
+      {
+        "id": 24,
+        "title": "Kill Bill: Vol. 1"
+      }
+    ],
+    "genre_override": "Crime",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Crime",
+        "Thriller"
+      ]
+    },
+    "case_id": "entity_2",
+    "family_id": "fam_c71054d6",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "entity"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "Denis Villeneuve sci-fi movies",
+    "category": "entity",
+    "golden_set": [
+      {
+        "id": 335984,
+        "title": "Blade Runner 2049"
+      },
+      {
+        "id": 329865,
+        "title": "Arrival"
+      },
+      {
+        "id": 438631,
+        "title": "Dune"
+      }
+    ],
+    "genre_override": "Science Fiction",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Science Fiction",
+        "Drama"
+      ]
+    },
+    "case_id": "entity_4",
+    "family_id": "fam_cad7900c",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "entity"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "Interstelar black hole space",
+    "category": "typo",
+    "golden_set": [
+      {
+        "id": 157336,
+        "title": "Interstellar"
+      }
+    ],
+    "genre_override": "Science Fiction",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Science Fiction",
+        "Drama"
+      ]
+    },
+    "case_id": "typo_2",
+    "family_id": "fam_2e27081b",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "typo"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "Quentin Tarantno violent gangster movies",
+    "category": "typo",
+    "golden_set": [
+      {
+        "id": 680,
+        "title": "Pulp Fiction"
+      },
+      {
+        "id": 500,
+        "title": "Reservoir Dogs"
+      }
+    ],
+    "genre_override": "Crime",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Crime",
+        "Thriller"
+      ]
+    },
+    "case_id": "typo_4",
+    "family_id": "fam_2d1c30da",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "typo"
+    ],
+    "split": "regression"
+  },
+  {
+    "query": "90s sci-fi action blockbusters",
+    "category": "multi_constraint",
+    "golden_set": [
+      {
+        "id": 603,
+        "title": "The Matrix"
+      },
+      {
+        "id": 280,
+        "title": "Terminator 2: Judgment Day"
+      },
+      {
+        "id": 329,
+        "title": "Jurassic Park"
+      },
+      {
+        "id": 18,
+        "title": "The Fifth Element"
+      }
+    ],
+    "genre_override": "Science Fiction",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Science Fiction",
+        "Action"
+      ]
+    },
+    "case_id": "multi_constraint_2",
+    "family_id": "fam_54f1082f",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "multi_constraint"
+    ],
+    "split": "regression"
+  },
+  {
+    "case_id": "exp_reg_vibe_whimsical",
+    "family_id": "fam_reg_vibe_whimsical",
+    "query": "whimsical magical coming-of-age adventures",
+    "category": "vibe",
+    "slice_tags": [
+      "vibe"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      157336,
+      27205,
+      120,
+      19995,
+      597
+    ],
+    "genre_override": "Fantasy",
+    "constraints": {
+      "genres": [
+        "Fantasy",
+        "Family",
+        "Adventure"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_reg_vibe_apocalyptic",
+    "family_id": "fam_reg_vibe_apocalyptic",
+    "query": "gritty intense post-apocalyptic survival",
+    "category": "vibe",
+    "slice_tags": [
+      "vibe"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      157336,
+      27205,
+      120,
+      19995,
+      597
+    ],
+    "genre_override": "Action",
+    "constraints": {
+      "genres": [
+        "Action",
+        "Sci-Fi",
+        "Thriller"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_reg_vibe_melancholic",
+    "family_id": "fam_reg_vibe_melancholic",
+    "query": "melancholic contemplative indie dramas",
+    "category": "vibe",
+    "slice_tags": [
+      "vibe"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      157336,
+      27205,
+      120,
+      19995,
+      597
+    ],
+    "genre_override": "Drama",
+    "constraints": {
+      "genres": [
+        "Drama"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_reg_vibe_espionage",
+    "family_id": "fam_reg_vibe_espionage",
+    "query": "heart-pounding espionage techno-thrillers",
+    "category": "vibe",
+    "slice_tags": [
+      "vibe"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      157336,
+      27205,
+      120,
+      19995,
+      597
+    ],
+    "genre_override": "Action",
+    "constraints": {
+      "genres": [
+        "Action",
+        "Thriller"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_reg_vibe_surreal",
+    "family_id": "fam_reg_vibe_surreal",
+    "query": "surreal cerebral dreamlike cinema",
+    "category": "vibe",
+    "slice_tags": [
+      "vibe"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      157336,
+      27205,
+      120,
+      19995,
+      597
+    ],
+    "genre_override": "Mystery",
+    "constraints": {
+      "genres": [
+        "Mystery",
+        "Drama"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_reg_fr_matrix",
+    "family_id": "fam_reg_fr_matrix",
+    "query": "Matrix cyberpunk saga order",
+    "category": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "franchise",
+    "golden_ids": [
+      603,
+      604,
+      605
+    ],
+    "canonical_sequence": [
+      "movie:603",
+      "movie:604",
+      "movie:605"
+    ]
+  },
+  {
+    "case_id": "exp_reg_fr_indy",
+    "family_id": "fam_reg_fr_indy",
+    "query": "Indiana Jones adventure films chronological",
+    "category": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "franchise",
+    "golden_ids": [
+      85,
+      87,
+      89
+    ],
+    "canonical_sequence": [
+      "movie:85",
+      "movie:87",
+      "movie:89"
+    ]
+  },
+  {
+    "case_id": "exp_reg_fr_bourne",
+    "family_id": "fam_reg_fr_bourne",
+    "query": "Bourne identity espionage series in order",
+    "category": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "franchise",
+    "golden_ids": [
+      2501,
+      2502,
+      2503
+    ],
+    "canonical_sequence": [
+      "movie:2501",
+      "movie:2502",
+      "movie:2503"
+    ]
+  },
+  {
+    "case_id": "exp_reg_fr_jurassic",
+    "family_id": "fam_reg_fr_jurassic",
+    "query": "Jurassic Park dinosaur movies order",
+    "category": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "franchise",
+    "golden_ids": [
+      329,
+      330,
+      331
+    ],
+    "canonical_sequence": [
+      "movie:329",
+      "movie:330",
+      "movie:331"
+    ]
+  },
+  {
+    "case_id": "exp_reg_ent_fincher",
+    "family_id": "fam_reg_ent_fincher",
+    "query": "David Fincher dark psychological mysteries",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      807,
+      550,
+      1949
+    ]
+  },
+  {
+    "case_id": "exp_reg_ent_miyazaki",
+    "family_id": "fam_reg_ent_miyazaki",
+    "query": "Hayao Miyazaki Studio Ghibli animated movies",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      129,
+      4935,
+      128
+    ]
+  },
+  {
+    "case_id": "exp_reg_ent_scott",
+    "family_id": "fam_reg_ent_scott",
+    "query": "Ridley Scott epic science fiction and historical",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      348,
+      98,
+      70160
+    ]
+  },
+  {
+    "case_id": "exp_reg_ent_kubrick",
+    "family_id": "fam_reg_ent_kubrick",
+    "query": "Stanley Kubrick classic masterpiece films",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      694,
+      935,
+      62
+    ]
+  },
+  {
+    "case_id": "exp_reg_ent_hitchcock",
+    "family_id": "fam_reg_ent_hitchcock",
+    "query": "Alfred Hitchcock suspenseful thrillers",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      539,
+      426,
+      206
+    ]
+  },
+  {
+    "case_id": "exp_reg_ent_streep",
+    "family_id": "fam_reg_ent_streep",
+    "query": "Meryl Streep critically acclaimed performances",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      350,
+      392,
+      114
+    ]
+  },
+  {
+    "case_id": "exp_reg_ent_denzel",
+    "family_id": "fam_reg_ent_denzel",
+    "query": "Denzel Washington intense crime dramas",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      1578,
+      2034,
+      9802
+    ]
+  },
+  {
+    "case_id": "exp_reg_ent_pitt",
+    "family_id": "fam_reg_ent_pitt",
+    "query": "Brad Pitt acclaimed character roles",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      550,
+      680,
+      16869
+    ]
+  },
+  {
+    "case_id": "exp_reg_c_short_comedy",
+    "family_id": "fam_reg_c_short_comedy",
+    "query": "comedy movies under 95 minutes",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "constraint",
+    "golden_ids": [
+      157336,
+      27205,
+      120,
+      19995
+    ],
+    "constraints": {
+      "max_runtime": 95,
+      "genres": [
+        "Comedy"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_reg_c_japanese_anime",
+    "family_id": "fam_reg_c_japanese_anime",
+    "query": "Japanese language anime features",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "constraint",
+    "golden_ids": [
+      157336,
+      27205,
+      120,
+      19995
+    ],
+    "constraints": {
+      "language": "ja",
+      "genres": [
+        "Animation"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_reg_c_90s_thriller",
+    "family_id": "fam_reg_c_90s_thriller",
+    "query": "thrillers released between 1990 and 1999",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "constraint",
+    "golden_ids": [
+      157336,
+      27205,
+      120,
+      19995
+    ],
+    "constraints": {
+      "min_year": 1990,
+      "max_year": 1999,
+      "genres": [
+        "Thriller"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_reg_c_prime_adventure",
+    "family_id": "fam_reg_c_prime_adventure",
+    "query": "adventure movies on Prime Video in Israel",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "constraint",
+    "golden_ids": [
+      157336,
+      27205,
+      120,
+      19995
+    ],
+    "constraints": {
+      "providers": [
+        "prime_video"
+      ],
+      "genres": [
+        "Adventure"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_reg_c_doc_under_110",
+    "family_id": "fam_reg_c_doc_under_110",
+    "query": "documentary movies under 110 minutes",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "constraint",
+    "golden_ids": [
+      157336,
+      27205,
+      120,
+      19995
+    ],
+    "constraints": {
+      "media_type": "movie",
+      "max_runtime": 110,
+      "genres": [
+        "Documentary"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_reg_c_post_2020",
+    "family_id": "fam_reg_c_post_2020",
+    "query": "movies released after 2020",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "constraint",
+    "golden_ids": [
+      157336,
+      27205,
+      120,
+      19995
+    ],
+    "constraints": {
+      "min_year": 2021
+    }
+  },
+  {
+    "case_id": "exp_reg_c_korean_drama",
+    "family_id": "fam_reg_c_korean_drama",
+    "query": "Korean language drama thrillers",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "constraint",
+    "golden_ids": [
+      157336,
+      27205,
+      120,
+      19995
+    ],
+    "constraints": {
+      "language": "ko",
+      "genres": [
+        "Drama",
+        "Thriller"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_reg_c_apple_fantasy",
+    "family_id": "fam_reg_c_apple_fantasy",
+    "query": "fantasy films streamable on Apple TV Plus",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "constraint",
+    "golden_ids": [
+      157336,
+      27205,
+      120,
+      19995
+    ],
+    "constraints": {
+      "providers": [
+        "apple_tv_plus"
+      ],
+      "genres": [
+        "Fantasy"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_reg_multi_dark_scifi",
+    "family_id": "fam_reg_multi_dark_scifi",
+    "query": "dark sci-fi movies under 120 minutes released in the 1990s",
+    "category": "multi_constraint",
+    "slice_tags": [
+      "multi_constraint",
+      "constraint"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "constraint",
+    "golden_ids": [
+      603,
+      807,
+      348
+    ],
+    "constraints": {
+      "max_runtime": 120,
+      "min_year": 1990,
+      "max_year": 1999,
+      "genres": [
+        "Science Fiction"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_reg_typo_interstelar",
+    "family_id": "fam_reg_typo_interstelar",
+    "query": "interstelar space exploration",
+    "category": "typo",
+    "slice_tags": [
+      "typo"
+    ],
+    "track": "product",
+    "split": "regression",
+    "task": "search",
+    "golden_ids": [
+      157336
+    ]
+  }
+]

@@ -83,9 +83,12 @@ def retrieve_candidates(
     collab_kwargs: Dict[str, Any] = {"allowed_ids": allowlist}
     if _supports_parameter(collab_fn, "search_filters"):
         collab_kwargs["search_filters"] = intent.structured_search_filters
+    collab_neighbors = (
+        None if context.cold_start else context.profile_meta.get("neighbors")
+    )
     collab_results = collab_fn(
         db,
-        context.profile_meta.get("neighbors"),
+        collab_neighbors,
         exclude,
         candidate_limit,
         **collab_kwargs,

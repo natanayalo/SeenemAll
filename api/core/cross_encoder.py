@@ -373,7 +373,13 @@ def score_query_candidates(
             raw_scores = model.predict(
                 pairs, batch_size=batch_size, convert_to_numpy=True
             )
+            from api.core.inference_metrics import record_success
+
+            record_success("cross_encoder", len(pairs))
     except Exception as exc:  # pragma: no cover - defensive inference guard
+        from api.core.inference_metrics import record_failure
+
+        record_failure("cross_encoder")
         logger.warning("CrossEncoder scoring failed (%s); using baseline scores.", exc)
         return [
             (

@@ -289,3 +289,30 @@ def test_openvino_cross_encoder_predict():
     # Empty pairs
     empty_preds = ov_ce.predict([])
     assert len(empty_preds) == 0
+
+
+def test_openvino_constructor_uses_cached_npu_model(monkeypatch):
+    import sys
+    import types
+    from pathlib import Path
+
+    tokenizer = MagicMock()
+    model = MagicMock()
+    loaders = types.ModuleType("optimum.intel.openvino")
+    loaders.OVModelForSequenceClassification = MagicMock()
+    loaders.OVModelForSequenceClassification.from_pretrained.return_value = model
+    transformers = types.ModuleType("transformers")
+    transformers.AutoTokenizer = MagicMock()
+    transformers.AutoTokenizer.from_pretrained.return_value = tokenizer
+    monkeypatch.setitem(sys.modules, "optimum.intel.openvino", loaders)
+    monkeypatch.setitem(sys.modules, "transformers", transformers)
+    monkeypatch.setattr(Path, "exists", lambda path: True)
+    encoder = cross_encoder.OpenVINOCrossEncoder("local/test", "NPU")
+    assert encoder.model is model and encoder.tokenizer is tokenizer
+    assert (
+        loaders.OVModelForSequenceClassification.from_pretrained.call_args.kwargs
+        == {"compile": False}
+    )
+    model.reshape.assert_called_once_with(25, 128)
+    model.to.assert_called_once_with("NPU")
+    model.compile.assert_called_once()

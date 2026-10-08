@@ -111,6 +111,20 @@ class PersistentCache:
             except sqlite3.Error as exc:
                 self._disable(exc)
 
+    def clear(self) -> None:
+        """Clear all entries for this cache namespace."""
+        if self._disabled or self._conn is None:
+            return
+        with self._lock:
+            try:
+                self._conn.execute(
+                    "DELETE FROM cache_entries WHERE namespace = ?",
+                    (self._namespace,),
+                )
+                self._conn.commit()
+            except sqlite3.Error as exc:
+                self._disable(exc)
+
     @staticmethod
     def _serialise_key(key: Any) -> str:
         if isinstance(key, str):

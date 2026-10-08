@@ -1,0 +1,185 @@
+{
+  "persona_scifi_enthusiast": {
+    "persona_id": "eval_p_scifi",
+    "description": "High affinity for hard science fiction, astrophysics, and dystopian cinema.",
+    "seed_history": [
+      {
+        "tmdb_id": 157336,
+        "title": "Interstellar",
+        "rating": 5.0,
+        "timestamp": 1600000000
+      },
+      {
+        "tmdb_id": 27205,
+        "title": "Inception",
+        "rating": 4.5,
+        "timestamp": 1600100000
+      },
+      {
+        "tmdb_id": 603,
+        "title": "The Matrix",
+        "rating": 5.0,
+        "timestamp": 1600200000
+      }
+    ],
+    "known_negatives": [
+      {
+        "tmdb_id": 597,
+        "title": "Titanic",
+        "rating": 1.0,
+        "reason": "Dislikes sentimental melodrama"
+      },
+      {
+        "tmdb_id": 350,
+        "title": "The Devil Wears Prada",
+        "rating": 1.5,
+        "reason": "Dislikes fashion comedy"
+      }
+    ],
+    "hidden_targets": [
+      {
+        "tmdb_id": 335984,
+        "title": "Blade Runner 2049",
+        "expected_grade": 3
+      },
+      {
+        "tmdb_id": 438631,
+        "title": "Dune",
+        "expected_grade": 3
+      }
+    ],
+    "preferred_services": [
+      "netflix",
+      "prime_video"
+    ],
+    "disliked_genres": [
+      "Romance",
+      "Music"
+    ],
+    "taste_clusters": [
+      {
+        "cluster_id": "hard_scifi",
+        "weight": 0.85
+      }
+    ]
+  },
+  "persona_prestige_drama": {
+    "persona_id": "eval_p_drama",
+    "description": "Prefers critically acclaimed character studies and historical epics.",
+    "seed_history": [
+      {
+        "tmdb_id": 278,
+        "title": "The Shawshank Redemption",
+        "rating": 5.0,
+        "timestamp": 1600000000
+      },
+      {
+        "tmdb_id": 238,
+        "title": "The Godfather",
+        "rating": 5.0,
+        "timestamp": 1600100000
+      },
+      {
+        "tmdb_id": 424,
+        "title": "Schindler's List",
+        "rating": 5.0,
+        "timestamp": 1600200000
+      }
+    ],
+    "known_negatives": [
+      {
+        "tmdb_id": 19995,
+        "title": "Avatar",
+        "rating": 1.5,
+        "reason": "Dislikes CGI spectacles without deep dialogue"
+      }
+    ],
+    "hidden_targets": [
+      {
+        "tmdb_id": 240,
+        "title": "The Godfather Part II",
+        "expected_grade": 3
+      },
+      {
+        "tmdb_id": 769,
+        "title": "GoodFellas",
+        "expected_grade": 3
+      }
+    ],
+    "preferred_services": [
+      "prime_video",
+      "yes"
+    ],
+    "disliked_genres": [
+      "Animation",
+      "Horror"
+    ],
+    "taste_clusters": [
+      {
+        "cluster_id": "classic_prestige",
+        "weight": 0.9
+      }
+    ]
+  },
+  "persona_family_animation": {
+    "persona_id": "eval_p_family",
+    "description": "Household watching Pixar, Disney, and Ghibli animated features.",
+    "seed_history": [
+      {
+        "tmdb_id": 862,
+        "title": "Toy Story",
+        "rating": 5.0,
+        "timestamp": 1600000000
+      },
+      {
+        "tmdb_id": 129,
+        "title": "Spirited Away",
+        "rating": 5.0,
+        "timestamp": 1600100000
+      }
+    ],
+    "known_negatives": [
+      {
+        "tmdb_id": 550,
+        "title": "Fight Club",
+        "rating": 0.5,
+        "reason": "Violent content not suitable for household"
+      }
+    ],
+    "hidden_targets": [
+      {
+        "tmdb_id": 863,
+        "title": "Toy Story 2",
+        "expected_grade": 3
+      },
+      {
+        "tmdb_id": 10193,
+        "title": "Toy Story 3",
+        "expected_grade": 3
+      }
+    ],
+    "preferred_services": [
+      "disney_plus"
+    ],
+    "disliked_genres": [
+      "Horror",
+      "Crime"
+    ],
+    "taste_clusters": [
+      {
+        "cluster_id": "family_animation",
+        "weight": 0.95
+      }
+    ]
+  },
+  "persona_neutral_empty": {
+    "persona_id": "eval_p_neutral",
+    "description": "Verified neutral persona with empty history, vectors, neighbors, and preferences.",
+    "seed_history": [],
+    "known_negatives": [],
+    "hidden_targets": [],
+    "preferred_services": [],
+    "disliked_genres": [],
+    "taste_clusters": []
+  }
+}

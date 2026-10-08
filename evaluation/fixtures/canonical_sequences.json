@@ -1,0 +1,87 @@
+{
+  "version": "2026.1",
+  "sequences": {
+    "star_wars_chronological": {
+      "franchise": "Star Wars",
+      "mode": "in_universe_chronological",
+      "source": "Lucasfilm Official Timeline 2024",
+      "items": [
+        "movie:1893",
+        "movie:1894",
+        "movie:1895",
+        "movie:11",
+        "movie:1891",
+        "movie:1892",
+        "movie:140607"
+      ],
+      "titles": [
+        "Star Wars: Episode I - The Phantom Menace",
+        "Star Wars: Episode II - Attack of the Clones",
+        "Star Wars: Episode III - Revenge of the Sith",
+        "Star Wars: Episode IV - A New Hope",
+        "Star Wars: Episode V - The Empire Strikes Back",
+        "Star Wars: Episode VI - Return of the Jedi",
+        "Star Wars: The Force Awakens"
+      ]
+    },
+    "star_wars_release": {
+      "franchise": "Star Wars",
+      "mode": "theatrical_release",
+      "source": "Lucasfilm Official Release Catalog",
+      "items": [
+        "movie:11",
+        "movie:1891",
+        "movie:1892",
+        "movie:1893",
+        "movie:1894",
+        "movie:1895",
+        "movie:140607"
+      ]
+    },
+    "harry_potter": {
+      "franchise": "Harry Potter",
+      "mode": "story_and_release",
+      "source": "Warner Bros. Wizarding World Canon",
+      "items": [
+        "movie:671",
+        "movie:672",
+        "movie:673",
+        "movie:674",
+        "movie:675",
+        "movie:767",
+        "movie:12444",
+        "movie:12445"
+      ]
+    },
+    "lord_of_the_rings": {
+      "franchise": "The Lord of the Rings",
+      "mode": "theatrical_and_story",
+      "source": "New Line Cinema Canon",
+      "items": [
+        "movie:120",
+        "movie:121",
+        "movie:122"
+      ]
+    },
+    "dark_knight_trilogy": {
+      "franchise": "The Dark Knight Trilogy",
+      "mode": "theatrical_and_story",
+      "source": "Warner Bros. Nolan Trilogy Canon",
+      "items": [
+        "movie:272",
+        "movie:155",
+        "movie:49026"
+      ]
+    },
+    "godfather_trilogy": {
+      "franchise": "The Godfather",
+      "mode": "theatrical_and_story",
+      "source": "Paramount Pictures Archive",
+      "items": [
+        "movie:238",
+        "movie:240",
+        "movie:242"
+      ]
+    }
+  }
+}

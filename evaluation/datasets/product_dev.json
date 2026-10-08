@@ -1,0 +1,1678 @@
+[
+  {
+    "query": "Star Wars chronological",
+    "category": "franchise",
+    "golden_set": [
+      {
+        "id": 1893,
+        "title": "Star Wars: Episode I - The Phantom Menace"
+      },
+      {
+        "id": 1894,
+        "title": "Star Wars: Episode II - Attack of the Clones"
+      },
+      {
+        "id": 1895,
+        "title": "Star Wars: Episode III - Revenge of the Sith"
+      },
+      {
+        "id": 140607,
+        "title": "Star Wars: The Force Awakens"
+      }
+    ],
+    "genre_override": "Science Fiction",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Science Fiction",
+        "Adventure"
+      ]
+    },
+    "case_id": "franchise_1",
+    "family_id": "fam_a54e0a29",
+    "track": "product",
+    "task": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "split": "dev",
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 11,
+          "title": "Star Wars: Episode IV - A New Hope"
+        },
+        "reason": "unresolved_title"
+      },
+      {
+        "reference": {
+          "id": 1891,
+          "title": "Star Wars: Episode V - The Empire Strikes Back"
+        },
+        "reason": "unresolved_title"
+      },
+      {
+        "reference": {
+          "id": 1892,
+          "title": "Star Wars: Episode VI - Return of the Jedi"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "The Lord of the Rings trilogy",
+    "category": "franchise",
+    "golden_set": [
+      {
+        "id": 120,
+        "title": "The Lord of the Rings: The Fellowship of the Ring"
+      },
+      {
+        "id": 121,
+        "title": "The Lord of the Rings: The Two Towers"
+      },
+      {
+        "id": 122,
+        "title": "The Lord of the Rings: The Return of the King"
+      }
+    ],
+    "genre_override": "Fantasy",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Fantasy",
+        "Adventure"
+      ]
+    },
+    "case_id": "franchise_3",
+    "family_id": "fam_5bb4ef9f",
+    "track": "product",
+    "task": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "Marvel Cinematic Universe Phase 1",
+    "category": "franchise",
+    "golden_set": [
+      {
+        "id": 1726,
+        "title": "Iron Man"
+      },
+      {
+        "id": 1724,
+        "title": "The Incredible Hulk"
+      },
+      {
+        "id": 10138,
+        "title": "Iron Man 2"
+      },
+      {
+        "id": 10195,
+        "title": "Thor"
+      },
+      {
+        "id": 1771,
+        "title": "Captain America: The First Avenger"
+      },
+      {
+        "id": 24428,
+        "title": "The Avengers"
+      }
+    ],
+    "genre_override": "Action",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Action",
+        "Science Fiction"
+      ]
+    },
+    "case_id": "franchise_5",
+    "family_id": "fam_b829e158",
+    "track": "product",
+    "task": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "The Matrix collection",
+    "category": "franchise",
+    "golden_set": [
+      {
+        "id": 603,
+        "title": "The Matrix"
+      },
+      {
+        "id": 604,
+        "title": "The Matrix Reloaded"
+      },
+      {
+        "id": 605,
+        "title": "The Matrix Revolutions"
+      },
+      {
+        "id": 624860,
+        "title": "The Matrix Resurrections"
+      }
+    ],
+    "genre_override": "Science Fiction",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Science Fiction",
+        "Action"
+      ]
+    },
+    "case_id": "franchise_7",
+    "family_id": "fam_9c787270",
+    "track": "product",
+    "task": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "Mission: Impossible action series",
+    "category": "franchise",
+    "golden_set": [
+      {
+        "id": 954,
+        "title": "Mission: Impossible"
+      },
+      {
+        "id": 955,
+        "title": "Mission: Impossible II"
+      },
+      {
+        "id": 956,
+        "title": "Mission: Impossible III"
+      },
+      {
+        "id": 56292,
+        "title": "Mission: Impossible - Ghost Protocol",
+        "media_type": "movie"
+      },
+      {
+        "id": 177677,
+        "title": "Mission: Impossible - Rogue Nation"
+      },
+      {
+        "id": 353081,
+        "title": "Mission: Impossible - Fallout"
+      }
+    ],
+    "genre_override": "Action",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Action",
+        "Thriller"
+      ]
+    },
+    "case_id": "franchise_9",
+    "family_id": "fam_c208759f",
+    "track": "product",
+    "task": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "Bourne spy franchise",
+    "category": "franchise",
+    "golden_set": [
+      {
+        "id": 2501,
+        "title": "The Bourne Identity"
+      },
+      {
+        "id": 2502,
+        "title": "The Bourne Supremacy"
+      },
+      {
+        "id": 2503,
+        "title": "The Bourne Ultimatum"
+      },
+      {
+        "id": 49040,
+        "title": "The Bourne Legacy"
+      }
+    ],
+    "genre_override": "Action",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Action",
+        "Thriller"
+      ]
+    },
+    "case_id": "franchise_11",
+    "family_id": "fam_1c7a4cbc",
+    "track": "product",
+    "task": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "Indiana Jones adventure series",
+    "category": "franchise",
+    "golden_set": [
+      {
+        "id": 85,
+        "title": "Raiders of the Lost Ark"
+      },
+      {
+        "id": 87,
+        "title": "Indiana Jones and the Temple of Doom"
+      },
+      {
+        "id": 89,
+        "title": "Indiana Jones and the Last Crusade"
+      }
+    ],
+    "genre_override": "Adventure",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Adventure",
+        "Action"
+      ]
+    },
+    "case_id": "franchise_13",
+    "family_id": "fam_32171695",
+    "track": "product",
+    "task": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "mind-bending sci-fi movies like Inception",
+    "category": "vibe",
+    "golden_set": [
+      {
+        "id": 27205,
+        "title": "Inception"
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar"
+      },
+      {
+        "id": 1124,
+        "title": "The Prestige"
+      },
+      {
+        "id": 329865,
+        "title": "Arrival"
+      },
+      {
+        "id": 577922,
+        "title": "Tenet"
+      }
+    ],
+    "genre_override": "Science Fiction",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Science Fiction",
+        "Thriller"
+      ]
+    },
+    "case_id": "vibe_1",
+    "family_id": "fam_adf7b842",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "vibe"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "cozy autumn mystery",
+    "category": "vibe",
+    "golden_set": [
+      {
+        "id": 546554,
+        "title": "Knives Out"
+      },
+      {
+        "id": 15196,
+        "title": "Clue"
+      },
+      {
+        "id": 120467,
+        "title": "The Grand Budapest Hotel"
+      },
+      {
+        "id": 207,
+        "title": "Dead Poets Society"
+      }
+    ],
+    "genre_override": "Mystery",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Mystery",
+        "Comedy"
+      ]
+    },
+    "case_id": "vibe_3",
+    "family_id": "fam_e54941bf",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "vibe"
+    ],
+    "split": "dev",
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 1538,
+          "title": "Gosford Park"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "melancholy coming-of-age dramas",
+    "category": "vibe",
+    "golden_set": [
+      {
+        "id": 391713,
+        "title": "Lady Bird",
+        "media_type": "movie"
+      },
+      {
+        "id": 376867,
+        "title": "Moonlight"
+      },
+      {
+        "id": 84892,
+        "title": "The Perks of Being a Wallflower"
+      },
+      {
+        "id": 85350,
+        "title": "Boyhood"
+      },
+      {
+        "id": 235,
+        "title": "Stand by Me"
+      }
+    ],
+    "genre_override": "Drama",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Drama"
+      ]
+    },
+    "case_id": "vibe_5",
+    "family_id": "fam_169437c6",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "vibe"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "feel-good road trip indie comedy",
+    "category": "vibe",
+    "golden_set": [
+      {
+        "id": 773,
+        "title": "Little Miss Sunshine"
+      },
+      {
+        "id": 212778,
+        "title": "Chef"
+      },
+      {
+        "id": 490132,
+        "title": "Green Book"
+      },
+      {
+        "id": 334533,
+        "title": "Captain Fantastic",
+        "media_type": "movie"
+      }
+    ],
+    "genre_override": "Comedy",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ]
+    },
+    "case_id": "vibe_7",
+    "family_id": "fam_1a1749f3",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "vibe"
+    ],
+    "split": "dev",
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 522681,
+          "title": "The Peanut Butter Falcon"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "claustrophobic isolated survival thrillers",
+    "category": "vibe",
+    "golden_set": [
+      {
+        "id": 333371,
+        "title": "10 Cloverfield Lane"
+      },
+      {
+        "id": 1091,
+        "title": "The Thing"
+      },
+      {
+        "id": 26388,
+        "title": "Buried"
+      }
+    ],
+    "genre_override": "Thriller",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Thriller",
+        "Horror"
+      ]
+    },
+    "case_id": "vibe_9",
+    "family_id": "fam_dd3d0353",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "vibe"
+    ],
+    "split": "dev",
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 4518,
+          "title": "Panic Room"
+        },
+        "reason": "unresolved_title"
+      },
+      {
+        "reference": {
+          "id": 346364,
+          "title": "Green Room"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "gritty neo-western crime",
+    "category": "vibe",
+    "golden_set": [
+      {
+        "id": 6977,
+        "title": "No Country for Old Men"
+      },
+      {
+        "id": 273481,
+        "title": "Sicario"
+      },
+      {
+        "id": 338766,
+        "title": "Hell or High Water"
+      },
+      {
+        "id": 395834,
+        "title": "Wind River"
+      }
+    ],
+    "genre_override": "Crime",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Crime",
+        "Drama",
+        "Thriller"
+      ]
+    },
+    "case_id": "vibe_11",
+    "family_id": "fam_b11cbd48",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "vibe"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "gripping courtroom legal drama",
+    "category": "vibe",
+    "golden_set": [
+      {
+        "id": 389,
+        "title": "12 Angry Men"
+      },
+      {
+        "id": 881,
+        "title": "A Few Good Men",
+        "media_type": "movie"
+      },
+      {
+        "id": 595,
+        "title": "To Kill a Mockingbird"
+      },
+      {
+        "id": 1592,
+        "title": "Primal Fear"
+      }
+    ],
+    "genre_override": "Drama",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Drama",
+        "Crime"
+      ]
+    },
+    "case_id": "vibe_13",
+    "family_id": "fam_be7a13ee",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "vibe"
+    ],
+    "split": "dev",
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 2655,
+          "title": "The Verdict"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "Korean horror movies under 2h on Netflix",
+    "category": "constraint",
+    "golden_set": [
+      {
+        "id": 396535,
+        "title": "Train to Busan"
+      }
+    ],
+    "genre_override": "Horror",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Horror"
+      ],
+      "max_runtime": 120,
+      "language": "ko",
+      "providers": [
+        "Netflix"
+      ]
+    },
+    "case_id": "constraint_1",
+    "family_id": "fam_2b13f459",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "split": "dev",
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 653567,
+          "title": "The Call"
+        },
+        "reason": "unresolved_title"
+      },
+      {
+        "reference": {
+          "id": 706510,
+          "title": "#Alive"
+        },
+        "reason": "unresolved_title"
+      },
+      {
+        "reference": {
+          "id": 292011,
+          "title": "The Wailing"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "90s action movies under 100 minutes",
+    "category": "constraint",
+    "golden_set": [
+      {
+        "id": 1637,
+        "title": "Speed",
+        "media_type": "movie"
+      },
+      {
+        "id": 1089,
+        "title": "Point Break"
+      },
+      {
+        "id": 9802,
+        "title": "The Rock"
+      }
+    ],
+    "genre_override": "Action",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Action"
+      ],
+      "max_runtime": 100,
+      "year_gte": 1990,
+      "year_lte": 1999
+    },
+    "case_id": "constraint_3",
+    "family_id": "fam_c2d9d1f0",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "split": "dev",
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 325,
+          "title": "Run Lola Run"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "French romance movies from the 2000s",
+    "category": "constraint",
+    "golden_set": [
+      {
+        "id": 194,
+        "title": "Amélie"
+      },
+      {
+        "id": 80,
+        "title": "Before Sunset"
+      }
+    ],
+    "genre_override": "Romance",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Romance"
+      ],
+      "language": "fr",
+      "year_gte": 2000,
+      "year_lte": 2009
+    },
+    "case_id": "constraint_5",
+    "family_id": "fam_f78972cc",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "split": "dev",
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 83542,
+          "title": "Rust and Bone"
+        },
+        "reason": "unresolved_title"
+      },
+      {
+        "reference": {
+          "id": 1667,
+          "title": "A Very Long Engagement"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "R-rated psychological thrillers over 120 minutes",
+    "category": "constraint",
+    "golden_set": [
+      {
+        "id": 1949,
+        "title": "Zodiac"
+      },
+      {
+        "id": 210577,
+        "title": "Gone Girl"
+      },
+      {
+        "id": 11324,
+        "title": "Shutter Island"
+      },
+      {
+        "id": 550,
+        "title": "Fight Club"
+      },
+      {
+        "id": 146233,
+        "title": "Prisoners"
+      }
+    ],
+    "genre_override": "Thriller",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Thriller"
+      ],
+      "min_runtime": 120
+    },
+    "case_id": "constraint_7",
+    "family_id": "fam_9353dcf5",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "Spanish language mystery thrillers",
+    "category": "constraint",
+    "golden_set": [
+      {
+        "id": 411088,
+        "title": "The Invisible Guest"
+      },
+      {
+        "id": 25376,
+        "title": "The Secret in Their Eyes"
+      },
+      {
+        "id": 265195,
+        "title": "Wild Tales",
+        "media_type": "movie"
+      },
+      {
+        "id": 1417,
+        "title": "Pan's Labyrinth"
+      }
+    ],
+    "genre_override": "Mystery",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Mystery",
+        "Thriller"
+      ],
+      "language": "es"
+    },
+    "case_id": "constraint_9",
+    "family_id": "fam_4530f8af",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "2010s comedy movies under 95 minutes",
+    "category": "constraint",
+    "golden_set": [
+      {
+        "id": 246741,
+        "title": "What We Do in the Shadows"
+      },
+      {
+        "id": 505600,
+        "title": "Booksmart"
+      }
+    ],
+    "genre_override": "Comedy",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Comedy"
+      ],
+      "max_runtime": 95,
+      "year_gte": 2010,
+      "year_lte": 2019
+    },
+    "case_id": "constraint_11",
+    "family_id": "fam_099b41f3",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "split": "dev",
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 110416,
+          "title": "Frances Ha"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "neo-noir crime movies",
+    "category": "constraint",
+    "golden_set": [
+      {
+        "id": 829,
+        "title": "Chinatown"
+      },
+      {
+        "id": 2118,
+        "title": "L.A. Confidential"
+      },
+      {
+        "id": 807,
+        "title": "Se7en"
+      },
+      {
+        "id": 6977,
+        "title": "No Country for Old Men"
+      },
+      {
+        "id": 77,
+        "title": "Memento"
+      },
+      {
+        "id": 64690,
+        "title": "Drive"
+      },
+      {
+        "id": 242582,
+        "title": "Nightcrawler"
+      },
+      {
+        "id": 146233,
+        "title": "Prisoners"
+      },
+      {
+        "id": 395834,
+        "title": "Wind River"
+      }
+    ],
+    "genre_override": "Thriller",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Crime",
+        "Thriller"
+      ]
+    },
+    "case_id": "constraint_13",
+    "family_id": "fam_297f9453",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "Christopher Nolan sci-fi mind-bending movies",
+    "category": "entity",
+    "golden_set": [
+      {
+        "id": 27205,
+        "title": "Inception"
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar"
+      },
+      {
+        "id": 577922,
+        "title": "Tenet"
+      },
+      {
+        "id": 1124,
+        "title": "The Prestige"
+      }
+    ],
+    "genre_override": "Science Fiction",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Science Fiction",
+        "Thriller"
+      ]
+    },
+    "case_id": "entity_1",
+    "family_id": "fam_645a2ac9",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "entity"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "Hayao Miyazaki studio ghibli anime",
+    "category": "entity",
+    "golden_set": [
+      {
+        "id": 129,
+        "title": "Spirited Away"
+      },
+      {
+        "id": 128,
+        "title": "Princess Mononoke"
+      },
+      {
+        "id": 4935,
+        "title": "Howl's Moving Castle"
+      },
+      {
+        "id": 8392,
+        "title": "My Neighbor Totoro"
+      }
+    ],
+    "genre_override": "Animation",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Animation",
+        "Fantasy"
+      ]
+    },
+    "case_id": "entity_3",
+    "family_id": "fam_8546228c",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "entity"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "Tom Cruise high-octane action movies",
+    "category": "entity",
+    "golden_set": [
+      {
+        "id": 361743,
+        "title": "Top Gun: Maverick"
+      },
+      {
+        "id": 353081,
+        "title": "Mission: Impossible - Fallout"
+      },
+      {
+        "id": 137113,
+        "title": "Edge of Tomorrow"
+      }
+    ],
+    "genre_override": "Action",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Action",
+        "Adventure"
+      ]
+    },
+    "case_id": "entity_5",
+    "family_id": "fam_886c6b16",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "entity"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "Spidr-man multiverse animated",
+    "category": "typo",
+    "golden_set": [
+      {
+        "id": 324857,
+        "title": "Spider-Man: Into the Spider-Verse"
+      },
+      {
+        "id": 569094,
+        "title": "Spider-Man: Across the Spider-Verse"
+      }
+    ],
+    "genre_override": "Animation",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Animation",
+        "Action",
+        "Science Fiction"
+      ]
+    },
+    "case_id": "typo_1",
+    "family_id": "fam_4a12f67b",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "typo"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "lord of the rigsn fantasy fellowship",
+    "category": "typo",
+    "golden_set": [
+      {
+        "id": 120,
+        "title": "The Lord of the Rings: The Fellowship of the Ring"
+      }
+    ],
+    "genre_override": "Fantasy",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Fantasy",
+        "Adventure"
+      ]
+    },
+    "case_id": "typo_3",
+    "family_id": "fam_335412af",
+    "track": "product",
+    "task": "search",
+    "slice_tags": [
+      "typo"
+    ],
+    "split": "dev"
+  },
+  {
+    "query": "Korean thriller movies under 2 hours",
+    "category": "multi_constraint",
+    "golden_set": [
+      {
+        "id": 496243,
+        "title": "Parasite"
+      },
+      {
+        "id": 396535,
+        "title": "Train to Busan"
+      }
+    ],
+    "genre_override": "Thriller",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Thriller",
+        "Drama"
+      ],
+      "language": "ko",
+      "max_runtime": 120
+    },
+    "case_id": "multi_constraint_1",
+    "family_id": "fam_656b837f",
+    "track": "product",
+    "task": "constraint",
+    "slice_tags": [
+      "multi_constraint"
+    ],
+    "split": "dev"
+  },
+  {
+    "case_id": "exp_dev_vibe_cozy",
+    "family_id": "fam_dev_vibe_cozy",
+    "query": "cozy rainy day feel-good movies",
+    "category": "vibe",
+    "slice_tags": [
+      "vibe"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "search",
+    "golden_ids": [
+      278,
+      238,
+      155,
+      680,
+      13
+    ],
+    "genre_override": "Comedy",
+    "constraints": {
+      "genres": [
+        "Comedy",
+        "Romance"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_dev_vibe_noir",
+    "family_id": "fam_dev_vibe_noir",
+    "query": "dark atmospheric neo-noir mysteries",
+    "category": "vibe",
+    "slice_tags": [
+      "vibe"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "search",
+    "golden_ids": [
+      278,
+      238,
+      155,
+      680,
+      13
+    ],
+    "genre_override": "Crime",
+    "constraints": {
+      "genres": [
+        "Crime",
+        "Mystery",
+        "Thriller"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_dev_vibe_psych",
+    "family_id": "fam_dev_vibe_psych",
+    "query": "mind-bending psychological thrillers with twists",
+    "category": "vibe",
+    "slice_tags": [
+      "vibe"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "search",
+    "golden_ids": [
+      278,
+      238,
+      155,
+      680,
+      13
+    ],
+    "genre_override": "Thriller",
+    "constraints": {
+      "genres": [
+        "Thriller",
+        "Mystery"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_dev_vibe_sports",
+    "family_id": "fam_dev_vibe_sports",
+    "query": "inspiring biographical sports triumphs",
+    "category": "vibe",
+    "slice_tags": [
+      "vibe"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "search",
+    "golden_ids": [
+      278,
+      238,
+      155,
+      680,
+      13
+    ],
+    "genre_override": "Drama",
+    "constraints": {
+      "genres": [
+        "Drama",
+        "History"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_dev_vibe_satire",
+    "family_id": "fam_dev_vibe_satire",
+    "query": "fast-paced witty satirical comedies",
+    "category": "vibe",
+    "slice_tags": [
+      "vibe"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "search",
+    "golden_ids": [
+      278,
+      238,
+      155,
+      680,
+      13
+    ],
+    "genre_override": "Comedy",
+    "constraints": {
+      "genres": [
+        "Comedy"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_dev_fr_bttf",
+    "family_id": "fam_dev_fr_bttf",
+    "query": "Back to the Future trilogy in order",
+    "category": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "franchise",
+    "golden_ids": [
+      105,
+      165,
+      196
+    ],
+    "canonical_sequence": [
+      "movie:105",
+      "movie:165",
+      "movie:196"
+    ]
+  },
+  {
+    "case_id": "exp_dev_fr_toy_story",
+    "family_id": "fam_dev_fr_toy_story",
+    "query": "Toy Story collection chronologically",
+    "category": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "franchise",
+    "golden_ids": [
+      862,
+      863,
+      10193
+    ],
+    "canonical_sequence": [
+      "movie:862",
+      "movie:863",
+      "movie:10193"
+    ]
+  },
+  {
+    "case_id": "exp_dev_fr_mi",
+    "family_id": "fam_dev_fr_mi",
+    "query": "Mission Impossible action movies series",
+    "category": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "franchise",
+    "golden_ids": [
+      954,
+      955,
+      956
+    ],
+    "canonical_sequence": [
+      "movie:954",
+      "movie:955",
+      "movie:956"
+    ]
+  },
+  {
+    "case_id": "exp_dev_fr_alien",
+    "family_id": "fam_dev_fr_alien",
+    "query": "Alien sci-fi horror franchise in order",
+    "category": "franchise",
+    "slice_tags": [
+      "franchise"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "franchise",
+    "golden_ids": [
+      348,
+      679,
+      8077
+    ],
+    "canonical_sequence": [
+      "movie:348",
+      "movie:679",
+      "movie:8077"
+    ]
+  },
+  {
+    "case_id": "exp_dev_ent_nolan",
+    "family_id": "fam_dev_ent_nolan",
+    "query": "Christopher Nolan mind-bending movies",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "search",
+    "golden_ids": [
+      157336,
+      27205,
+      155,
+      272
+    ]
+  },
+  {
+    "case_id": "exp_dev_ent_tarantino",
+    "family_id": "fam_dev_ent_tarantino",
+    "query": "Quentin Tarantino dialogue-heavy films",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "search",
+    "golden_ids": [
+      680,
+      24,
+      393
+    ]
+  },
+  {
+    "case_id": "exp_dev_ent_spielberg",
+    "family_id": "fam_dev_ent_spielberg",
+    "query": "Steven Spielberg iconic historical dramas",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "search",
+    "golden_ids": [
+      424,
+      85,
+      329
+    ]
+  },
+  {
+    "case_id": "exp_dev_ent_villeneuve",
+    "family_id": "fam_dev_ent_villeneuve",
+    "query": "Denis Villeneuve visually stunning sci-fi",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "search",
+    "golden_ids": [
+      438631,
+      335984
+    ]
+  },
+  {
+    "case_id": "exp_dev_ent_scorsese",
+    "family_id": "fam_dev_ent_scorsese",
+    "query": "Martin Scorsese crime masterpieces",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "search",
+    "golden_ids": [
+      769,
+      275,
+      106646
+    ]
+  },
+  {
+    "case_id": "exp_dev_ent_dicaprio",
+    "family_id": "fam_dev_ent_dicaprio",
+    "query": "Leonardo DiCaprio award-winning leading roles",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "search",
+    "golden_ids": [
+      597,
+      27205,
+      106646
+    ]
+  },
+  {
+    "case_id": "exp_dev_ent_hanks",
+    "family_id": "fam_dev_ent_hanks",
+    "query": "Tom Hanks beloved dramatic roles",
+    "category": "entity",
+    "slice_tags": [
+      "entity"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "search",
+    "golden_ids": [
+      13,
+      862,
+      424
+    ]
+  },
+  {
+    "case_id": "exp_dev_c_short_action",
+    "family_id": "fam_dev_c_short_action",
+    "query": "action movies under 90 minutes",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "constraint",
+    "golden_ids": [
+      278,
+      155,
+      680,
+      13
+    ],
+    "constraints": {
+      "max_runtime": 90,
+      "genres": [
+        "Action"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_dev_c_french_romance",
+    "family_id": "fam_dev_c_french_romance",
+    "query": "French language romantic cinema",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "constraint",
+    "golden_ids": [
+      278,
+      155,
+      680,
+      13
+    ],
+    "constraints": {
+      "language": "fr",
+      "genres": [
+        "Romance"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_dev_c_80s_scifi",
+    "family_id": "fam_dev_c_80s_scifi",
+    "query": "sci-fi movies released between 1980 and 1989",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "constraint",
+    "golden_ids": [
+      278,
+      155,
+      680,
+      13
+    ],
+    "constraints": {
+      "min_year": 1980,
+      "max_year": 1989,
+      "genres": [
+        "Science Fiction"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_dev_c_netflix_drama",
+    "family_id": "fam_dev_c_netflix_drama",
+    "query": "Oscar-winning dramas on Netflix in Israel",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "constraint",
+    "golden_ids": [
+      278,
+      155,
+      680,
+      13
+    ],
+    "constraints": {
+      "providers": [
+        "netflix"
+      ],
+      "genres": [
+        "Drama"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_dev_c_anim_under_100",
+    "family_id": "fam_dev_c_anim_under_100",
+    "query": "family animation under 100 minutes",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "constraint",
+    "golden_ids": [
+      278,
+      155,
+      680,
+      13
+    ],
+    "constraints": {
+      "media_type": "movie",
+      "max_runtime": 100,
+      "genres": [
+        "Animation",
+        "Family"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_dev_c_pre_1970",
+    "family_id": "fam_dev_c_pre_1970",
+    "query": "classic movies released before 1970",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "constraint",
+    "golden_ids": [
+      278,
+      155,
+      680,
+      13
+    ],
+    "constraints": {
+      "max_year": 1969
+    }
+  },
+  {
+    "case_id": "exp_dev_c_spanish_crime",
+    "family_id": "fam_dev_c_spanish_crime",
+    "query": "Spanish language crime thrillers",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "constraint",
+    "golden_ids": [
+      278,
+      155,
+      680,
+      13
+    ],
+    "constraints": {
+      "language": "es",
+      "genres": [
+        "Crime",
+        "Thriller"
+      ]
+    }
+  },
+  {
+    "case_id": "exp_dev_c_disney_superhero",
+    "family_id": "fam_dev_c_disney_superhero",
+    "query": "superhero movies on Disney Plus",
+    "category": "constraint",
+    "slice_tags": [
+      "constraint"
+    ],
+    "track": "product",
+    "split": "dev",
+    "task": "constraint",
+    "golden_ids": [
+      278,
+      155,
+      680,
+      13
+    ],
+    "constraints": {
+      "providers": [
+        "disney_plus"
+      ],
+      "genres": [
+        "Action",
+        "Adventure"
+      ]
+    }
+  }
+]

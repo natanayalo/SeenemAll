@@ -82,3 +82,25 @@ def _ensure_sentence_transformers_stub() -> None:
 
 _ensure_torch_stub()
 _ensure_sentence_transformers_stub()
+
+try:
+    from thinc.backends import NumpyOps
+    from thinc.backends import registry as thinc_registry
+
+    if "NumpyOps" not in thinc_registry.ops:
+        thinc_registry.ops.register("NumpyOps", func=NumpyOps)
+except Exception:
+    pass
+
+try:
+    import spacy
+    import spacy.util
+    import spacy.vectors
+
+    if "spacy.Vectors.v1" not in spacy.util.registry.vectors:
+        if hasattr(spacy.vectors, "create_mode_vectors"):
+            spacy.util.registry.vectors.register(
+                "spacy.Vectors.v1", func=spacy.vectors.create_mode_vectors
+            )
+except Exception:
+    pass

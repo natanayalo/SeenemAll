@@ -649,7 +649,11 @@ def score_candidates(
         )
 
     ann_weight_override = params.mixer_ann_weight
-    collab_weight_override = params.mixer_collab_weight
+    collab_weight_override = (
+        0.0
+        if getattr(params, "mask_preferences", False)
+        else params.mixer_collab_weight
+    )
     trending_weight_override = params.mixer_trending_weight
     popularity_weight_override = params.mixer_popularity_weight
     vote_weight_override = params.mixer_vote_weight

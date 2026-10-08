@@ -1,0 +1,138 @@
+{
+  "snapshot_version": "2026-10-01-frozen-il",
+  "country_code": "IL",
+  "capture_date": "2026-10-01T00:00:00Z",
+  "description": "Frozen Israel streaming availability snapshot for Seen'emAll Evaluation Suite v2",
+  "tracked_providers": [
+    "netflix",
+    "disney_plus",
+    "prime_video",
+    "apple_tv_plus",
+    "yes",
+    "hot",
+    "cellcom_tv",
+    "partner_tv"
+  ],
+  "items": {
+    "movie:11": {
+      "title": "Star Wars: Episode IV - A New Hope",
+      "available_services": ["disney_plus"],
+      "confirmed_absent": ["netflix", "prime_video", "apple_tv_plus"]
+    },
+    "movie:1891": {
+      "title": "Star Wars: Episode V - The Empire Strikes Back",
+      "available_services": ["disney_plus"],
+      "confirmed_absent": ["netflix", "prime_video"]
+    },
+    "movie:1892": {
+      "title": "Star Wars: Episode VI - Return of the Jedi",
+      "available_services": ["disney_plus"],
+      "confirmed_absent": ["netflix", "prime_video"]
+    },
+    "movie:1893": {
+      "title": "Star Wars: Episode I - The Phantom Menace",
+      "available_services": ["disney_plus"],
+      "confirmed_absent": ["netflix"]
+    },
+    "movie:1894": {
+      "title": "Star Wars: Episode II - Attack of the Clones",
+      "available_services": ["disney_plus"],
+      "confirmed_absent": ["netflix"]
+    },
+    "movie:1895": {
+      "title": "Star Wars: Episode III - Revenge of the Sith",
+      "available_services": ["disney_plus"],
+      "confirmed_absent": ["netflix"]
+    },
+    "movie:140607": {
+      "title": "Star Wars: The Force Awakens",
+      "available_services": ["disney_plus"],
+      "confirmed_absent": ["netflix"]
+    },
+    "movie:671": {
+      "title": "Harry Potter and the Philosopher's Stone",
+      "available_services": ["netflix", "yes", "hot"],
+      "confirmed_absent": ["disney_plus"]
+    },
+    "movie:672": {
+      "title": "Harry Potter and the Chamber of Secrets",
+      "available_services": ["netflix", "yes", "hot"],
+      "confirmed_absent": ["disney_plus"]
+    },
+    "movie:673": {
+      "title": "Harry Potter and the Prisoner of Azkaban",
+      "available_services": ["netflix", "yes", "hot"],
+      "confirmed_absent": ["disney_plus"]
+    },
+    "movie:120": {
+      "title": "The Lord of the Rings: The Fellowship of the Ring",
+      "available_services": ["prime_video", "yes"],
+      "confirmed_absent": ["disney_plus", "netflix"]
+    },
+    "movie:121": {
+      "title": "The Lord of the Rings: The Two Towers",
+      "available_services": ["prime_video", "yes"],
+      "confirmed_absent": ["disney_plus", "netflix"]
+    },
+    "movie:122": {
+      "title": "The Lord of the Rings: The Return of the King",
+      "available_services": ["prime_video", "yes"],
+      "confirmed_absent": ["disney_plus", "netflix"]
+    },
+    "movie:272": {
+      "title": "Batman Begins",
+      "available_services": ["netflix", "yes"],
+      "confirmed_absent": ["disney_plus"]
+    },
+    "movie:155": {
+      "title": "The Dark Knight",
+      "available_services": ["netflix", "yes"],
+      "confirmed_absent": ["disney_plus"]
+    },
+    "movie:49026": {
+      "title": "The Dark Knight Rises",
+      "available_services": ["netflix", "yes"],
+      "confirmed_absent": ["disney_plus"]
+    },
+    "movie:278": {
+      "title": "The Shawshank Redemption",
+      "available_services": ["netflix", "prime_video"],
+      "confirmed_absent": ["disney_plus"]
+    },
+    "movie:238": {
+      "title": "The Godfather",
+      "available_services": ["prime_video"],
+      "confirmed_absent": ["netflix", "disney_plus"]
+    },
+    "movie:240": {
+      "title": "The Godfather Part II",
+      "available_services": ["prime_video"],
+      "confirmed_absent": ["netflix", "disney_plus"]
+    },
+    "movie:597": {
+      "title": "Titanic",
+      "available_services": ["disney_plus"],
+      "confirmed_absent": ["netflix"]
+    },
+    "movie:157336": {
+      "title": "Interstellar",
+      "available_services": ["netflix", "prime_video"],
+      "confirmed_absent": ["disney_plus"]
+    },
+    "movie:27205": {
+      "title": "Inception",
+      "available_services": ["netflix"],
+      "confirmed_absent": ["disney_plus"]
+    },
+    "movie:19995": {
+      "title": "Avatar",
+      "available_services": ["disney_plus"],
+      "confirmed_absent": ["netflix", "prime_video"]
+    },
+    "movie:76600": {
+      "title": "Avatar: The Way of Water",
+      "available_services": ["disney_plus"],
+      "confirmed_absent": ["netflix", "prime_video"]
+    }
+  }
+}

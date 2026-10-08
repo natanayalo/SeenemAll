@@ -37,6 +37,7 @@ models/gliner_small_ov/
 
 # Evaluation artifacts
 evaluation/artifacts/
+evaluation/.judgment_cache.json
 evaluation/evaluation_results*.csv
 evaluation/evaluation_scores*.csv
 evaluation/ab_comparison_report*.json

@@ -1,0 +1,384 @@
+[
+  {
+    "query": "cold_start: top acclaimed world cinema",
+    "category": "cold_start",
+    "user_id": "u_cold_start_1",
+    "golden_set": [
+      {
+        "id": 496243,
+        "title": "Parasite"
+      },
+      {
+        "id": 129,
+        "title": "Spirited Away"
+      },
+      {
+        "id": 346,
+        "title": "Seven Samurai"
+      },
+      {
+        "id": 598,
+        "title": "City of God"
+      },
+      {
+        "id": 426426,
+        "title": "Roma"
+      }
+    ],
+    "genre_override": "Drama",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Drama"
+      ]
+    }
+  },
+  {
+    "query": "cold_start: essential sci-fi classics for new viewer",
+    "category": "cold_start",
+    "user_id": "u_cold_start_2",
+    "golden_set": [
+      {
+        "id": 78,
+        "title": "Blade Runner"
+      },
+      {
+        "id": 603,
+        "title": "The Matrix"
+      },
+      {
+        "id": 62,
+        "title": "2001: A Space Odyssey"
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar"
+      }
+    ],
+    "genre_override": "Science Fiction",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Science Fiction"
+      ]
+    }
+  },
+  {
+    "query": "cold_start: uplifting feel-good crowdpleasers",
+    "category": "cold_start",
+    "user_id": "u_cold_start_3",
+    "golden_set": [
+      {
+        "id": 77338,
+        "title": "The Intouchables"
+      },
+      {
+        "id": 346648,
+        "title": "Paddington 2"
+      },
+      {
+        "id": 194,
+        "title": "Amélie"
+      },
+      {
+        "id": 773,
+        "title": "Little Miss Sunshine"
+      }
+    ],
+    "genre_override": "Comedy",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ]
+    }
+  },
+  {
+    "query": "cold_start: trending binge-worthy TV series",
+    "category": "cold_start",
+    "user_id": "u_cold_start_4",
+    "golden_set": [
+      {
+        "id": 1396,
+        "title": "Breaking Bad"
+      },
+      {
+        "id": 66732,
+        "title": "Stranger Things"
+      },
+      {
+        "id": 76331,
+        "title": "Succession"
+      },
+      {
+        "id": 100088,
+        "title": "The Last of Us"
+      }
+    ],
+    "genre_override": "Drama",
+    "constraints": {
+      "media_type": "tv",
+      "genres": [
+        "Drama"
+      ]
+    }
+  },
+  {
+    "query": "cold_start: obscure cyberpunk anime",
+    "category": "cold_start",
+    "user_id": "u_cold_start_5",
+    "golden_set": [
+      {
+        "id": 149,
+        "title": "Akira"
+      },
+      {
+        "id": 9323,
+        "title": "Ghost in the Shell"
+      }
+    ],
+    "genre_override": "Animation",
+    "constraints": {
+      "genres": [
+        "Animation",
+        "Science Fiction"
+      ]
+    },
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 1944,
+          "title": "Ergo Proxy"
+        },
+        "reason": "unresolved_title"
+      },
+      {
+        "reference": {
+          "id": 1858,
+          "title": "Texhnolyze"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "cold_start: cozy food and cooking documentaries",
+    "category": "cold_start",
+    "user_id": "u_cold_start_6",
+    "golden_set": [],
+    "genre_override": "Documentary",
+    "constraints": {
+      "genres": [
+        "Documentary"
+      ]
+    },
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 75780,
+          "title": "Jiro Dreams of Sushi"
+        },
+        "reason": "unresolved_title"
+      },
+      {
+        "reference": {
+          "id": 62417,
+          "title": "Chef's Table"
+        },
+        "reason": "unresolved_title"
+      },
+      {
+        "reference": {
+          "id": 88206,
+          "title": "Street Food"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "cold_start: psychological mystery puzzle box",
+    "category": "cold_start",
+    "user_id": "u_cold_start_7",
+    "golden_set": [
+      {
+        "id": 77,
+        "title": "Memento"
+      },
+      {
+        "id": 11324,
+        "title": "Shutter Island"
+      },
+      {
+        "id": 1018,
+        "title": "Mulholland Drive",
+        "media_type": "movie"
+      },
+      {
+        "id": 1124,
+        "title": "The Prestige"
+      }
+    ],
+    "genre_override": "Mystery",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Mystery",
+        "Thriller"
+      ]
+    }
+  },
+  {
+    "query": "cold_start: dark comedy crime series",
+    "category": "cold_start",
+    "user_id": "u_cold_start_8",
+    "golden_set": [
+      {
+        "id": 60622,
+        "title": "Fargo"
+      },
+      {
+        "id": 60059,
+        "title": "Better Call Saul"
+      },
+      {
+        "id": 73107,
+        "title": "Barry"
+      },
+      {
+        "id": 1398,
+        "title": "The Sopranos"
+      }
+    ],
+    "genre_override": "Crime",
+    "constraints": {
+      "media_type": "tv",
+      "genres": [
+        "Crime",
+        "Comedy",
+        "Drama"
+      ]
+    }
+  },
+  {
+    "query": "cold_start: epic fantasy adventure",
+    "category": "cold_start",
+    "user_id": "u_cold_start_9",
+    "golden_set": [
+      {
+        "id": 120,
+        "title": "The Lord of the Rings: The Fellowship of the Ring"
+      },
+      {
+        "id": 1399,
+        "title": "Game of Thrones",
+        "media_type": "tv"
+      },
+      {
+        "id": 94605,
+        "title": "Arcane",
+        "media_type": "tv"
+      }
+    ],
+    "genre_override": "Sci-Fi & Fantasy",
+    "constraints": {
+      "genres": [
+        "Fantasy",
+        "Action & Adventure",
+        "Sci-Fi & Fantasy"
+      ]
+    }
+  },
+  {
+    "query": "cold_start: high stakes modern heist series",
+    "category": "cold_start",
+    "user_id": "u_cold_start_10",
+    "golden_set": [
+      {
+        "id": 71446,
+        "title": "Money Heist"
+      },
+      {
+        "id": 96677,
+        "title": "Lupin"
+      },
+      {
+        "id": 64199,
+        "title": "Sneaky Pete"
+      }
+    ],
+    "genre_override": "Crime",
+    "constraints": {
+      "media_type": "tv",
+      "genres": [
+        "Crime",
+        "Drama"
+      ]
+    }
+  },
+  {
+    "query": "cold_start: post-apocalyptic TV shows",
+    "category": "cold_start",
+    "user_id": "u_cold_start_11",
+    "golden_set": [
+      {
+        "id": 100088,
+        "title": "The Last of Us"
+      },
+      {
+        "id": 106379,
+        "title": "Fallout"
+      }
+    ],
+    "genre_override": "Drama",
+    "constraints": {
+      "media_type": "tv",
+      "genres": [
+        "Drama",
+        "Sci-Fi & Fantasy"
+      ]
+    },
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 85937,
+          "title": "Station Eleven"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  },
+  {
+    "query": "cold_start: animated coming-of-age gems",
+    "category": "cold_start",
+    "user_id": "u_cold_start_12",
+    "golden_set": [
+      {
+        "id": 372058,
+        "title": "Your Name."
+      },
+      {
+        "id": 129,
+        "title": "Spirited Away"
+      }
+    ],
+    "genre_override": "Animation",
+    "constraints": {
+      "media_type": "movie",
+      "genres": [
+        "Animation",
+        "Drama"
+      ]
+    },
+    "excluded_golden_references": [
+      {
+        "reference": {
+          "id": 378064,
+          "title": "A Silent Voice"
+        },
+        "reason": "unresolved_title"
+      }
+    ]
+  }
+]
