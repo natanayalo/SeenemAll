@@ -2,6 +2,8 @@
 
 The v2 reference records the current production configuration under the new measurement contract. It does not claim an improvement, change recommendation weights, or waive quality gates. The legacy `evaluation/baseline.json` remains historical evidence; its scores and cached timings cannot be compared directly with v2.
 
+The qualified **v2.2 evidence profile remains the default** for the saved reference. The experimental `--evidence-version v2.3` delivers sourced studio, award and country/date-specific streaming facts, retains sufficiency probabilities, and requires separate qualification and a new reference. Its focused assessment still fails one unknown-award control; see [the measured evidence assessment](nimble_sufficiency_assessment.md). The original baseline is not regraded or overwritten.
+
 ## Capture
 
 ```text

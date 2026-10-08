@@ -22,6 +22,9 @@ class SystemOneJudgeAdapter(LocalJudgeAdapter):
     timeout_seconds: float
     api_key: str | None = None
 
+    def sufficiency_probability(self, raw_response: str) -> float:
+        return float(json.loads(raw_response)["answers"]["evidence_sufficient"]["noul"])
+
     def _headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json", "User-Agent": "SeenemAllEval"}
         if self.api_key:

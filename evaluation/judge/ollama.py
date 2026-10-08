@@ -17,7 +17,15 @@ MODEL_TAGS = {
 class OllamaJudgeAdapter(SystemOneJudgeAdapter):
     """Never pull weights; reject replaced artifacts or changed server versions."""
 
-    def __init__(self, name: str, tag: str, metadata: dict, version: str, url: str):
+    def __init__(
+        self,
+        name: str,
+        tag: str,
+        metadata: dict,
+        version: str,
+        url: str,
+        evidence_version: str | None = None,
+    ):
         digest = metadata.get("digest", "unavailable")
         super().__init__(
             name,
@@ -27,6 +35,7 @@ class OllamaJudgeAdapter(SystemOneJudgeAdapter):
                 "quantization_level", "unavailable"
             ),
             runtime="systemone_ollama",
+            evidence_version=evidence_version,
         )
         self.service_url = url.rstrip("/")
         self.endpoint_url = self.service_url + "/v1/systemone"
@@ -64,7 +73,9 @@ class OllamaJudgeAdapter(SystemOneJudgeAdapter):
         ).hexdigest()
 
 
-def discover_ollama_judges() -> dict[str, OllamaJudgeAdapter]:
+def discover_ollama_judges(
+    evidence_version: str | None = None,
+) -> dict[str, OllamaJudgeAdapter]:
     """Freeze discovery once for a run so tags cannot silently change provenance."""
     url = os.environ.get("OLLAMA_JUDGE_URL", "http://127.0.0.1:11434").rstrip("/")
     probe = OllamaJudgeAdapter("discovery", "discovery", {}, "unknown", url)
@@ -74,6 +85,8 @@ def discover_ollama_judges() -> dict[str, OllamaJudgeAdapter]:
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         version, models = "unavailable", {}
     return {
-        name: OllamaJudgeAdapter(name, tag, models.get(tag, {}), version, url)
+        name: OllamaJudgeAdapter(
+            name, tag, models.get(tag, {}), version, url, evidence_version
+        )
         for name, tag in MODEL_TAGS.items()
     }

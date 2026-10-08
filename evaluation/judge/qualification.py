@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
+import json
 from pathlib import Path
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -135,6 +136,17 @@ def qualification_record_matches(judge: LocalJudgeAdapter, record: Any) -> bool:
         return False
     if record.get("scope") != "qualification":
         return False
+    if judge.evidence_version == "v2.3":
+        controls = record.get("sufficiency_control_cases", 0)
+        accuracy = record.get("sufficiency_control_accuracy", 0)
+        if not isinstance(controls, int) or isinstance(controls, bool) or controls < 14:
+            return False
+        if (
+            not isinstance(accuracy, (int, float))
+            or isinstance(accuracy, bool)
+            or not 0.95 <= accuracy <= 1
+        ):
+            return False
     for key, minimum_count in (
         ("pilot_pairs", 400),
         ("pilot_distinct_pairs", 400),
@@ -170,9 +182,12 @@ class JudgeQualificationRunner:
     """Milestone 0 qualification pilot evaluator."""
 
     def __init__(
-        self, output_dir: Path = Path("evaluation/qualification_reports")
+        self,
+        output_dir: Path = Path("evaluation/qualification_reports"),
+        evidence_version: str = "v2.2",
     ) -> None:
         self.output_dir = output_dir
+        self.evidence_version = evidence_version
 
     def build_pilot_items_for_family(
         self, family_id: str, count: int = 20, catalog_cases: Optional[List[Any]] = None
@@ -196,7 +211,11 @@ class JudgeQualificationRunner:
         family_items: List[ItemEvidence] = []
         seen_ids = set()
 
-        cat_meta = load_catalog_metadata()
+        cat_meta = (
+            load_catalog_metadata()
+            if self.evidence_version == "v2.2"
+            else load_catalog_metadata(evidence_version=self.evidence_version)
+        )
         if cases:
             for case in cases:
                 family = getattr(case, "family_id", None)
@@ -449,6 +468,7 @@ class JudgeQualificationRunner:
                 release_year=ctrl_year,
                 runtime=ctrl_runtime,
                 media_type=ctrl_media_type,
+                evidence_version=self.evidence_version,
             )
             ctrl_inp = JudgeInput(query=ctrl.query, evidence=ctrl_ev)
             out = checked_judgment(ctrl_inp)
@@ -462,6 +482,36 @@ class JudgeQualificationRunner:
                     control_correct += 1
                 elif ctrl.expected_grade > 0 and out.grade >= 2:
                     control_correct += 1
+
+        if self.evidence_version == "v2.3":
+            # Unknown required facts are controls too; confident guesses cannot
+            # qualify an enriched evidence profile.
+            from evaluation.evidence_assessment import CASES_PATH
+
+            cases = json.loads(CASES_PATH.read_text(encoding="utf-8"))["cases"]
+            catalog = load_catalog_metadata(evidence_version=self.evidence_version)
+            correct = 0
+            for case in cases:
+                tid = TypedId.parse(case["typed_id"])
+                inp = JudgeInput(
+                    case["query"], build_item_evidence(tid, catalog[str(tid)])
+                )
+                out = checked_judgment(inp)
+                expected = case["expected_sufficient"][self.evidence_version]
+                if (
+                    out.execution_status == "success"
+                    and out.evidence_sufficiency == expected
+                ):
+                    correct += int(
+                        not expected
+                        or case.get("minimum_grade", 0)
+                        <= out.grade
+                        <= case.get("maximum_grade", 3)
+                    )
+            report["sufficiency_control_cases"] = len(cases)
+            report["sufficiency_control_accuracy"] = (
+                correct / len(cases) if cases else 0
+            )
 
         # Calculate metrics
         rep_rate = (
@@ -530,6 +580,15 @@ class JudgeQualificationRunner:
             and report["malformed_count"] == 0
         )
         report["qualified"] = full_scope and report["measured_gates_pass"]
+        if self.evidence_version == "v2.3":
+            report["sufficiency_control_pass"] = (
+                report["sufficiency_control_cases"] >= 14
+                and report["sufficiency_control_accuracy"] >= 0.95
+            )
+            report["measured_gates_pass"] = (
+                report["measured_gates_pass"] and report["sufficiency_control_pass"]
+            )
+            report["qualified"] = full_scope and report["measured_gates_pass"]
 
         return report
 

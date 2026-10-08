@@ -2,11 +2,19 @@
 
 Updated 9 October 2026 with the measured production reference.
 
+## Contextual evidence and sufficiency diagnostics
+
+The experimental v2.3 evidence profile now delivers sourced studio, award and country/date-specific streaming facts for 19 affected items. Sufficiency probabilities survive native output, cache and adjudication. Historical v2.2 evidence, qualification and the saved baseline remain compatible and unchanged. See [the detailed diagnostic](nimble_sufficiency_assessment.md).
+
+The real uncached assessment executed 56 successful requests: 14 cases, two repeats, two evidence profiles. Correct usable decisions improved from 12/28 to 26/28; false abstentions fell from 10 to zero. The remaining unsupported-award case failed both repeats. Enriched qualification now includes these factual sufficiency controls and requires >=95% correctness; measured 13/14 is below that gate. v2.3 remains explicit and unqualified, while v2.2 stays the production default. This does not regrade the original 94 unresolved judgments or establish full-suite quality improvements.
+
+Current verification passes **867 tests**, six dependency warnings, **54.71 seconds**; exact coverage **10769/12336 = 87.29734112%**. All **38 modified production modules** meet the unrounded 85% gate, with 24 new regression cases. Required legacy recommendation checks remain separate: nDCG@10 0.4494 fails the old 0.72 threshold, diversity 0.6086 passes 0.45, and historical cached timing comparisons fail their latency gate. No ranking weights or recommendation behavior changed.
+
 ## Production reference migration
 
 The new immutable v2 snapshot workflow records current production separately from the historical legacy baseline. It supports frozen-ranking comparisons on the unchanged full product dataset or its development/regression subsets, verifies catalog/index/judge fingerprints, and keeps unresolved evidence explicit as provisional scores. The separate cache-cold latency measurement records the host/model runtime and cannot be compared against cached historical timings. No recommendation weights change. See [the workflow and query budget](evaluation_v2_baseline.md).
 
-Final validation passes **843 tests**, with six dependency warnings, in **69.26 seconds**. Exact coverage is **10638/12205 = 87.161%**, with all **37 changed production modules** meeting the unrounded 85% gate. The snapshot module covers **149/156 = 95.51282051%**. Regression cases cover immutable references, recorded quality defects, explicit evidence gaps, incompatible/tampered inputs, index drift, execution/latency failures, and frozen-ranking/subset comparisons. The real production snapshot is committed at `evaluation/baseline_v2.json`: 101 queries, 1084 pooled judgments, 94 unresolved judgments across 38 queries, and no execution failures. Five provider queries returned empty lists; these remain recorded quality defects. Its quality status is **inconclusive**; scores remain provisional where evidence is unresolved. Earlier verification below remains historical evidence.
+Baseline-capture validation passed **843 tests**, with six dependency warnings, in **69.26 seconds**. Exact coverage is **10638/12205 = 87.161%**, with all **37 changed production modules** meeting the unrounded 85% gate. The snapshot module covers **149/156 = 95.51282051%**. Regression cases cover immutable references, recorded quality defects, explicit evidence gaps, incompatible/tampered inputs, index drift, execution/latency failures, and frozen-ranking/subset comparisons. The real production snapshot is committed at `evaluation/baseline_v2.json`: 101 queries, 1084 pooled judgments, 94 unresolved judgments across 38 queries, and no execution failures. Five provider queries returned empty lists; these remain recorded quality defects. Its quality status is **inconclusive**; scores remain provisional where evidence is unresolved. Earlier verification below remains historical evidence.
 
 
 ### Measured initial v2 reference

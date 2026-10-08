@@ -9,7 +9,7 @@ import time
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from evaluation.deterministic import apply_deterministic_override
-from evaluation.judge.base import LocalJudgeAdapter, MAX_INPUT_CHARS
+from evaluation.judge.base import LocalJudgeAdapter
 from evaluation.models import (
     DeterministicConstraint,
     ItemEvidence,
@@ -110,7 +110,7 @@ class PoolAdjudicator:
         self,
         judge: LocalJudgeAdapter,
         judge_input: JudgeInput,
-    ) -> Tuple[int, Dict[int, float], bool, Any, str]:
+    ) -> Tuple[int, Dict[int, float], bool, Any, str, Optional[float]]:
         """Run judge or retrieve from persistent cache."""
         cached = self.cache.get(judge_input, judge)
         # Retry a prior resource rejection only if the input now fits the guard.
@@ -118,7 +118,7 @@ class PoolAdjudicator:
         if (
             cached
             and cached.get("execution_status") == "over_limit"
-            and len(judge.build_prompt(judge_input)) <= MAX_INPUT_CHARS
+            and len(judge.build_prompt(judge_input)) <= judge.input_character_limit()
         ):
             cached = None
         if cached:
@@ -130,6 +130,7 @@ class PoolAdjudicator:
                 and bool(cached["evidence_sufficiency"]),
                 judge.get_provenance(judge_input.evidence.content_hash()),
                 cached.get("execution_status", "failed"),
+                cached.get("evidence_sufficiency_probability"),
             )
 
         output = judge.judge_pair(judge_input)
@@ -140,6 +141,7 @@ class PoolAdjudicator:
             output.execution_status == "success" and output.evidence_sufficiency,
             output.provenance,
             output.execution_status,
+            output.evidence_sufficiency_probability,
         )
 
     def adjudicate_pair(
@@ -155,7 +157,7 @@ class PoolAdjudicator:
 
         # 1. Exploratory Single-Judge Mode
         if mode == "single_judge" or self.secondary_judge is None:
-            g1, p1, suff1, prov1, execution_status = self._judge_cached(
+            g1, p1, suff1, prov1, execution_status, suff_prob = self._judge_cached(
                 self.primary_judge, judge_input
             )
             final_grade = g1 if suff1 else None
@@ -182,19 +184,21 @@ class PoolAdjudicator:
                 deterministic_override=override,
                 violation_reasons=violations,
                 execution_statuses=[execution_status],
+                evidence_sufficiency_probabilities=[suff_prob],
             )
 
         # 2. Authoritative Multi-Judge Consensus Mode
         # Step 1: Primary and secondary independently label complete item
-        g1, p1, suff1, prov1, status1 = self._judge_cached(
+        g1, p1, suff1, prov1, status1, prob1 = self._judge_cached(
             self.primary_judge, judge_input
         )
-        g2, p2, suff2, prov2, status2 = self._judge_cached(
+        g2, p2, suff2, prov2, status2, prob2 = self._judge_cached(
             self.secondary_judge, judge_input
         )
 
         provenances = [prov1, prov2]
         execution_statuses = [status1, status2]
+        sufficiency_probabilities = [prob1, prob2]
 
         # Step 2: Exact agreement when both find sufficient evidence
         if suff1 and suff2 and g1 == g2:
@@ -205,11 +209,12 @@ class PoolAdjudicator:
         else:
             # Step 3: Disagreements or evidence conflicts go to 3rd qualifying model
             if self.tie_breaker_judge is not None:
-                g3, p3, suff3, prov3, status3 = self._judge_cached(
+                g3, p3, suff3, prov3, status3, prob3 = self._judge_cached(
                     self.tie_breaker_judge, judge_input
                 )
                 provenances.append(prov3)
                 execution_statuses.append(status3)
+                sufficiency_probabilities.append(prob3)
 
                 # Step 4: Accept a grade only when at least 2 distinct models assign that exact grade
                 valid_votes = []
@@ -259,6 +264,7 @@ class PoolAdjudicator:
             deterministic_override=override,
             violation_reasons=violations,
             execution_statuses=execution_statuses,
+            evidence_sufficiency_probabilities=sufficiency_probabilities,
         )
 
 

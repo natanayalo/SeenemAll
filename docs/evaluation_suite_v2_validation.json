@@ -2,12 +2,12 @@
   "verified_date": "2026-10-09",
   "test_runtime": "Windows / Python 3.12.10",
   "unit_verification": {
-    "tests_passed": 843,
+    "tests_passed": 867,
     "dependency_warnings": 6,
-    "elapsed_seconds": 69.26,
-    "covered_statements": 10638,
-    "statements": 12205,
-    "unrounded_coverage": 87.16099959033183,
+    "elapsed_seconds": 54.71,
+    "covered_statements": 10769,
+    "statements": 12336,
+    "unrounded_coverage": 87.2973411154345,
     "modified_modules": [
       {
         "module": "api/core/cross_encoder.py",
@@ -89,9 +89,9 @@
       },
       {
         "module": "evaluation/baseline_v2.py",
-        "covered_statements": 149,
-        "statements": 156,
-        "unrounded_coverage": 95.51282051282051
+        "covered_statements": 150,
+        "statements": 157,
+        "unrounded_coverage": 95.54140127388536
       },
       {
         "module": "evaluation/build_dataset_splits.py",
@@ -125,14 +125,20 @@
       },
       {
         "module": "evaluation/evaluate.py",
-        "covered_statements": 943,
-        "statements": 1067,
-        "unrounded_coverage": 88.37863167760075
+        "covered_statements": 946,
+        "statements": 1070,
+        "unrounded_coverage": 88.41121495327103
       },
       {
         "module": "evaluation/evidence.py",
-        "covered_statements": 64,
-        "statements": 64,
+        "covered_statements": 78,
+        "statements": 78,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/evidence_assessment.py",
+        "covered_statements": 66,
+        "statements": 66,
         "unrounded_coverage": 100.0
       },
       {
@@ -143,15 +149,15 @@
       },
       {
         "module": "evaluation/judge/base.py",
-        "covered_statements": 51,
-        "statements": 54,
-        "unrounded_coverage": 94.44444444444444
+        "covered_statements": 59,
+        "statements": 62,
+        "unrounded_coverage": 95.16129032258064
       },
       {
         "module": "evaluation/judge/consensus.py",
-        "covered_statements": 186,
-        "statements": 190,
-        "unrounded_coverage": 97.89473684210526
+        "covered_statements": 188,
+        "statements": 192,
+        "unrounded_coverage": 97.91666666666667
       },
       {
         "module": "evaluation/judge/ollama.py",
@@ -161,9 +167,9 @@
       },
       {
         "module": "evaluation/judge/qualification.py",
-        "covered_statements": 267,
-        "statements": 279,
-        "unrounded_coverage": 95.6989247311828
+        "covered_statements": 294,
+        "statements": 306,
+        "unrounded_coverage": 96.07843137254902
       },
       {
         "module": "evaluation/judge/rubric.py",
@@ -179,8 +185,8 @@
       },
       {
         "module": "evaluation/judge/systemone.py",
-        "covered_statements": 52,
-        "statements": 52,
+        "covered_statements": 54,
+        "statements": 54,
         "unrounded_coverage": 100.0
       },
       {
@@ -197,9 +203,9 @@
       },
       {
         "module": "evaluation/models.py",
-        "covered_statements": 290,
-        "statements": 300,
-        "unrounded_coverage": 96.66666666666667
+        "covered_statements": 298,
+        "statements": 308,
+        "unrounded_coverage": 96.75324675324676
       },
       {
         "module": "evaluation/personalization.py",
@@ -712,6 +718,148 @@
       "The quality arithmetic is provisional when evidence remains unresolved; comparison coverage gates remain enforced.",
       "This is the initial production reference for the v2 contract. Legacy scores and cached timings are not comparable.",
       "Latency describes this host and runtime. Rerun baseline and candidate together for future speed comparisons."
+    ]
+  },
+  "evidence_sufficiency_upgrade": {
+    "evidence_version": "v2.3",
+    "status": "experimental; not production-qualified",
+    "active_default": "v2.2",
+    "contextual_records": 19,
+    "native_assessment": {
+      "v2.2": {
+        "requests": 28,
+        "correct": 12,
+        "false_abstentions": 10,
+        "false_sufficiency": 4,
+        "execution_failures": 0
+      },
+      "v2.3": {
+        "requests": 28,
+        "correct": 26,
+        "false_abstentions": 0,
+        "false_sufficiency": 2,
+        "execution_failures": 0
+      }
+    },
+    "distinct_control_cases": 14,
+    "native_requests": 56,
+    "judgment_cache_used": false,
+    "judge_fingerprints": {
+      "v2.2": "1f005ca2ac68f282d51b2dd9ccc9a8ded5b01a34c0dd8e25e25888e2ecd860cd",
+      "v2.3": "9d5df18b21b6bab1393bcc9feb4d03003c28121b6a26fa952684920871a34e32"
+    },
+    "input_manifest_sha256": "73a668df2bd2a77b5f99d3b81fe94ea930235c649df79d3abacb4abdd0a7b5d3",
+    "case_manifest_sha256": "96e590c5b768883927c1096c8d5be81f3ae2b43dbd3f6fa49e763046eaffe17a",
+    "remaining_failure": "unknown_award; false sufficient / grade 1 despite missing mandatory award evidence",
+    "new_qualification_control_gate": {
+      "minimum_cases": 14,
+      "minimum_usable_correctness": 0.95,
+      "observed_distinct_correctness": 0.9285714285714286,
+      "passed": false
+    },
+    "original_reference_compatibility": "verified against full 101 cases, current index and original qualified judge",
+    "additional_unit_regression_cases": 24,
+    "latest_legacy_ab": {
+      "backend": "elasticsearch",
+      "baseline_param": "default",
+      "candidate_param": "default",
+      "k": 10,
+      "comparisons": {
+        "ndcg": {
+          "metric": "nDCG@10",
+          "baseline": 0.4430057236653608,
+          "candidate": 0.449395261630625,
+          "delta": 0.006389537965264203,
+          "lift_percent": 1.4423149914177529
+        },
+        "map": {
+          "metric": "MAP",
+          "baseline": 0.38340237570076274,
+          "candidate": 0.38742649674101287,
+          "delta": 0.004024121040250128,
+          "lift_percent": 1.049581665448747
+        },
+        "precision": {
+          "metric": "Precision@10",
+          "baseline": 0.19354838709677416,
+          "candidate": 0.19677419354838704,
+          "delta": 0.0032258064516128837,
+          "lift_percent": 1.666666666666657
+        },
+        "recall": {
+          "metric": "Recall@10",
+          "baseline": 0.4725806451612903,
+          "candidate": 0.4782258064516129,
+          "delta": 0.005645161290322609,
+          "lift_percent": 1.194539249146764
+        },
+        "ild": {
+          "metric": "Intra-List Diversity",
+          "baseline": 0.6086782359700724,
+          "candidate": 0.608624611465243,
+          "delta": -5.3624504829374864e-05,
+          "lift_percent": -0.008809992153557381
+        },
+        "unique_count": {
+          "metric": "Unique Items Rec'd",
+          "baseline": 469.0,
+          "candidate": 467.0,
+          "delta": -2.0,
+          "lift_percent": -0.42643923240938164
+        },
+        "intent_alignment": {
+          "metric": "Intent Adherence",
+          "baseline": 0.8949206349206349,
+          "candidate": 0.8932539682539683,
+          "delta": -0.0016666666666665941,
+          "lift_percent": -0.1862362539907688
+        },
+        "latency_mean": {
+          "metric": "Latency Mean (ms)",
+          "baseline": 42.273687095955886,
+          "candidate": 762.8906580709642,
+          "delta": 720.6169709750083,
+          "lift_percent": 1704.6466028366524
+        },
+        "latency_p50": {
+          "metric": "Latency P50 (ms)",
+          "baseline": 4.369949994725175,
+          "candidate": 625.1326000201516,
+          "delta": 620.7626500254264,
+          "lift_percent": 14205.257514953919
+        },
+        "latency_p95": {
+          "metric": "Latency P95 (ms)",
+          "baseline": 5.875030007155143,
+          "candidate": 984.3041449494194,
+          "delta": 978.4291149422643,
+          "lift_percent": 16654.02753263634
+        }
+      },
+      "quality_gate": {
+        "enabled": true,
+        "passed": false,
+        "checks": {
+          "latency_mean_improved": false,
+          "latency_p95_improved": false,
+          "ndcg_non_regression": true,
+          "map_non_regression": true
+        }
+      }
+    },
+    "legacy_regression": {
+      "ndcg_at_10": 0.4494,
+      "required_ndcg_at_10": 0.72,
+      "ndcg_passed": false,
+      "ild_at_10": 0.6086,
+      "required_ild_at_10": 0.45,
+      "ild_passed": true
+    },
+    "limitations": [
+      "14 deliberately selected diagnostic cases; repeats are not independent cases",
+      "Enriched evidence combines added facts and presentation; this run does not isolate causal contributions",
+      "No new 101-query quality score or reference; original 94 unresolved judgments remain historical",
+      "Unlisted providers and missing award facts remain unknown, not confirmed absent"
     ]
   }
 }

@@ -1541,6 +1541,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="Nimble via Ollama, or a deterministic stub for automated tests.",
     )
     parser.add_argument(
+        "--evidence-version",
+        choices=["v2.2", "v2.3"],
+        default="v2.2",
+        help="Frozen evidence profile; enriched v2.3 requires a separate qualification and reference.",
+    )
+    parser.add_argument(
         "--allow-stub-judges-for-testing",
         action="store_true",
         help="Allow stub judges in authoritative/consensus mode (strictly for automated testing).",
@@ -1697,8 +1703,13 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
 
     # 2. Local Judge Qualification Pilot (Milestone 0)
     if args.qualify_judges:
-        runner = JudgeQualificationRunner()
-        candidates: Dict[str, LocalJudgeAdapter] = dict(discover_ollama_judges())
+        evidence_version = getattr(args, "evidence_version", "v2.2")
+        runner = JudgeQualificationRunner(evidence_version=evidence_version)
+        candidates: Dict[str, LocalJudgeAdapter] = dict(
+            discover_ollama_judges()
+            if evidence_version == "v2.2"
+            else discover_ollama_judges(evidence_version)
+        )
         pilot_families = [
             "fam_vibe_noir",
             "fam_vibe_cozy",
@@ -1769,7 +1780,11 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
         print(f"    Operation Mode:    {panel_mode}")
         print("=" * 76 + "\n")
 
-        qual_file = Path("evaluation/.judge_qualification_ollama.json")
+        qual_file = Path(
+            "evaluation/.judge_qualification_ollama.json"
+            if evidence_version == "v2.2"
+            else "evaluation/.judge_qualification_ollama_v2.3.json"
+        )
         qual_file.parent.mkdir(parents=True, exist_ok=True)
         qual_data = {
             "primary": primary.model_name if primary else None,
@@ -1956,7 +1971,12 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
             return int(EvaluationStatus.INVALID)
 
     # Check qualification records in authoritative runs
-    ollama_candidates = discover_ollama_judges()
+    evidence_version = getattr(args, "evidence_version", "v2.2")
+    ollama_candidates = (
+        discover_ollama_judges()
+        if evidence_version == "v2.2"
+        else discover_ollama_judges(evidence_version)
+    )
     ollama_panel_names = []
     if ollama_candidates is not None and args.judge_config != "stub":
         primary_name = "bespoke-nimble-9b"
@@ -1971,7 +1991,11 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
         ollama_panel_names = [primary_name] + [
             name for name in ollama_candidates if name != primary_name
         ]
-    qual_file = Path("evaluation/.judge_qualification_ollama.json")
+    qual_file = Path(
+        "evaluation/.judge_qualification_ollama.json"
+        if evidence_version == "v2.2"
+        else "evaluation/.judge_qualification_ollama_v2.3.json"
+    )
     if is_authoritative and not getattr(args, "allow_stub_judges_for_testing", False):
         if not qual_file.exists():
             print(
@@ -2099,7 +2123,11 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
 
     per_query_rows = []
 
-    catalog_metadata = load_catalog_metadata()
+    catalog_metadata = (
+        load_catalog_metadata()
+        if evidence_version == "v2.2"
+        else load_catalog_metadata(evidence_version=evidence_version)
+    )
 
     for case in cases:
         # Retrieve candidates up to depth 100 so Known-Positive Recall@100 measures true retrieval depth
@@ -2190,7 +2218,16 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
                 ),
                 None,
             )
-            ev = pool_item_evidence(tid, match or {}, catalog_metadata)
+            ev = (
+                pool_item_evidence(tid, match or {}, catalog_metadata)
+                if evidence_version == "v2.2"
+                else pool_item_evidence(
+                    tid,
+                    match or {},
+                    catalog_metadata,
+                    evidence_version=evidence_version,
+                )
+            )
             pool_evidence.append(ev)
             if pid_str in candidate_top_ids and case.constraints:
                 valid, _ = check_deterministic_constraints(ev, case.constraints)

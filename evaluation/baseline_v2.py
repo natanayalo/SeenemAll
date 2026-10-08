@@ -120,7 +120,11 @@ def load_reference(
         "dataset_sha256": fingerprint(
             [row["case"] for row in reference["per_query_results"]]
         ),
-        "catalog_sha256": fingerprint(load_catalog_metadata()),
+        "catalog_sha256": fingerprint(
+            load_catalog_metadata()
+            if getattr(args, "evidence_version", "v2.2") == "v2.2"
+            else load_catalog_metadata(evidence_version=args.evidence_version)
+        ),
         "judge_fingerprint": judge.qualification_fingerprint(),
         "backend": args.backend,
         "k": args.k,
@@ -173,9 +177,18 @@ def capture_baseline(args: Any) -> int:
     cases = load_evaluation_cases(track=args.track, split=args.split)
     if not cases:
         raise ValueError("Full product dataset is missing or empty")
-    judge = discover_ollama_judges()["bespoke-nimble-9b"]
+    evidence_version = getattr(args, "evidence_version", "v2.2")
+    judge = (
+        discover_ollama_judges()
+        if evidence_version == "v2.2"
+        else discover_ollama_judges(evidence_version)
+    )["bespoke-nimble-9b"]
     qualification = json.loads(
-        Path("evaluation/.judge_qualification_ollama.json").read_text()
+        Path(
+            "evaluation/.judge_qualification_ollama.json"
+            if evidence_version == "v2.2"
+            else "evaluation/.judge_qualification_ollama_v2.3.json"
+        ).read_text()
     )
     if not judge.is_available() or not qualification_record_matches(
         judge, qualification["reports"].get(judge.model_name, {})
@@ -183,7 +196,11 @@ def capture_baseline(args: Any) -> int:
         raise ValueError(
             "Production baseline requires the available, qualified judge artifact"
         )
-    catalog = load_catalog_metadata()
+    catalog = (
+        load_catalog_metadata()
+        if evidence_version == "v2.2"
+        else load_catalog_metadata(evidence_version=evidence_version)
+    )
     index_artifact = index_identity(args.backend)
     build_identity = code_identity()
     started_at = datetime.now(timezone.utc).isoformat()
@@ -210,8 +227,19 @@ def capture_baseline(args: Any) -> int:
         records = []
         violations = []
         pool_evidence = [
-            pool_item_evidence(
-                TypedId.parse(identifier), results_by_id.get(identifier, {}), catalog
+            (
+                pool_item_evidence(
+                    TypedId.parse(identifier),
+                    results_by_id.get(identifier, {}),
+                    catalog,
+                )
+                if evidence_version == "v2.2"
+                else pool_item_evidence(
+                    TypedId.parse(identifier),
+                    results_by_id.get(identifier, {}),
+                    catalog,
+                    evidence_version=evidence_version,
+                )
             )
             for identifier in pool
         ]
@@ -315,6 +343,7 @@ def capture_baseline(args: Any) -> int:
         "judge_fingerprint": judge.qualification_fingerprint(),
         "judge_provenance": judge.get_provenance("").to_dict(),
         "judge_workers": args.baseline_judge_workers,
+        "evidence_version": evidence_version,
         "code": build_identity,
         "runtime": runtime_identity(),
         "query_count": len(rows),

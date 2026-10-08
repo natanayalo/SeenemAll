@@ -11,6 +11,7 @@ from evaluation.models import ItemEvidence, TypedId
 
 CATALOG_EVIDENCE_PATH = Path("evaluation/fixtures/catalog_evidence_v2.2.json")
 LEGACY_CATALOG_PATH = Path("evaluation/fixtures/catalog_metadata.json")
+CONTEXT_EVIDENCE_PATH = Path("evaluation/fixtures/context_evidence_v2.3.json")
 CATALOG_FIELDS = (
     "tmdb_id",
     "media_type",
@@ -63,7 +64,9 @@ def index_catalog_metadata(data: Any) -> dict[str, dict[str, Any]]:
     return indexed
 
 
-def load_catalog_metadata(path: Path | None = None) -> dict[str, dict[str, Any]]:
+def load_catalog_metadata(
+    path: Path | None = None, *, evidence_version: str = "v2.2"
+) -> dict[str, dict[str, Any]]:
     """Use the frozen corrected snapshot, then legacy data, then a live DB read.
 
     Explicit or existing corrupt snapshots fail rather than silently changing
@@ -74,9 +77,10 @@ def load_catalog_metadata(path: Path | None = None) -> dict[str, dict[str, Any]]
     )
     for candidate in candidates:
         if candidate.exists():
-            return index_catalog_metadata(
+            indexed = index_catalog_metadata(
                 json.loads(candidate.read_text(encoding="utf-8"))
             )
+            return contextualize_catalog(indexed, evidence_version)
     if path is not None:
         raise FileNotFoundError(path)
     from api.db.models import Item
@@ -84,7 +88,33 @@ def load_catalog_metadata(path: Path | None = None) -> dict[str, dict[str, Any]]
 
     with get_sessionmaker()() as db:
         rows = db.query(Item).order_by(Item.media_type, Item.tmdb_id).all()
-        return index_catalog_metadata([catalog_metadata_from_item(row) for row in rows])
+        return contextualize_catalog(
+            index_catalog_metadata([catalog_metadata_from_item(row) for row in rows]),
+            evidence_version,
+        )
+
+
+def contextualize_catalog(
+    catalog: dict[str, dict[str, Any]], evidence_version: str
+) -> dict[str, dict[str, Any]]:
+    """Select a frozen evidence version; never merge live request watch options."""
+    if evidence_version == "v2.2":
+        return catalog
+    if evidence_version != "v2.3":
+        raise ValueError("Unsupported evidence version")
+    supplement = json.loads(CONTEXT_EVIDENCE_PATH.read_text(encoding="utf-8"))
+    if supplement.get("evidence_version") != evidence_version:
+        raise ValueError("Context evidence version mismatch")
+    return {
+        tid: {
+            **row,
+            "_evidence_version": evidence_version,
+            "_contextual_facts": supplement["items"].get(
+                tid, {"availability": None, "studios": None, "awards": None}
+            ),
+        }
+        for tid, row in catalog.items()
+    }
 
 
 def _names(values: Any) -> list[str]:
@@ -121,13 +151,26 @@ def build_item_evidence(tid: TypedId, metadata: Mapping[str, Any]) -> ItemEviden
         maturity_rating=metadata.get("maturity_rating"),
         collection_id=metadata.get("collection_id"),
         collection_name=metadata.get("collection_name"),
+        evidence_version=metadata.get("_evidence_version", "v2.2"),
+        contextual_facts=metadata.get("_contextual_facts"),
     )
 
 
 def pool_item_evidence(
-    tid: TypedId, result: Mapping[str, Any], catalog: Mapping[str, Any]
+    tid: TypedId,
+    result: Mapping[str, Any],
+    catalog: Mapping[str, Any],
+    *,
+    evidence_version: str | None = None,
 ) -> ItemEvidence:
     """Hydrate thin API results from the same frozen catalog used by the pilot."""
     metadata = dict(result)
     metadata.update(catalog.get(str(tid), {}))
+    if evidence_version == "v2.3" and str(tid) not in catalog:
+        metadata["_evidence_version"] = evidence_version
+        metadata["_contextual_facts"] = {
+            "availability": None,
+            "studios": None,
+            "awards": None,
+        }
     return build_item_evidence(tid, metadata)

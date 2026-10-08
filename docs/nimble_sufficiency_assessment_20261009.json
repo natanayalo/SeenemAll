@@ -1,0 +1,1768 @@
+{
+  "scope": "diagnostic, not qualification or baseline promotion",
+  "created_at": "2026-10-08T22:38:43.835305+00:00",
+  "repeats": 2,
+  "case_count": 14,
+  "native_requests": 56,
+  "production_cache_used": false,
+  "case_manifest_sha256": "96e590c5b768883927c1096c8d5be81f3ae2b43dbd3f6fa49e763046eaffe17a",
+  "input_manifest_sha256": "73a668df2bd2a77b5f99d3b81fe94ea930235c649df79d3abacb4abdd0a7b5d3",
+  "judge_fingerprints": {
+    "v2.2": "1f005ca2ac68f282d51b2dd9ccc9a8ded5b01a34c0dd8e25e25888e2ecd860cd",
+    "v2.3": "9d5df18b21b6bab1393bcc9feb4d03003c28121b6a26fa952684920871a34e32"
+  },
+  "summary": {
+    "v2.2": {
+      "requests": 28,
+      "correct": 12,
+      "false_abstentions": 10,
+      "false_sufficiency": 4,
+      "execution_failures": 0
+    },
+    "v2.3": {
+      "requests": 28,
+      "correct": 26,
+      "false_abstentions": 0,
+      "false_sufficiency": 2,
+      "execution_failures": 0
+    }
+  },
+  "results": [
+    {
+      "version": "v2.2",
+      "case_id": "matrix_membership",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": false,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.011226046599759518,
+          "1": 0.022341511263576044,
+          "2": 0.2056039263696098,
+          "3": 0.7608285157670547
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 2.716,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "6563d2cc1d732f53e97bf2b8ba0e5c2f2927eec43a9d44090ac5590b71543f7e"
+        },
+        "evidence_sufficiency_probability": 0.2771412026248379
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "matrix_membership",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": false,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.011226046599759518,
+          "1": 0.022341511263576044,
+          "2": 0.2056039263696098,
+          "3": 0.7608285157670547
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 2.716,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "6563d2cc1d732f53e97bf2b8ba0e5c2f2927eec43a9d44090ac5590b71543f7e"
+        },
+        "evidence_sufficiency_probability": 0.2771412026248379
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "star_wars_membership",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": false,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.07768935337710088,
+          "1": 0.2285561151131209,
+          "2": 0.5716559801905587,
+          "3": 0.12209855131921953
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 1.7382,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "fe7c61fd007d005f1d8a6e9fed99df17509c2cd4cbe8b4809be3ee085f2b8139"
+        },
+        "evidence_sufficiency_probability": 0.49274496992874517
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "star_wars_membership",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": false,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.07768935337710088,
+          "1": 0.2285561151131209,
+          "2": 0.5716559801905587,
+          "3": 0.12209855131921953
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 1.7382,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "fe7c61fd007d005f1d8a6e9fed99df17509c2cd4cbe8b4809be3ee085f2b8139"
+        },
+        "evidence_sufficiency_probability": 0.49274496992874517
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "jedi_membership",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": false,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.023878769369141756,
+          "1": 0.04919119616700992,
+          "2": 0.5721604744530089,
+          "3": 0.3547695600108394
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 2.2578,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "18941b9623ecd272fc61b8f456590bad2d5bae0fed51946a9abeb521dbb50d80"
+        },
+        "evidence_sufficiency_probability": 0.4651995620132041
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "jedi_membership",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": false,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.023878769369141756,
+          "1": 0.04919119616700992,
+          "2": 0.5721604744530089,
+          "3": 0.3547695600108394
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 2.2578,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "18941b9623ecd272fc61b8f456590bad2d5bae0fed51946a9abeb521dbb50d80"
+        },
+        "evidence_sufficiency_probability": 0.4651995620132041
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "toy_story_membership",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": false,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.010016205814627619,
+          "1": 0.019160588474635053,
+          "2": 0.4893371177026577,
+          "3": 0.48148608800807957
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 2.4423,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "7951d2dda06475442d91b4683aee41050f85d8c4d6fd4157413f623f64e770c6"
+        },
+        "evidence_sufficiency_probability": 0.34917375579882604
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "toy_story_membership",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": false,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.010016205814627619,
+          "1": 0.019160588474635053,
+          "2": 0.4893371177026577,
+          "3": 0.48148608800807957
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 2.4423,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "7951d2dda06475442d91b4683aee41050f85d8c4d6fd4157413f623f64e770c6"
+        },
+        "evidence_sufficiency_probability": 0.34917375579882604
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "predator_year_and_genre",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": false,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.00047685878586918573,
+          "1": 0.0046543781876931785,
+          "2": 0.24633580140494704,
+          "3": 0.7485329616214905
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 2.7429,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "57a3ab2093b3bef4a07cb1c17332d0785c6de1e24dd7b41231471019dc6cdabd"
+        },
+        "evidence_sufficiency_probability": 0.36000548683366335
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "predator_year_and_genre",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": false,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.00047685878586918573,
+          "1": 0.0046543781876931785,
+          "2": 0.24633580140494704,
+          "3": 0.7485329616214905
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 2.7429,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "57a3ab2093b3bef4a07cb1c17332d0785c6de1e24dd7b41231471019dc6cdabd"
+        },
+        "evidence_sufficiency_probability": 0.36000548683366335
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "known_year_mismatch",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 0,
+        "probabilities": {
+          "0": 0.6002708331371648,
+          "1": 0.3985052221165669,
+          "2": 0.0004055082005173386,
+          "3": 0.0008184365457509199
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.4018,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "6563d2cc1d732f53e97bf2b8ba0e5c2f2927eec43a9d44090ac5590b71543f7e"
+        },
+        "evidence_sufficiency_probability": 0.9593674589162882
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "known_year_mismatch",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 0,
+        "probabilities": {
+          "0": 0.6002708331371648,
+          "1": 0.3985052221165669,
+          "2": 0.0004055082005173386,
+          "3": 0.0008184365457509199
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.4018,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "6563d2cc1d732f53e97bf2b8ba0e5c2f2927eec43a9d44090ac5590b71543f7e"
+        },
+        "evidence_sufficiency_probability": 0.9593674589162882
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "known_language_mismatch",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 0,
+        "probabilities": {
+          "0": 0.5466009635205591,
+          "1": 0.4528094313299385,
+          "2": 0.00022223321942978945,
+          "3": 0.00036737193007255734
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.4544,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "57a3ab2093b3bef4a07cb1c17332d0785c6de1e24dd7b41231471019dc6cdabd"
+        },
+        "evidence_sufficiency_probability": 0.9694001052902869
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "known_language_mismatch",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 0,
+        "probabilities": {
+          "0": 0.5466009635205591,
+          "1": 0.4528094313299385,
+          "2": 0.00022223321942978945,
+          "3": 0.00036737193007255734
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.4544,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "57a3ab2093b3bef4a07cb1c17332d0785c6de1e24dd7b41231471019dc6cdabd"
+        },
+        "evidence_sufficiency_probability": 0.9694001052902869
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "known_runtime_mismatch",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": false,
+      "result": {
+        "grade": 1,
+        "probabilities": {
+          "0": 0.2819154501943189,
+          "1": 0.7171553450596219,
+          "2": 0.00011131595544972349,
+          "3": 0.0008178887906095352
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.7198,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "57a3ab2093b3bef4a07cb1c17332d0785c6de1e24dd7b41231471019dc6cdabd"
+        },
+        "evidence_sufficiency_probability": 0.9833628160060869
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "known_runtime_mismatch",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": false,
+      "result": {
+        "grade": 1,
+        "probabilities": {
+          "0": 0.2819154501943189,
+          "1": 0.7171553450596219,
+          "2": 0.00011131595544972349,
+          "3": 0.0008178887906095352
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.7198,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "57a3ab2093b3bef4a07cb1c17332d0785c6de1e24dd7b41231471019dc6cdabd"
+        },
+        "evidence_sufficiency_probability": 0.9833628160060869
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "ghibli_studio",
+      "repeat": 0,
+      "expected_sufficient": false,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.0013648266192551567,
+          "1": 0.007679123622943075,
+          "2": 0.6171531550809298,
+          "3": 0.37380289467687194
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 2.3634,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "3a8eb58e9d481550d21384a5b61beae43259bb2a7f7a2725eb003b01391f4203"
+        },
+        "evidence_sufficiency_probability": 0.39958280244504374
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "ghibli_studio",
+      "repeat": 1,
+      "expected_sufficient": false,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.0013648266192551567,
+          "1": 0.007679123622943075,
+          "2": 0.6171531550809298,
+          "3": 0.37380289467687194
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 2.3634,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "3a8eb58e9d481550d21384a5b61beae43259bb2a7f7a2725eb003b01391f4203"
+        },
+        "evidence_sufficiency_probability": 0.39958280244504374
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "netflix_il_offer",
+      "repeat": 0,
+      "expected_sufficient": false,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.0833335906345953,
+          "1": 0.07807828258618879,
+          "2": 0.6683770425287103,
+          "3": 0.17021108425050546
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 1.9255,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "3a8eb58e9d481550d21384a5b61beae43259bb2a7f7a2725eb003b01391f4203"
+        },
+        "evidence_sufficiency_probability": 0.14229146942348586
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "netflix_il_offer",
+      "repeat": 1,
+      "expected_sufficient": false,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.0833335906345953,
+          "1": 0.07807828258618879,
+          "2": 0.6683770425287103,
+          "3": 0.17021108425050546
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 1.9255,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "3a8eb58e9d481550d21384a5b61beae43259bb2a7f7a2725eb003b01391f4203"
+        },
+        "evidence_sufficiency_probability": 0.14229146942348586
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "academy_award",
+      "repeat": 0,
+      "expected_sufficient": false,
+      "correct": false,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.0016120874892684408,
+          "1": 0.017060928263385615,
+          "2": 0.6576575136004914,
+          "3": 0.3236694706468545
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.3034,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "e99b597f2bfd8512453f1b271ea389dfba786fd81be7582d9dca56c276167d0b"
+        },
+        "evidence_sufficiency_probability": 0.7567172946902406
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "academy_award",
+      "repeat": 1,
+      "expected_sufficient": false,
+      "correct": false,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.0016120874892684408,
+          "1": 0.017060928263385615,
+          "2": 0.6576575136004914,
+          "3": 0.3236694706468545
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.3034,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "e99b597f2bfd8512453f1b271ea389dfba786fd81be7582d9dca56c276167d0b"
+        },
+        "evidence_sufficiency_probability": 0.7567172946902406
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "award_and_provider",
+      "repeat": 0,
+      "expected_sufficient": false,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.07902946244693268,
+          "1": 0.2396539108589767,
+          "2": 0.5166201618774877,
+          "3": 0.1646964648166029
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 1.767,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "e99b597f2bfd8512453f1b271ea389dfba786fd81be7582d9dca56c276167d0b"
+        },
+        "evidence_sufficiency_probability": 0.37493729607752674
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "award_and_provider",
+      "repeat": 1,
+      "expected_sufficient": false,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.07902946244693268,
+          "1": 0.2396539108589767,
+          "2": 0.5166201618774877,
+          "3": 0.1646964648166029
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 1.767,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "e99b597f2bfd8512453f1b271ea389dfba786fd81be7582d9dca56c276167d0b"
+        },
+        "evidence_sufficiency_probability": 0.37493729607752674
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "unknown_country",
+      "repeat": 0,
+      "expected_sufficient": false,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.04893383134038652,
+          "1": 0.16857950550661896,
+          "2": 0.5902211672831807,
+          "3": 0.19226549586981379
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 1.9258,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "e99b597f2bfd8512453f1b271ea389dfba786fd81be7582d9dca56c276167d0b"
+        },
+        "evidence_sufficiency_probability": 0.38981326911594444
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "unknown_country",
+      "repeat": 1,
+      "expected_sufficient": false,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.04893383134038652,
+          "1": 0.16857950550661896,
+          "2": 0.5902211672831807,
+          "3": 0.19226549586981379
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 1.9258,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "e99b597f2bfd8512453f1b271ea389dfba786fd81be7582d9dca56c276167d0b"
+        },
+        "evidence_sufficiency_probability": 0.38981326911594444
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "unknown_award",
+      "repeat": 0,
+      "expected_sufficient": false,
+      "correct": false,
+      "result": {
+        "grade": 1,
+        "probabilities": {
+          "0": 0.24934184217087388,
+          "1": 0.7442269233613076,
+          "2": 0.0016963841352302105,
+          "3": 0.004734850332588318
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.7618,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "57a3ab2093b3bef4a07cb1c17332d0785c6de1e24dd7b41231471019dc6cdabd"
+        },
+        "evidence_sufficiency_probability": 0.8321119824404963
+      }
+    },
+    {
+      "version": "v2.2",
+      "case_id": "unknown_award",
+      "repeat": 1,
+      "expected_sufficient": false,
+      "correct": false,
+      "result": {
+        "grade": 1,
+        "probabilities": {
+          "0": 0.24934184217087388,
+          "1": 0.7442269233613076,
+          "2": 0.0016963841352302105,
+          "3": 0.004734850332588318
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.7618,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+          "evidence_hash": "57a3ab2093b3bef4a07cb1c17332d0785c6de1e24dd7b41231471019dc6cdabd"
+        },
+        "evidence_sufficiency_probability": 0.8321119824404963
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "matrix_membership",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.010279792258468935,
+          "1": 0.02922793162869457,
+          "2": 0.21909352932564416,
+          "3": 0.7413987467871923
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.6916,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "59bcd7782f9df89fb29f8f2a2a5482567c850c391531f4f5f8cde25e7deceb71"
+        },
+        "evidence_sufficiency_probability": 0.843237670679733
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "matrix_membership",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.010279792258468935,
+          "1": 0.02922793162869457,
+          "2": 0.21909352932564416,
+          "3": 0.7413987467871923
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.6916,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "59bcd7782f9df89fb29f8f2a2a5482567c850c391531f4f5f8cde25e7deceb71"
+        },
+        "evidence_sufficiency_probability": 0.843237670679733
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "star_wars_membership",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.10891846422800512,
+          "1": 0.24734453637492546,
+          "2": 0.4329356885702632,
+          "3": 0.21080131082680617
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 1.7456,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "8076145dffa29840547f6be34646d979ec48b2b1c2e31edcbb9d264423231ed8"
+        },
+        "evidence_sufficiency_probability": 0.506656238574794
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "star_wars_membership",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.10891846422800512,
+          "1": 0.24734453637492546,
+          "2": 0.4329356885702632,
+          "3": 0.21080131082680617
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 1.7456,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "8076145dffa29840547f6be34646d979ec48b2b1c2e31edcbb9d264423231ed8"
+        },
+        "evidence_sufficiency_probability": 0.506656238574794
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "jedi_membership",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.03445652092807729,
+          "1": 0.061548296013102986,
+          "2": 0.4980211468890192,
+          "3": 0.4059740361698006
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.2755,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "1d28d1f82f11ca62570f3a90e993487e8df382b45c5df6d8b6d383c8059ab0db"
+        },
+        "evidence_sufficiency_probability": 0.694516365869275
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "jedi_membership",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.03445652092807729,
+          "1": 0.061548296013102986,
+          "2": 0.4980211468890192,
+          "3": 0.4059740361698006
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.2755,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "1d28d1f82f11ca62570f3a90e993487e8df382b45c5df6d8b6d383c8059ab0db"
+        },
+        "evidence_sufficiency_probability": 0.694516365869275
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "toy_story_membership",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.009157334967929039,
+          "1": 0.02120891966637017,
+          "2": 0.2063630468703595,
+          "3": 0.7632706984953413
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.7237,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "bb27e3875b766e06e52c0bc5456fe4e3c84c54dab95eedeabaa9b3898d1d6f12"
+        },
+        "evidence_sufficiency_probability": 0.7969833895588468
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "toy_story_membership",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.009157334967929039,
+          "1": 0.02120891966637017,
+          "2": 0.2063630468703595,
+          "3": 0.7632706984953413
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.7237,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "bb27e3875b766e06e52c0bc5456fe4e3c84c54dab95eedeabaa9b3898d1d6f12"
+        },
+        "evidence_sufficiency_probability": 0.7969833895588468
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "predator_year_and_genre",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.00043021603413239534,
+          "1": 0.008162730869154568,
+          "2": 0.20739180604724258,
+          "3": 0.7840152470494705
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.775,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "39b95e39833a60d1c283498c1f475c5a1aabe7faf583b1a4c0d470ceab50af47"
+        },
+        "evidence_sufficiency_probability": 0.9680487701690799
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "predator_year_and_genre",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.00043021603413239534,
+          "1": 0.008162730869154568,
+          "2": 0.20739180604724258,
+          "3": 0.7840152470494705
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.775,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "39b95e39833a60d1c283498c1f475c5a1aabe7faf583b1a4c0d470ceab50af47"
+        },
+        "evidence_sufficiency_probability": 0.9680487701690799
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "known_year_mismatch",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 0,
+        "probabilities": {
+          "0": 0.923307759394942,
+          "1": 0.07483020943267508,
+          "2": 0.0003561877683362338,
+          "3": 0.0015058434040465657
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.0801,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "59bcd7782f9df89fb29f8f2a2a5482567c850c391531f4f5f8cde25e7deceb71"
+        },
+        "evidence_sufficiency_probability": 0.9174270117062947
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "known_year_mismatch",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 0,
+        "probabilities": {
+          "0": 0.923307759394942,
+          "1": 0.07483020943267508,
+          "2": 0.0003561877683362338,
+          "3": 0.0015058434040465657
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.0801,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "59bcd7782f9df89fb29f8f2a2a5482567c850c391531f4f5f8cde25e7deceb71"
+        },
+        "evidence_sufficiency_probability": 0.9174270117062947
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "known_language_mismatch",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 0,
+        "probabilities": {
+          "0": 0.8140291198240386,
+          "1": 0.18532853431626845,
+          "2": 0.0001818955957484285,
+          "3": 0.0004604502639446578
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.1871,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "39b95e39833a60d1c283498c1f475c5a1aabe7faf583b1a4c0d470ceab50af47"
+        },
+        "evidence_sufficiency_probability": 0.9576593250144382
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "known_language_mismatch",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 0,
+        "probabilities": {
+          "0": 0.8140291198240386,
+          "1": 0.18532853431626845,
+          "2": 0.0001818955957484285,
+          "3": 0.0004604502639446578
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.1871,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "39b95e39833a60d1c283498c1f475c5a1aabe7faf583b1a4c0d470ceab50af47"
+        },
+        "evidence_sufficiency_probability": 0.9576593250144382
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "known_runtime_mismatch",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 0,
+        "probabilities": {
+          "0": 0.9242595363496746,
+          "1": 0.07419466557631266,
+          "2": 0.00013213853088321465,
+          "3": 0.0014136595431295698
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.0787,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "39b95e39833a60d1c283498c1f475c5a1aabe7faf583b1a4c0d470ceab50af47"
+        },
+        "evidence_sufficiency_probability": 0.970342392504469
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "known_runtime_mismatch",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 0,
+        "probabilities": {
+          "0": 0.9242595363496746,
+          "1": 0.07419466557631266,
+          "2": 0.00013213853088321465,
+          "3": 0.0014136595431295698
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.0787,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "39b95e39833a60d1c283498c1f475c5a1aabe7faf583b1a4c0d470ceab50af47"
+        },
+        "evidence_sufficiency_probability": 0.970342392504469
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "ghibli_studio",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.0006900111047184399,
+          "1": 0.0065700600265444845,
+          "2": 0.23343689015310265,
+          "3": 0.7593030387156344
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.7514,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "b9e28586d2bb1526a6dbc6cf213159515bdbccd2abad9b20561140dc8538fcaf"
+        },
+        "evidence_sufficiency_probability": 0.9239983608127461
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "ghibli_studio",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.0006900111047184399,
+          "1": 0.0065700600265444845,
+          "2": 0.23343689015310265,
+          "3": 0.7593030387156344
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.7514,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "b9e28586d2bb1526a6dbc6cf213159515bdbccd2abad9b20561140dc8538fcaf"
+        },
+        "evidence_sufficiency_probability": 0.9239983608127461
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "netflix_il_offer",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.001065814922946772,
+          "1": 0.011989275232766425,
+          "2": 0.19861994922562573,
+          "3": 0.7883249606186611
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.7742,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "b9e28586d2bb1526a6dbc6cf213159515bdbccd2abad9b20561140dc8538fcaf"
+        },
+        "evidence_sufficiency_probability": 0.9403680287530422
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "netflix_il_offer",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.001065814922946772,
+          "1": 0.011989275232766425,
+          "2": 0.19861994922562573,
+          "3": 0.7883249606186611
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.7742,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "b9e28586d2bb1526a6dbc6cf213159515bdbccd2abad9b20561140dc8538fcaf"
+        },
+        "evidence_sufficiency_probability": 0.9403680287530422
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "academy_award",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.0007223293335119939,
+          "1": 0.009045026800325083,
+          "2": 0.09520239762591247,
+          "3": 0.8950302462402505
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.8845,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "54a60849bf2a68e94643bcc540f84270ad5fba627bd7e3b9cce286584c340ff2"
+        },
+        "evidence_sufficiency_probability": 0.952543098682781
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "academy_award",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.0007223293335119939,
+          "1": 0.009045026800325083,
+          "2": 0.09520239762591247,
+          "3": 0.8950302462402505
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.8845,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "54a60849bf2a68e94643bcc540f84270ad5fba627bd7e3b9cce286584c340ff2"
+        },
+        "evidence_sufficiency_probability": 0.952543098682781
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "award_and_provider",
+      "repeat": 0,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.0013245445831951358,
+          "1": 0.014948439267553135,
+          "2": 0.1320741637545418,
+          "3": 0.8516528523947099
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.8341,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "54a60849bf2a68e94643bcc540f84270ad5fba627bd7e3b9cce286584c340ff2"
+        },
+        "evidence_sufficiency_probability": 0.9504731428444069
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "award_and_provider",
+      "repeat": 1,
+      "expected_sufficient": true,
+      "correct": true,
+      "result": {
+        "grade": 3,
+        "probabilities": {
+          "0": 0.0013245445831951358,
+          "1": 0.014948439267553135,
+          "2": 0.1320741637545418,
+          "3": 0.8516528523947099
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 2.8341,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "54a60849bf2a68e94643bcc540f84270ad5fba627bd7e3b9cce286584c340ff2"
+        },
+        "evidence_sufficiency_probability": 0.9504731428444069
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "unknown_country",
+      "repeat": 0,
+      "expected_sufficient": false,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.11908465737345966,
+          "1": 0.14464204248493798,
+          "2": 0.4251396039586419,
+          "3": 0.3111336961829605
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 1.9283,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "54a60849bf2a68e94643bcc540f84270ad5fba627bd7e3b9cce286584c340ff2"
+        },
+        "evidence_sufficiency_probability": 0.41010274557771637
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "unknown_country",
+      "repeat": 1,
+      "expected_sufficient": false,
+      "correct": true,
+      "result": {
+        "grade": 2,
+        "probabilities": {
+          "0": 0.11908465737345966,
+          "1": 0.14464204248493798,
+          "2": 0.4251396039586419,
+          "3": 0.3111336961829605
+        },
+        "evidence_sufficiency": false,
+        "execution_status": "success",
+        "expected_score": 1.9283,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "54a60849bf2a68e94643bcc540f84270ad5fba627bd7e3b9cce286584c340ff2"
+        },
+        "evidence_sufficiency_probability": 0.41010274557771637
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "unknown_award",
+      "repeat": 0,
+      "expected_sufficient": false,
+      "correct": false,
+      "result": {
+        "grade": 1,
+        "probabilities": {
+          "0": 0.3144910477892363,
+          "1": 0.6846984116549836,
+          "2": 0.00024108697985753179,
+          "3": 0.0005694535759226021
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.6869,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "39b95e39833a60d1c283498c1f475c5a1aabe7faf583b1a4c0d470ceab50af47"
+        },
+        "evidence_sufficiency_probability": 0.7858046812464017
+      }
+    },
+    {
+      "version": "v2.3",
+      "case_id": "unknown_award",
+      "repeat": 1,
+      "expected_sufficient": false,
+      "correct": false,
+      "result": {
+        "grade": 1,
+        "probabilities": {
+          "0": 0.3144910477892363,
+          "1": 0.6846984116549836,
+          "2": 0.00024108697985753179,
+          "3": 0.0005694535759226021
+        },
+        "evidence_sufficiency": true,
+        "execution_status": "success",
+        "expected_score": 0.6869,
+        "latency_ms": 0.0,
+        "provenance": {
+          "model_name": "bespoke-nimble-9b",
+          "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+          "projection_head_revision": null,
+          "quantization": "Q8_0",
+          "runtime": "systemone_ollama",
+          "prompt_rubric_hash": "776cba14a4ba71997d06d73a3b72cc318b42ff0a0fb8bfd40796b8d3895c19da",
+          "evidence_hash": "39b95e39833a60d1c283498c1f475c5a1aabe7faf583b1a4c0d470ceab50af47"
+        },
+        "evidence_sufficiency_probability": 0.7858046812464017
+      }
+    }
+  ]
+}

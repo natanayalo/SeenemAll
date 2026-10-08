@@ -1,0 +1,789 @@
+{
+  "evidence_version": "v2.3",
+  "captured_at": "2026-10-08T22:32:38.308268+00:00",
+  "items": {
+    "movie:106": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/106/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": []
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 25,
+            "logo_path": "/nM2MfoMqzJQRiSynsDabOtFKetD.png",
+            "name": "20th Century Fox",
+            "origin_country": "US"
+          },
+          {
+            "id": 840,
+            "logo_path": null,
+            "name": "Lawrence Gordon Productions",
+            "origin_country": "US"
+          },
+          {
+            "id": 1885,
+            "logo_path": "/xlvoOZr4s1PygosrwZyolIFe5xs.png",
+            "name": "Silver Pictures",
+            "origin_country": "US"
+          },
+          {
+            "id": 1302,
+            "logo_path": "/zC3b70ixHh89qJIikLQPEvLqbPM.png",
+            "name": "Davis Entertainment",
+            "origin_country": "US"
+          },
+          {
+            "id": 5263,
+            "logo_path": null,
+            "name": "Amercent Films",
+            "origin_country": ""
+          },
+          {
+            "id": 5264,
+            "logo_path": null,
+            "name": "American Entertainment Partners L.P.",
+            "origin_country": "US"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/106",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:1062722": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/1062722/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": [
+          {
+            "provider_id": 8,
+            "provider_name": "Netflix",
+            "offer_type": "flatrate"
+          }
+        ]
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 101082,
+            "logo_path": "/zjAYU6sUmYaeFeJ1yWeaqzsWAz8.png",
+            "name": "Double Dare You",
+            "origin_country": "US"
+          },
+          {
+            "id": 10678,
+            "logo_path": null,
+            "name": "Demilo Films",
+            "origin_country": "CA"
+          },
+          {
+            "id": 279898,
+            "logo_path": null,
+            "name": "Bluegrass 7",
+            "origin_country": "US"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/1062722",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:11": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/11/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": []
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 1,
+            "logo_path": "/tlVSws0RvvtPBwViUyOFAO0vcQS.png",
+            "name": "Lucasfilm Ltd.",
+            "origin_country": "US"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/11",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:120": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/120/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": [
+          {
+            "provider_id": 1899,
+            "provider_name": "HBO Max",
+            "offer_type": "flatrate"
+          }
+        ]
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 12,
+            "logo_path": "/2ycs64eqV5rqKYHyQK0GVoKGvfX.png",
+            "name": "New Line Cinema",
+            "origin_country": "US"
+          },
+          {
+            "id": 11,
+            "logo_path": "/6FAuASQHybRkZUk08p9PzSs9ezM.png",
+            "name": "WingNut Films",
+            "origin_country": "NZ"
+          },
+          {
+            "id": 5237,
+            "logo_path": "/mlnr7vsBHvLye8oEb5A76C0t8x9.png",
+            "name": "The Saul Zaentz Company",
+            "origin_country": "US"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/120",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:128": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/128/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": [
+          {
+            "provider_id": 8,
+            "provider_name": "Netflix",
+            "offer_type": "flatrate"
+          }
+        ]
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 10342,
+            "logo_path": "/uFuxPEZRUcBTEiYIxjHJq62Vr77.png",
+            "name": "Studio Ghibli",
+            "origin_country": "JP"
+          },
+          {
+            "id": 1778,
+            "logo_path": "/b5rT6VbYza3LyfltCmz1OcqzWJM.png",
+            "name": "dentsu",
+            "origin_country": "JP"
+          },
+          {
+            "id": 1779,
+            "logo_path": "/41nGzTdCnORYZIZzaGZtfsBwQCl.png",
+            "name": "Tokuma Shoten",
+            "origin_country": "JP"
+          },
+          {
+            "id": 6755,
+            "logo_path": "/bWiM2iY82B32NGmPCOFatgfekIR.png",
+            "name": "Nippon Television Network Corporation",
+            "origin_country": "JP"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/128",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:129": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/129/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": [
+          {
+            "provider_id": 8,
+            "provider_name": "Netflix",
+            "offer_type": "flatrate"
+          }
+        ]
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 10342,
+            "logo_path": "/uFuxPEZRUcBTEiYIxjHJq62Vr77.png",
+            "name": "Studio Ghibli",
+            "origin_country": "JP"
+          },
+          {
+            "id": 1779,
+            "logo_path": "/41nGzTdCnORYZIZzaGZtfsBwQCl.png",
+            "name": "Tokuma Shoten",
+            "origin_country": "JP"
+          },
+          {
+            "id": 6755,
+            "logo_path": "/bWiM2iY82B32NGmPCOFatgfekIR.png",
+            "name": "Nippon Television Network Corporation",
+            "origin_country": "JP"
+          },
+          {
+            "id": 11847,
+            "logo_path": "/gW5RN3ylzsAwQ1uGHBpezUZ0vXF.png",
+            "name": "Mitsubishi",
+            "origin_country": "JP"
+          },
+          {
+            "id": 1778,
+            "logo_path": "/b5rT6VbYza3LyfltCmz1OcqzWJM.png",
+            "name": "dentsu",
+            "origin_country": "JP"
+          },
+          {
+            "id": 1780,
+            "logo_path": "/4Qzhr7FxVtaMwmsh7118G3yvOhO.png",
+            "name": "TFC",
+            "origin_country": "JP"
+          },
+          {
+            "id": 164892,
+            "logo_path": "/2wH2cZCfpQvMsWZCZbHFEJx0R86.png",
+            "name": "The Walt Disney Company (Japan)",
+            "origin_country": "JP"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/129",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:13": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/13/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": []
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 4,
+            "logo_path": "/jay6WcMgagAklUt7i9Euwj1pzTF.png",
+            "name": "Paramount Pictures",
+            "origin_country": "US"
+          },
+          {
+            "id": 21920,
+            "logo_path": null,
+            "name": "The Steve Tisch Company",
+            "origin_country": "US"
+          },
+          {
+            "id": 412,
+            "logo_path": null,
+            "name": "Wendy Finerman Productions",
+            "origin_country": "US"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/13",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": {
+        "wins": [
+          {
+            "award": "Academy Award",
+            "category": "Best Picture",
+            "ceremony_year": 1995
+          }
+        ],
+        "source": "https://www.oscars.org/oscars/ceremonies/1995/memorable-moments",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "documented wins only; omitted awards remain unknown"
+      }
+    },
+    "movie:155": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/155/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": [
+          {
+            "provider_id": 1899,
+            "provider_name": "HBO Max",
+            "offer_type": "flatrate"
+          }
+        ]
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 174,
+            "logo_path": "/zhD3hhtKB5qyv7ZeL4uLpNxgMVU.png",
+            "name": "Warner Bros. Pictures",
+            "origin_country": "US"
+          },
+          {
+            "id": 923,
+            "logo_path": "/5UQsZrfbfG2dYJbx8DxfoTr2Bvu.png",
+            "name": "Legendary Pictures",
+            "origin_country": "US"
+          },
+          {
+            "id": 9996,
+            "logo_path": "/3tvBqYsBhxWeHlu62SIJ1el93O7.png",
+            "name": "Syncopy",
+            "origin_country": "GB"
+          },
+          {
+            "id": 429,
+            "logo_path": "/4Y00XuSMuP1gimd0jP6JT57QbCI.png",
+            "name": "DC",
+            "origin_country": "US"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/155",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:157336": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/157336/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": [
+          {
+            "provider_id": 1899,
+            "provider_name": "HBO Max",
+            "offer_type": "flatrate"
+          }
+        ]
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 923,
+            "logo_path": "/5UQsZrfbfG2dYJbx8DxfoTr2Bvu.png",
+            "name": "Legendary Pictures",
+            "origin_country": "US"
+          },
+          {
+            "id": 9996,
+            "logo_path": "/3tvBqYsBhxWeHlu62SIJ1el93O7.png",
+            "name": "Syncopy",
+            "origin_country": "GB"
+          },
+          {
+            "id": 13769,
+            "logo_path": null,
+            "name": "Lynda Obst Productions",
+            "origin_country": "US"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/157336",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:1892": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/1892/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": []
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 1,
+            "logo_path": "/tlVSws0RvvtPBwViUyOFAO0vcQS.png",
+            "name": "Lucasfilm Ltd.",
+            "origin_country": "US"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/1892",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:19995": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/19995/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": []
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 444,
+            "logo_path": null,
+            "name": "Dune Entertainment",
+            "origin_country": "US"
+          },
+          {
+            "id": 574,
+            "logo_path": "/8wdmrfGcDx3TJxYiiDksLzAW4pB.png",
+            "name": "Lightstorm Entertainment",
+            "origin_country": "US"
+          },
+          {
+            "id": 25,
+            "logo_path": "/nM2MfoMqzJQRiSynsDabOtFKetD.png",
+            "name": "20th Century Fox",
+            "origin_country": "US"
+          },
+          {
+            "id": 133789,
+            "logo_path": "/bJdeIb1ET3BkyodAASVDq1x3mls.png",
+            "name": "Ingenious Film Partners",
+            "origin_country": "GB"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/19995",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:27205": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/27205/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": [
+          {
+            "provider_id": 1899,
+            "provider_name": "HBO Max",
+            "offer_type": "flatrate"
+          }
+        ]
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 174,
+            "logo_path": "/zhD3hhtKB5qyv7ZeL4uLpNxgMVU.png",
+            "name": "Warner Bros. Pictures",
+            "origin_country": "US"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/27205",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:278": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/278/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": []
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 97,
+            "logo_path": "/smyTD67uNsdaySnnjVDmh0kyotp.png",
+            "name": "Castle Rock Entertainment",
+            "origin_country": "US"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/278",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:301528": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/301528/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": []
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 3,
+            "logo_path": "/1TjvGVDMYsj6JBxOAkUHpPEwLf7.png",
+            "name": "Pixar",
+            "origin_country": "US"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/301528",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:396535": {
+      "availability": null,
+      "studios": {
+        "companies": [
+          {
+            "id": 20064,
+            "logo_path": "/2In7Heq6DuXDjOwPmJqHWkpohaL.png",
+            "name": "Next Entertainment World",
+            "origin_country": "KR"
+          },
+          {
+            "id": 103875,
+            "logo_path": "/b4VEWBV2hgvrXts7VlAcnkZTLwM.png",
+            "name": "RedPeter Films",
+            "origin_country": "KR"
+          },
+          {
+            "id": 73918,
+            "logo_path": "/lnHDA1Fnpdjbg6fUF4gpneeAdf1.png",
+            "name": "Contents Panda",
+            "origin_country": "KR"
+          },
+          {
+            "id": 88607,
+            "logo_path": null,
+            "name": "Union Investment Partners",
+            "origin_country": "KR"
+          },
+          {
+            "id": 710,
+            "logo_path": null,
+            "name": "KTB Network",
+            "origin_country": "KR"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/396535",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:453": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/453/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": [
+          {
+            "provider_id": 8,
+            "provider_name": "Netflix",
+            "offer_type": "flatrate"
+          }
+        ]
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 33,
+            "logo_path": "/8lvHyhjr8oUKOOy2dKXoALWKdp0.png",
+            "name": "Universal Pictures",
+            "origin_country": "US"
+          },
+          {
+            "id": 7,
+            "logo_path": "/zcKhWbxFJ4CohZ9dLBMxmOArTVn.png",
+            "name": "DreamWorks Pictures",
+            "origin_country": "US"
+          },
+          {
+            "id": 23,
+            "logo_path": "/bJOFo2ufq7iFC1F4qZm8aLxF5aS.png",
+            "name": "Imagine Entertainment",
+            "origin_country": "US"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/453",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": {
+        "wins": [
+          {
+            "award": "Academy Award",
+            "category": "Best Picture",
+            "ceremony_year": 2002
+          }
+        ],
+        "source": "https://www.oscars.org/oscars/ceremonies/2002/memorable-moments",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "documented wins only; omitted awards remain unknown"
+      }
+    },
+    "movie:4935": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/4935/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": [
+          {
+            "provider_id": 8,
+            "provider_name": "Netflix",
+            "offer_type": "flatrate"
+          }
+        ]
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 10342,
+            "logo_path": "/uFuxPEZRUcBTEiYIxjHJq62Vr77.png",
+            "name": "Studio Ghibli",
+            "origin_country": "JP"
+          },
+          {
+            "id": 1779,
+            "logo_path": "/41nGzTdCnORYZIZzaGZtfsBwQCl.png",
+            "name": "Tokuma Shoten",
+            "origin_country": "JP"
+          },
+          {
+            "id": 6755,
+            "logo_path": "/bWiM2iY82B32NGmPCOFatgfekIR.png",
+            "name": "Nippon Television Network Corporation",
+            "origin_country": "JP"
+          },
+          {
+            "id": 1778,
+            "logo_path": "/b5rT6VbYza3LyfltCmz1OcqzWJM.png",
+            "name": "dentsu",
+            "origin_country": "JP"
+          },
+          {
+            "id": 272654,
+            "logo_path": null,
+            "name": "Walt Disney Japan",
+            "origin_country": "JP"
+          },
+          {
+            "id": 12518,
+            "logo_path": "/qJZAVb8vx6qFLQJ6cunRkVUJVdB.png",
+            "name": "d-rights",
+            "origin_country": "JP"
+          },
+          {
+            "id": 882,
+            "logo_path": "/fRSWWjquvzcHjACbtF53utZFIll.png",
+            "name": "TOHO",
+            "origin_country": "JP"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/4935",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:603": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/603/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": [
+          {
+            "provider_id": 1899,
+            "provider_name": "HBO Max",
+            "offer_type": "flatrate"
+          }
+        ]
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 79,
+            "logo_path": "/at4uYdwAAgNRKhZuuFX8ShKSybw.png",
+            "name": "Village Roadshow Pictures",
+            "origin_country": "US"
+          },
+          {
+            "id": 372,
+            "logo_path": null,
+            "name": "Groucho II Film Partnership",
+            "origin_country": ""
+          },
+          {
+            "id": 1885,
+            "logo_path": "/xlvoOZr4s1PygosrwZyolIFe5xs.png",
+            "name": "Silver Pictures",
+            "origin_country": "US"
+          },
+          {
+            "id": 174,
+            "logo_path": "/zhD3hhtKB5qyv7ZeL4uLpNxgMVU.png",
+            "name": "Warner Bros. Pictures",
+            "origin_country": "US"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/603",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    },
+    "movie:8392": {
+      "availability": {
+        "country": "IL",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "source": "https://api.themoviedb.org/3/movie/8392/watch/providers",
+        "coverage": "positive offers only; unlisted providers remain unknown",
+        "offers": [
+          {
+            "provider_id": 8,
+            "provider_name": "Netflix",
+            "offer_type": "flatrate"
+          }
+        ]
+      },
+      "studios": {
+        "companies": [
+          {
+            "id": 10342,
+            "logo_path": "/uFuxPEZRUcBTEiYIxjHJq62Vr77.png",
+            "name": "Studio Ghibli",
+            "origin_country": "JP"
+          },
+          {
+            "id": 1779,
+            "logo_path": "/41nGzTdCnORYZIZzaGZtfsBwQCl.png",
+            "name": "Tokuma Shoten",
+            "origin_country": "JP"
+          }
+        ],
+        "source": "https://api.themoviedb.org/3/movie/8392",
+        "captured_at": "2026-10-08T22:32:38.308268+00:00",
+        "coverage": "reported production companies; not exhaustive absence evidence"
+      },
+      "awards": null
+    }
+  }
+}

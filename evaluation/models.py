@@ -148,6 +148,8 @@ class ItemEvidence:
     maturity_rating: Optional[str] = None
     collection_id: Optional[int] = None
     collection_name: Optional[str] = None
+    evidence_version: str = EVIDENCE_CONTRACT_VERSION
+    contextual_facts: Optional[Dict[str, Any]] = None
 
     def __post_init__(self) -> None:
         self.media_type = (self.media_type or self.typed_id.media_type).strip().lower()
@@ -218,10 +220,14 @@ class ItemEvidence:
                 synopsis_val = synopsis_val[:avail].rstrip() + suffix
 
         full_text = other_text + synopsis_line_prefix + synopsis_val
+        if self.evidence_version == "v2.3":
+            full_text += "\nContextual Facts (unknown is not absence): " + json.dumps(
+                self.contextual_facts or {}, sort_keys=True, ensure_ascii=False
+            )
         return full_text
 
     def content_hash(self) -> str:
-        payload = {
+        payload: Dict[str, Any] = {
             "typed_id": str(self.typed_id),
             "title": self.title,
             "synopsis": self.synopsis,
@@ -239,8 +245,10 @@ class ItemEvidence:
             "maturity_rating": self.maturity_rating,
             "collection_id": self.collection_id,
             "collection_name": self.collection_name,
-            "evidence_contract": EVIDENCE_CONTRACT_VERSION,
+            "evidence_contract": self.evidence_version,
         }
+        if self.evidence_version == "v2.3":
+            payload["contextual_facts"] = self.contextual_facts
         encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
@@ -294,6 +302,7 @@ class JudgeOutput:
     expected_score: float = 0.0  # Sum(grade * p), preserved for diagnostics only
     latency_ms: float = 0.0
     raw_response: Optional[str] = None
+    evidence_sufficiency_probability: Optional[float] = None
 
     def __post_init__(self) -> None:
         # Validate grade bounds
@@ -313,6 +322,7 @@ class JudgeOutput:
             "expected_score": round(self.expected_score, 4),
             "latency_ms": round(self.latency_ms, 2),
             "provenance": self.provenance.to_dict(),
+            "evidence_sufficiency_probability": self.evidence_sufficiency_probability,
         }
 
 
@@ -326,6 +336,9 @@ class JudgmentRecord:
     status: str  # ACCEPTED, UNJUDGED, CONFLICT, INSUFFICIENT_EVIDENCE, JUDGE_FAILED
     provenances: List[JudgeProvenance] = field(default_factory=list)
     consensus_model_count: int = 1
+    evidence_sufficiency_probabilities: List[Optional[float]] = field(
+        default_factory=list
+    )
     probabilities: Optional[Dict[int, float]] = None
     deterministic_override: bool = False
     violation_reasons: List[str] = field(default_factory=list)
@@ -344,6 +357,7 @@ class JudgmentRecord:
             "deterministic_override": self.deterministic_override,
             "violation_reasons": self.violation_reasons,
             "execution_statuses": self.execution_statuses,
+            "evidence_sufficiency_probabilities": self.evidence_sufficiency_probabilities,
             "probabilities": self.probabilities,
             "provenances": [p.to_dict() for p in self.provenances],
         }

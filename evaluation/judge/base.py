@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import hashlib
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 import json
 from evaluation.query_interpretation import INTERPRETATION_VERSION, interpret_query
 
@@ -51,12 +51,14 @@ class LocalJudgeAdapter(ABC):
         tokenizer_revision: str = "v1.0",
         quantization: str = "int8",
         runtime: str = "local",
+        evidence_version: Optional[str] = None,
     ) -> None:
         self.model_name = model_name
         self.checkpoint_revision = checkpoint_revision
         self.tokenizer_revision = tokenizer_revision
         self.quantization = quantization
         self.runtime = runtime
+        self.evidence_version = evidence_version
 
     @abstractmethod
     def is_available(self) -> bool:
@@ -96,7 +98,8 @@ class LocalJudgeAdapter(ABC):
             json.dumps(
                 {
                     "contract": ADAPTER_CONTRACT_VERSION,
-                    "evidence_contract": EVIDENCE_CONTRACT_VERSION,
+                    "evidence_contract": self.evidence_version
+                    or EVIDENCE_CONTRACT_VERSION,
                     "qualification_protocol": QUALIFICATION_PROTOCOL_VERSION,
                     "rubric": STANDARD_RUBRIC_TEXT,
                     "query_interpretation": INTERPRETATION_VERSION,
@@ -129,16 +132,21 @@ class LocalJudgeAdapter(ABC):
         provenance = self.get_provenance(evidence_hash)
 
         prompt = self.build_prompt(judge_input)
+        if judge_input.evidence.evidence_version != (
+            self.evidence_version or EVIDENCE_CONTRACT_VERSION
+        ):
+            raise ValueError("Judge and input evidence versions must match")
 
         # Reject over-limit inputs before inference; never permit silent truncation
-        if len(prompt) > MAX_INPUT_CHARS:
+        input_limit = self.input_character_limit()
+        if len(prompt) > input_limit:
             return JudgeOutput(
                 grade=int(RubricGrade.IRRELEVANT),
                 probabilities={0: 1.0, 1: 0.0, 2: 0.0, 3: 0.0},
                 evidence_sufficiency=False,
                 execution_status="over_limit",
                 provenance=provenance,
-                raw_response=f"Input length {len(prompt)} exceeds maximum {MAX_INPUT_CHARS} characters.",
+                raw_response=f"Input length {len(prompt)} exceeds maximum {input_limit} characters.",
             )
 
         try:
@@ -157,6 +165,7 @@ class LocalJudgeAdapter(ABC):
                 execution_status="success",
                 provenance=provenance,
                 raw_response=raw_resp,
+                evidence_sufficiency_probability=self.sufficiency_probability(raw_resp),
             )
         except ValueError as exc:
             return JudgeOutput(
@@ -176,6 +185,13 @@ class LocalJudgeAdapter(ABC):
                 provenance=provenance,
                 raw_response=f"Execution error: {exc}",
             )
+
+    def sufficiency_probability(self, raw_response: str) -> Optional[float]:
+        """Adapters without a sufficiency probability leave this unknown."""
+        return None
+
+    def input_character_limit(self) -> int:
+        return 8192 if self.evidence_version == "v2.3" else MAX_INPUT_CHARS
 
     def test_option_order_permutation(
         self,
