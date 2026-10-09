@@ -616,7 +616,6 @@ def default_param_grid() -> (
             "mmr": True,
             "franchise_cap": True,
             "serendipity": True,
-            "limit": 10,
             "rerank_budget": 10,
         },
         "budget_25": lambda entry: {
@@ -627,7 +626,6 @@ def default_param_grid() -> (
             "mmr": True,
             "franchise_cap": True,
             "serendipity": True,
-            "limit": 10,
             "rerank_budget": 25,
         },
         "no_rerank": lambda entry: {

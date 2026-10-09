@@ -177,6 +177,33 @@ class RecommendationPipeline:
                     )
                 reranked = franchise_items + other_items
 
+        # If rerank_budget evaluated fewer items than params.limit, append remaining candidates
+        # from scored.ordered so the downstream pool is not prematurely truncated below params.limit.
+        if len(reranked) < params.limit and len(scored.ordered) > len(reranked):
+            reranked_ids = {it["id"] for it in reranked if it.get("id") is not None}
+            remaining_pool = [
+                it for it in scored.ordered if it.get("id") not in reranked_ids
+            ]
+            reranked.extend(remaining_pool[: params.limit - len(reranked)])
+
+        # Enrich any replacement items missing explanations (e.g. from serendipity slot insertion)
+        missing_explanation = [it for it in reranked if not it.get("explanation")]
+        if missing_explanation:
+            from api.core.reranker import _with_default_explanations
+
+            enriched_items = {
+                it["id"]: it.get("explanation")
+                for it in _with_default_explanations(
+                    missing_explanation,
+                    intent.intent_filters,
+                    params.query,
+                    apply_low_signal=False,
+                )
+            }
+            for it in reranked:
+                if not it.get("explanation") and it.get("id") in enriched_items:
+                    it["explanation"] = enriched_items[it["id"]]
+
         pipeline_ms = (time.perf_counter() - _pipeline_start) * 1000
         METRICS.histogram("recommend.total_latency_ms").observe(pipeline_ms)
         METRICS.histogram("recommend.pipeline_latency_ms").observe(pipeline_ms)

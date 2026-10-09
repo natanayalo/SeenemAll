@@ -51,11 +51,14 @@ _DEFAULT_STREAMING_PROVIDER_ALIASES: Dict[str, Set[str]] = {
         "apple_tv_plus",
         "apple-tv-plus",
         "appletvplus",
+        "atp",
+    },
+    "apple_tv": {
         "apple_tv",
         "apple-tv",
         "apple",
-        "atp",
         "itu",
+        "itunes",
     },
     "paramount_plus": {
         "paramount_plus",

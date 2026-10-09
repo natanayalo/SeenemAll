@@ -222,8 +222,7 @@ class EvaluationRunner:
         merged_params = dict(params or {})
         merged_params["user_id"] = user_id
         merged_params["query"] = query
-        if "limit" not in merged_params:
-            merged_params["limit"] = limit
+        merged_params["limit"] = limit
         merged_params["debug"] = True
 
         if bypass_cache:

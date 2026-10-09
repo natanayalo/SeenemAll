@@ -573,3 +573,101 @@ def test_runner_serendipity_runs_once_when_rerank_false():
         res = asyncio.run(runner._run(req, params, MagicMock(), collector))
         assert len(res.items) > 0
         assert serendipity_call_count == 1
+
+
+def test_serendipity_replacements_have_explanations_when_rerank_false():
+    runner = RecommendationPipeline()
+    req = MagicMock()
+    params = RecommendParams(
+        query="space action", limit=10, rerank=False, serendipity=True
+    )
+    collector = MagicMock()
+
+    mock_pool = MagicMock()
+    mock_pool.ids = list(range(20))
+    mock_pool.boost_ids = []
+    mock_intent = MagicMock()
+    mock_intent.intent_filters = MagicMock()
+    mock_intent.intent_filters.effective_genres.return_value = ["Action"]
+    mock_intent.matched_collection_ids = ()
+    mock_intent.collection_item_ids = ()
+    mock_intent.is_chronological_requested = False
+
+    items = [
+        {
+            "id": i,
+            "title": f"Item {i}",
+            "genres": ["Action"],
+            "score": 1.0 - i * 0.05,
+            "original_rank": i,
+        }
+        for i in range(10)
+    ]
+    # Serendipity context items lack explanation
+    serendipity_items = [
+        {
+            "id": 99,
+            "title": "Long Tail Star",
+            "genres": ["Action"],
+            "popularity": 1.0,
+            "vote_count": 10,
+            "original_rank": 50,
+        }
+    ]
+    mock_scored = SimpleNamespace(ordered=items, serendipity_context=serendipity_items)
+
+    with patch(
+        "api.pipeline.runner.load_user_context", return_value=MagicMock()
+    ), patch(
+        "api.pipeline.runner.resolve_query_intent", return_value=mock_intent
+    ), patch(
+        "api.pipeline.runner.retrieve_candidates", return_value=mock_pool
+    ), patch(
+        "api.pipeline.runner.score_candidates", return_value=mock_scored
+    ):
+        res = asyncio.run(runner._run(req, params, MagicMock(), collector))
+        assert len(res.items) >= 10
+        for it in res.items[: params.limit]:
+            assert "explanation" in it
+            assert it["explanation"] is not None
+            assert len(it["explanation"]) > 0
+
+
+def test_runner_preserves_depth_when_rerank_budget_less_than_limit():
+    runner = RecommendationPipeline()
+    req = MagicMock()
+    params = RecommendParams(
+        query="test", limit=100, rerank_budget=10, rerank=False, serendipity=False
+    )
+    collector = MagicMock()
+
+    mock_pool = MagicMock()
+    mock_pool.ids = list(range(100))
+    mock_pool.boost_ids = []
+    mock_intent = MagicMock()
+    mock_intent.intent_filters = MagicMock()
+    mock_intent.intent_filters.effective_genres.return_value = []
+    mock_intent.matched_collection_ids = ()
+    mock_intent.collection_item_ids = ()
+    mock_intent.is_chronological_requested = False
+
+    items = [
+        {"id": i, "title": f"Item {i}", "score": 1.0 - i * 0.005, "original_rank": i}
+        for i in range(100)
+    ]
+    mock_scored = SimpleNamespace(ordered=items, serendipity_context=[])
+
+    with patch(
+        "api.pipeline.runner.load_user_context", return_value=MagicMock()
+    ), patch(
+        "api.pipeline.runner.resolve_query_intent", return_value=mock_intent
+    ), patch(
+        "api.pipeline.runner.retrieve_candidates", return_value=mock_pool
+    ), patch(
+        "api.pipeline.runner.score_candidates", return_value=mock_scored
+    ):
+        res = asyncio.run(runner._run(req, params, MagicMock(), collector))
+        assert len(res.items) == 100
+        for it in res.items:
+            assert "explanation" in it
+            assert it["explanation"] is not None

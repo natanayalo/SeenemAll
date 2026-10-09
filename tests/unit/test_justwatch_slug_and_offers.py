@@ -91,10 +91,16 @@ def test_default_aliases_include_slugs_and_shortcodes():
     assert "prime_video" in prime
     assert "prv" in prime
 
-    apple = _DEFAULT_STREAMING_PROVIDER_ALIASES["apple_tv_plus"]
-    assert "apple-tv-plus" in apple
-    assert "atp" in apple
-    assert "apple-tv" in apple
+    apple_plus = _DEFAULT_STREAMING_PROVIDER_ALIASES["apple_tv_plus"]
+    assert "apple-tv-plus" in apple_plus
+    assert "atp" in apple_plus
+    assert "apple-tv" not in apple_plus
+    assert "itu" not in apple_plus
+
+    apple_store = _DEFAULT_STREAMING_PROVIDER_ALIASES["apple_tv"]
+    assert "apple-tv" in apple_store
+    assert "itu" in apple_store
+    assert "apple-tv-plus" not in apple_store
 
     netflix = _DEFAULT_STREAMING_PROVIDER_ALIASES["netflix"]
     assert "netflix" in netflix
@@ -109,6 +115,21 @@ def test_watch_link_route_resolves_aliases_and_slugs(monkeypatch):
     # Will return 404 because item 999999 doesn't exist, but endpoint executes validation successfully
     assert resp.status_code == 404
     assert resp.json()["detail"] == "Link not found"
+
+
+def test_apple_tv_plus_does_not_redirect_to_apple_tv_store():
+    # If a movie only has apple-tv (store) available, requesting apple-tv-plus must not redirect to it
+    client = TestClient(app)
+    # Item 383 (The Terminator) has apple-tv and netflix in IL, but NOT apple-tv-plus
+    resp = client.get("/watch-link/383?service=apple-tv-plus&country=IL")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Link not found"
+
+    resp_store = client.get(
+        "/watch-link/383?service=apple-tv&country=IL", follow_redirects=False
+    )
+    assert resp_store.status_code == 307
+    assert "apple.com" in resp_store.headers["location"]
 
 
 def test_score_candidates_preserves_offer_type():
