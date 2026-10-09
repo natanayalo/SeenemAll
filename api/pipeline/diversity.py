@@ -73,9 +73,14 @@ def apply_serendipity_slot(
     current: List[Dict[str, Any]],
     candidate_pool: List[Dict[str, Any]],
     limit: int,
+    cap: int = 2,
+    exempt_collection_ids: Set[int] | None = None,
+    enforce_franchise_cap: bool = True,
+    protected_ids: Set[int] | None = None,
+    is_chronological: bool = False,
 ) -> List[Dict[str, Any]]:
     ratio = get_hook("_SERENDIPITY_RATIO", _SERENDIPITY_RATIO)
-    if not current or limit <= 0 or ratio <= 0.0:
+    if not current or not candidate_pool or limit <= 0 or ratio <= 0.0:
         return current
 
     top_count = min(limit, len(current))
@@ -90,11 +95,38 @@ def apply_serendipity_slot(
     if len(existing_long_tail) >= target:
         return current
 
+    protected = set(protected_ids or ())
     short_tail_candidates = [
-        idx for idx, item in enumerate(top_section) if not is_lt_fn(item, limit)
+        idx
+        for idx, item in enumerate(top_section)
+        if not is_lt_fn(item, limit) and item.get("id") not in protected
     ]
     if not short_tail_candidates:
         return current
+
+    exempt = exempt_collection_ids or set()
+    franchise_counts: Dict[int, int] = {}
+    if enforce_franchise_cap and cap > 0:
+        for item in top_section:
+            cid = item.get("collection_id")
+            if cid is not None and cid not in exempt:
+                franchise_counts[cid] = franchise_counts.get(cid, 0) + 1
+
+    def _preserves_chronology(
+        section: List[Dict[str, Any]], idx: int, cand: Dict[str, Any]
+    ) -> bool:
+        cand_year = cand.get("release_year")
+        if cand_year is None:
+            return False
+        if idx > 0:
+            prev_year = section[idx - 1].get("release_year")
+            if prev_year is not None and cand_year < prev_year:
+                return False
+        if idx < len(section) - 1:
+            next_year = section[idx + 1].get("release_year")
+            if next_year is not None and cand_year > next_year:
+                return False
+        return True
 
     top_ids = {item.get("id") for item in top_section if item.get("id") is not None}
 
@@ -104,6 +136,14 @@ def apply_serendipity_slot(
         ident = item.get("id")
         if ident is None or ident in top_ids or ident in seen_pool:
             continue
+        if enforce_franchise_cap and cap > 0:
+            cid = item.get("collection_id")
+            if (
+                cid is not None
+                and cid not in exempt
+                and franchise_counts.get(cid, 0) >= cap
+            ):
+                continue
         if is_lt_fn(item, limit):
             replacement_pool.append(item)
             seen_pool.add(ident)
@@ -115,12 +155,48 @@ def apply_serendipity_slot(
     if needed <= 0:
         return current
 
-    short_tail_candidates = short_tail_candidates[-needed:]
-    replacements = replacement_pool[:needed]
+    new_top = list(top_section)
+    used_replacement_indices: set[int] = set()
 
-    new_top = top_section
-    for idx, replacement in zip(short_tail_candidates, replacements):
-        new_top[idx] = replacement
+    for idx in reversed(short_tail_candidates):
+        if needed <= 0:
+            break
+        old_item = new_top[idx]
+        old_cid = old_item.get("collection_id")
+
+        for r_idx, replacement in enumerate(replacement_pool):
+            if r_idx in used_replacement_indices:
+                continue
+
+            new_cid = replacement.get("collection_id")
+            if (
+                enforce_franchise_cap
+                and cap > 0
+                and new_cid is not None
+                and new_cid not in exempt
+            ):
+                cur_count = franchise_counts.get(new_cid, 0)
+                net_count = cur_count + (0 if old_cid == new_cid else 1)
+                if net_count > cap:
+                    continue
+
+            if is_chronological and not _preserves_chronology(
+                new_top, idx, replacement
+            ):
+                continue
+
+            # Accepted replacement
+            new_top[idx] = replacement
+            used_replacement_indices.add(r_idx)
+            if enforce_franchise_cap and cap > 0:
+                if old_cid is not None and old_cid not in exempt:
+                    franchise_counts[old_cid] = max(
+                        0, franchise_counts.get(old_cid, 0) - 1
+                    )
+                if new_cid is not None and new_cid not in exempt:
+                    franchise_counts[new_cid] = franchise_counts.get(new_cid, 0) + 1
+            needed -= 1
+            break
 
     deduped: List[Dict[str, Any]] = []
     seen_ids: set[int] = set()
@@ -130,7 +206,8 @@ def apply_serendipity_slot(
             if ident is not None:
                 seen_ids.add(ident)
             deduped.append(item)
-
+    if enforce_franchise_cap and cap > 0:
+        return apply_franchise_cap(deduped, cap=cap, exempt_collection_ids=exempt)
     return deduped
 
 
@@ -141,8 +218,13 @@ def apply_diversity_policies(
     diversify: bool,
     boost_ids: List[int],
     exempt_collection_ids: Set[int] | None = None,
+    serendipity: bool = True,
+    presentation_limit: int | None = None,
+    mmr: bool = True,
+    franchise_cap: bool = True,
 ) -> List[Dict[str, Any]]:
-    if diversify:
+    pres_limit = presentation_limit if presentation_limit is not None else limit
+    if diversify and franchise_cap:
         cap_fn = get_hook("_apply_franchise_cap", apply_franchise_cap)
         try:
             ordered = cap_fn(ordered, exempt_collection_ids=exempt_collection_ids)
@@ -160,7 +242,7 @@ def apply_diversity_policies(
         ordered_boosted = []
         remaining = ordered
 
-    if diversify:
+    if diversify and mmr:
         mmr_fn = get_hook("diversify_with_mmr", diversify_with_mmr)
         if boost_set:
             slots_needed = max(0, limit - len(ordered_boosted))
@@ -171,8 +253,19 @@ def apply_diversity_policies(
         else:
             ordered = mmr_fn(ordered, limit=limit)
 
-    serendipity_fn = get_hook("_apply_serendipity_slot", apply_serendipity_slot)
-    ordered = serendipity_fn(ordered, serendipity_context, limit)
+    if serendipity:
+        serendipity_fn = get_hook("_apply_serendipity_slot", apply_serendipity_slot)
+        try:
+            ordered = serendipity_fn(
+                ordered,
+                serendipity_context,
+                pres_limit,
+                cap=2,
+                exempt_collection_ids=exempt_collection_ids,
+                enforce_franchise_cap=bool(diversify and franchise_cap),
+            )
+        except TypeError:
+            ordered = serendipity_fn(ordered, serendipity_context, pres_limit)
 
     if boost_ids:
         boost_fn = get_hook("_prioritize_boosted_items", prioritize_boosted_items)

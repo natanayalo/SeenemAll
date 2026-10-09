@@ -20,6 +20,16 @@ class RecommendParams:
         description="Optional natural-language intent (e.g. 'light sci-fi < 2h')",
     )
     diversify: bool = Query(True, description="Whether to diversify recommendations.")
+    mmr: bool = Query(True, description="Whether to apply MMR diversification.")
+    franchise_cap: bool = Query(True, description="Whether to apply franchise caps.")
+    serendipity: bool = Query(
+        True,
+        description="Whether to include long-tail serendipity slots.",
+    )
+    rerank_budget: int | None = Query(
+        None,
+        description="Candidate budget to evaluate during reranking (defaults to max(limit, 25)).",
+    )
     profile: str | None = Query(None, description="Optional profile identifier")
     use_llm_intent: bool = Query(
         True,

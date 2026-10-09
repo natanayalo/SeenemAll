@@ -11,6 +11,7 @@ from api.core.metrics import METRICS, timer
 from api.core.inference_metrics import inference_request, InferenceCollector
 from api.pipeline.context import load_user_context
 from api.pipeline.diversity import apply_diversity_policies
+from api.pipeline.hooks import get_hook
 from api.pipeline.intent import resolve_query_intent
 from api.pipeline.models import ComputeResult, RecommendParams
 from api.pipeline.reranker import build_debug_snapshot, rerank_candidates
@@ -67,32 +68,52 @@ class RecommendationPipeline:
             return ComputeResult(items=[], debug_context={})
 
         # Stage 5: Diversity & Policy
+        if getattr(params, "rerank_budget", None) is not None:
+            rerank_budget = params.rerank_budget
+        else:
+            rerank_budget = (
+                max(params.limit, 25) if params.rerank is not False else params.limit
+            )
+        diversity_limit = max(params.limit, rerank_budget)
         with timer("recommend.diversity_latency_ms"):
             diversified = apply_diversity_policies(
                 scored.ordered,
                 scored.serendipity_context,
-                limit=params.limit,
+                limit=diversity_limit,
                 diversify=params.diversify,
                 boost_ids=pool.boost_ids,
                 exempt_collection_ids=set(
                     getattr(intent, "matched_collection_ids", ()) or ()
                 ),
+                serendipity=False,
+                presentation_limit=params.limit,
+                mmr=getattr(params, "mmr", True),
+                franchise_cap=getattr(params, "franchise_cap", True),
             )
 
         # Stage 6: Presentation & Reranking
-        METRICS.histogram("recommend.rerank_candidate_count").observe(len(diversified))
+        to_rerank = (
+            diversified[:rerank_budget]
+            if rerank_budget < len(diversified)
+            else diversified
+        )
+        rest = diversified[rerank_budget:] if rerank_budget < len(diversified) else []
+        METRICS.histogram("recommend.rerank_candidate_count").observe(len(to_rerank))
         with timer("recommend.rerank_latency_ms"):
-            reranked = rerank_candidates(
-                diversified,
+            reranked_top = rerank_candidates(
+                to_rerank,
                 intent=intent.intent_filters,
                 query=params.query,
                 context=context,
                 rerank=params.rerank,
                 rerank_provider=params.rerank_provider,
             )
+        reranked = reranked_top + rest
 
         matched_coll_ids = set(getattr(intent, "matched_collection_ids", ()) or ())
         coll_item_ids = set(getattr(intent, "collection_item_ids", ()) or ())
+        is_chrono = bool(getattr(intent, "is_chronological_requested", False))
+
         if matched_coll_ids or coll_item_ids:
             franchise_items = [
                 it
@@ -106,7 +127,7 @@ class RecommendationPipeline:
                 if it.get("collection_id") not in matched_coll_ids
                 and it.get("id") not in coll_item_ids
             ]
-            if getattr(intent, "is_chronological_requested", False):
+            if is_chrono:
                 franchise_items.sort(
                     key=lambda it: (
                         it.get("release_year") is None,
@@ -114,6 +135,73 @@ class RecommendationPipeline:
                     )
                 )
             reranked = franchise_items + other_items
+            protected_ids = {
+                it["id"] for it in franchise_items if it.get("id") is not None
+            }
+        else:
+            protected_ids = set()
+
+        if getattr(params, "serendipity", True):
+            from api.pipeline.diversity import apply_serendipity_slot
+
+            serendipity_fn = get_hook("_apply_serendipity_slot", apply_serendipity_slot)
+            try:
+                reranked = serendipity_fn(
+                    reranked,
+                    scored.serendipity_context,
+                    params.limit,
+                    cap=2,
+                    exempt_collection_ids=matched_coll_ids,
+                    enforce_franchise_cap=bool(
+                        params.diversify and getattr(params, "franchise_cap", True)
+                    ),
+                    protected_ids=protected_ids,
+                    is_chronological=is_chrono,
+                )
+            except TypeError:
+                reranked = serendipity_fn(
+                    reranked, scored.serendipity_context, params.limit
+                )
+
+            if matched_coll_ids or coll_item_ids:
+                franchise_items = [
+                    it
+                    for it in reranked
+                    if it.get("collection_id") in matched_coll_ids
+                    or it.get("id") in coll_item_ids
+                ]
+                other_items = [
+                    it
+                    for it in reranked
+                    if it.get("collection_id") not in matched_coll_ids
+                    and it.get("id") not in coll_item_ids
+                ]
+                if is_chrono:
+                    franchise_items.sort(
+                        key=lambda it: (
+                            it.get("release_year") is None,
+                            it.get("release_year") or 0,
+                        )
+                    )
+                reranked = franchise_items + other_items
+
+        # Enrich any replacement items missing explanations (e.g. from serendipity slot insertion)
+        missing_explanation = [it for it in reranked if not it.get("explanation")]
+        if missing_explanation:
+            from api.core.reranker import _with_default_explanations
+
+            enriched_items = {
+                it["id"]: it.get("explanation")
+                for it in _with_default_explanations(
+                    missing_explanation,
+                    intent.intent_filters,
+                    params.query,
+                    apply_low_signal=False,
+                )
+            }
+            for it in reranked:
+                if not it.get("explanation") and it.get("id") in enriched_items:
+                    it["explanation"] = enriched_items[it["id"]]
 
         pipeline_ms = (time.perf_counter() - _pipeline_start) * 1000
         METRICS.histogram("recommend.total_latency_ms").observe(pipeline_ms)

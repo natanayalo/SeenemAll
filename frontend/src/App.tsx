@@ -9,6 +9,7 @@ interface Genre {
 interface WatchOption {
   service: string;
   url: string;
+  offer_type?: string;
 }
 
 interface Recommendation {
@@ -434,7 +435,7 @@ function App() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
-                                {opt.service.toUpperCase()}
+                                {opt.service.replace(/[-_]/g, ' ').toUpperCase()}{opt.offer_type ? ` (${opt.offer_type.toUpperCase()})` : ''}
                               </a>
                             </li>
                           ))}

@@ -43,6 +43,9 @@ evaluation/evaluation_results*.csv
 evaluation/evaluation_scores*.csv
 evaluation/ab_comparison_report*.json
 evaluation/report.html
+evaluation/reports/
+evaluation/v2_comparison_report*.json
+evaluation/qrels/qrels_*_*.json
 evaluation/sweep_*.csv
 evaluation/*.md
 *.csv

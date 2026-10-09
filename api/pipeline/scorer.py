@@ -567,9 +567,17 @@ def score_candidates(
         cleaned_options = []
         if watch_options and watch_options[0] is not None:
             cleaned_options = [
-                {"service": opt["service"], "url": opt["url"]}
+                {
+                    "service": opt["service"],
+                    "url": opt["url"],
+                    **(
+                        {"offer_type": opt["offer_type"]}
+                        if opt.get("offer_type") is not None
+                        else {}
+                    ),
+                }
                 for opt in watch_options
-                if opt["url"] is not None
+                if opt.get("url") is not None
             ]
 
         provider_allowed = True
