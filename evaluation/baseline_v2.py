@@ -8,7 +8,6 @@ import os
 import platform
 import subprocess
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -33,7 +32,7 @@ from evaluation.metrics import (
     calculate_precision_at_k,
     check_for_duplicates,
 )
-from evaluation.models import EvaluationStatus, GainMode, JudgeInput, TypedId
+from evaluation.models import EvaluationStatus, GainMode, TypedId
 from evaluation.runner import EvaluationRunner, IndexArtifactVerifier
 
 SCHEMA = "seenemall.production-baseline.v2.1"
@@ -85,12 +84,7 @@ def warm_judgments(
     adjudicator: Any, query: str, evidence: list[Any], workers: int
 ) -> None:
     """Parallelize independent inference only; commit cache entries sequentially."""
-    judge = adjudicator.primary_judge
-    inputs = [JudgeInput(query, item) for item in evidence]
-    missing = [item for item in inputs if adjudicator.cache.get(item, judge) is None]
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        for item, result in zip(missing, pool.map(judge.judge_pair, missing)):
-            adjudicator.cache.set(item, judge, result.to_dict())
+    adjudicator.warm_pool(query, evidence, workers)
 
 
 def index_identity(backend: str) -> dict[str, Any]:

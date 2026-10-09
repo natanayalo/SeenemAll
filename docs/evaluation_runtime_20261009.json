@@ -1,0 +1,588 @@
+{
+  "schema": "seenemall.evaluation-runtime-assessment.v1",
+  "date": "2026-10-09",
+  "worker_evidence": "evaluation_judge_workers_20261009.json",
+  "worker_measurements": [
+    {
+      "workers": 1,
+      "requests": 28,
+      "elapsed_seconds": 144.06645110005047,
+      "pairs_per_second": 0.1943547563377869,
+      "execution_failures": 0,
+      "decision_agreement": 1.0,
+      "repeatable": true,
+      "eligible": true
+    },
+    {
+      "workers": 2,
+      "requests": 28,
+      "elapsed_seconds": 118.37379870004952,
+      "pairs_per_second": 0.23653883129111988,
+      "execution_failures": 0,
+      "decision_agreement": 1.0,
+      "repeatable": true,
+      "eligible": true
+    },
+    {
+      "workers": 4,
+      "requests": 28,
+      "elapsed_seconds": 110.89199530007318,
+      "pairs_per_second": 0.2524979366114943,
+      "execution_failures": 0,
+      "decision_agreement": 1.0,
+      "repeatable": true,
+      "eligible": true
+    }
+  ],
+  "recommended_workers": 4,
+  "grading_elapsed_reduction": 0.23027190263011676,
+  "runs": {
+    "quick_development": {
+      "query_count": 14,
+      "phase": "preflight",
+      "performance": {
+        "elapsed_seconds": 49.39889100007713,
+        "judge_calls": 0
+      },
+      "gate_result": {
+        "status": "FAIL",
+        "exit_code": 1,
+        "passed": false,
+        "family_count": 14,
+        "slice_counts": {
+          "constraint": 3,
+          "entity": 3,
+          "franchise": 3,
+          "multi_constraint": 1,
+          "typo": 1,
+          "vibe": 3
+        },
+        "reasons": [
+          "preflight_constraints_and_order",
+          "preflight_completeness"
+        ],
+        "checks": [
+          {
+            "name": "preflight_execution",
+            "passed": true,
+            "observed": 0,
+            "threshold": 0,
+            "details": "No failures, fallbacks, duplicates or empty candidate outputs."
+          },
+          {
+            "name": "preflight_constraints_and_order",
+            "passed": false,
+            "observed": 10,
+            "threshold": 0,
+            "details": "No hard constraint, dislike or canonical order violations."
+          },
+          {
+            "name": "preflight_completeness",
+            "passed": false,
+            "observed": 0.8928571428571429,
+            "threshold": 0.95,
+            "details": ""
+          },
+          {
+            "name": "preflight_sample_size",
+            "passed": true,
+            "observed": {
+              "families": 14,
+              "slices": {
+                "constraint": 3,
+                "entity": 3,
+                "franchise": 3,
+                "multi_constraint": 1,
+                "typo": 1,
+                "vibe": 3
+              }
+            },
+            "threshold": {},
+            "details": ""
+          }
+        ]
+      },
+      "quality_evaluated": false
+    },
+    "promotion_preflight": {
+      "query_count": 50,
+      "phase": "preflight",
+      "performance": {
+        "elapsed_seconds": 63.610375899937935,
+        "judge_calls": 0
+      },
+      "gate_result": {
+        "status": "INVALID",
+        "exit_code": 2,
+        "passed": false,
+        "family_count": 50,
+        "slice_counts": {
+          "constraint": 15,
+          "entity": 10,
+          "franchise": 10,
+          "multi_constraint": 2,
+          "typo": 3,
+          "vibe": 11
+        },
+        "reasons": [
+          "preflight_execution",
+          "preflight_constraints_and_order",
+          "preflight_completeness"
+        ],
+        "checks": [
+          {
+            "name": "preflight_execution",
+            "passed": false,
+            "observed": 4,
+            "threshold": 0,
+            "details": "No failures, fallbacks, duplicates or empty candidate outputs."
+          },
+          {
+            "name": "preflight_constraints_and_order",
+            "passed": false,
+            "observed": 35,
+            "threshold": 0,
+            "details": "No hard constraint, dislike or canonical order violations."
+          },
+          {
+            "name": "preflight_completeness",
+            "passed": false,
+            "observed": 0.8320000000000001,
+            "threshold": 0.95,
+            "details": ""
+          },
+          {
+            "name": "preflight_sample_size",
+            "passed": true,
+            "observed": {
+              "families": 50,
+              "slices": {
+                "constraint": 15,
+                "entity": 10,
+                "franchise": 10,
+                "multi_constraint": 2,
+                "typo": 3,
+                "vibe": 11
+              }
+            },
+            "threshold": {
+              "families": 50,
+              "per_critical_slice": 10
+            },
+            "details": ""
+          }
+        ]
+      },
+      "quality_evaluated": false
+    },
+    "full_graded_diagnostic": {
+      "query_count": 101,
+      "phase": "graded",
+      "performance": {
+        "elapsed_seconds": 104.48878700006753,
+        "retrieval_and_preflight_seconds": 104.34519370005,
+        "judge_calls": 0,
+        "judge_workers": 4
+      },
+      "gate_result": {
+        "status": "INVALID",
+        "exit_code": 2,
+        "passed": false,
+        "family_count": 101,
+        "slice_counts": {
+          "franchise": 21,
+          "vibe": 23,
+          "constraint": 30,
+          "entity": 20,
+          "typo": 5,
+          "multi_constraint": 3
+        },
+        "reasons": [
+          "Execution integrity check failed (invalid run or empty candidate output)."
+        ],
+        "checks": [
+          {
+            "name": "execution_integrity",
+            "passed": false,
+            "observed": {
+              "failures": 0,
+              "fallbacks": 0,
+              "duplicates": false,
+              "empty_cases": 5
+            },
+            "threshold": {
+              "failures": 0,
+              "fallbacks": 0,
+              "duplicates": false,
+              "empty_cases": 0
+            },
+            "details": "Execution must have zero failures, zero unexpected fallbacks, no empty outputs, and no duplicate items."
+          }
+        ]
+      },
+      "quality_evaluated": true
+    }
+  },
+  "full_reference_parity": {
+    "unresolved_pairs": 94,
+    "maximum_absolute_ndcg_delta": 0.0,
+    "maximum_absolute_recall_delta": 0.0
+  },
+  "unit_verification": {
+    "tests_passed": 903,
+    "elapsed_seconds": 72.39,
+    "covered_statements": 10958,
+    "statements": 12523,
+    "unrounded_coverage": 87.50299449013815,
+    "modified_modules": [
+      {
+        "module": "api/core/cross_encoder.py",
+        "covered_statements": 214,
+        "statements": 240,
+        "unrounded_coverage": 89.16666666666667
+      },
+      {
+        "module": "api/core/elasticsearch_client.py",
+        "covered_statements": 28,
+        "statements": 28,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "api/core/filter_matcher.py",
+        "covered_statements": 409,
+        "statements": 455,
+        "unrounded_coverage": 89.89010989010988
+      },
+      {
+        "module": "api/core/inference_metrics.py",
+        "covered_statements": 47,
+        "statements": 47,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "api/core/persistent_cache.py",
+        "covered_statements": 109,
+        "statements": 109,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "api/core/reranker.py",
+        "covered_statements": 825,
+        "statements": 890,
+        "unrounded_coverage": 92.69662921348315
+      },
+      {
+        "module": "api/db/session.py",
+        "covered_statements": 71,
+        "statements": 71,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "api/pipeline/context.py",
+        "covered_statements": 219,
+        "statements": 226,
+        "unrounded_coverage": 96.90265486725664
+      },
+      {
+        "module": "api/pipeline/models.py",
+        "covered_statements": 101,
+        "statements": 102,
+        "unrounded_coverage": 99.01960784313725
+      },
+      {
+        "module": "api/pipeline/reranker.py",
+        "covered_statements": 81,
+        "statements": 81,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "api/pipeline/retriever/fusion.py",
+        "covered_statements": 126,
+        "statements": 136,
+        "unrounded_coverage": 92.6470588235294
+      },
+      {
+        "module": "api/pipeline/runner.py",
+        "covered_statements": 64,
+        "statements": 65,
+        "unrounded_coverage": 98.46153846153847
+      },
+      {
+        "module": "api/pipeline/scorer.py",
+        "covered_statements": 351,
+        "statements": 380,
+        "unrounded_coverage": 92.36842105263158
+      },
+      {
+        "module": "evaluation/baseline_v2.py",
+        "covered_statements": 144,
+        "statements": 151,
+        "unrounded_coverage": 95.36423841059603
+      },
+      {
+        "module": "evaluation/build_dataset_splits.py",
+        "covered_statements": 101,
+        "statements": 103,
+        "unrounded_coverage": 98.05825242718447
+      },
+      {
+        "module": "evaluation/catalog_references.py",
+        "covered_statements": 17,
+        "statements": 17,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/coverage_gate.py",
+        "covered_statements": 42,
+        "statements": 42,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/datasets.py",
+        "covered_statements": 172,
+        "statements": 182,
+        "unrounded_coverage": 94.50549450549451
+      },
+      {
+        "module": "evaluation/deterministic.py",
+        "covered_statements": 171,
+        "statements": 192,
+        "unrounded_coverage": 89.0625
+      },
+      {
+        "module": "evaluation/evaluate.py",
+        "covered_statements": 980,
+        "statements": 1102,
+        "unrounded_coverage": 88.92921960072596
+      },
+      {
+        "module": "evaluation/evidence.py",
+        "covered_statements": 78,
+        "statements": 78,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/evidence_assessment.py",
+        "covered_statements": 66,
+        "statements": 66,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/judge/__init__.py",
+        "covered_statements": 6,
+        "statements": 6,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/judge/base.py",
+        "covered_statements": 59,
+        "statements": 62,
+        "unrounded_coverage": 95.16129032258064
+      },
+      {
+        "module": "evaluation/judge/consensus.py",
+        "covered_statements": 251,
+        "statements": 255,
+        "unrounded_coverage": 98.43137254901961
+      },
+      {
+        "module": "evaluation/judge/ollama.py",
+        "covered_statements": 39,
+        "statements": 39,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/judge/qualification.py",
+        "covered_statements": 294,
+        "statements": 306,
+        "unrounded_coverage": 96.07843137254902
+      },
+      {
+        "module": "evaluation/judge/rubric.py",
+        "covered_statements": 31,
+        "statements": 31,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/judge/stub.py",
+        "covered_statements": 56,
+        "statements": 58,
+        "unrounded_coverage": 96.55172413793103
+      },
+      {
+        "module": "evaluation/judge/systemone.py",
+        "covered_statements": 54,
+        "statements": 54,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/judge/throughput.py",
+        "covered_statements": 68,
+        "statements": 68,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/latency.py",
+        "covered_statements": 120,
+        "statements": 123,
+        "unrounded_coverage": 97.5609756097561
+      },
+      {
+        "module": "evaluation/metrics.py",
+        "covered_statements": 185,
+        "statements": 193,
+        "unrounded_coverage": 95.85492227979275
+      },
+      {
+        "module": "evaluation/models.py",
+        "covered_statements": 298,
+        "statements": 308,
+        "unrounded_coverage": 96.75324675324676
+      },
+      {
+        "module": "evaluation/personalization.py",
+        "covered_statements": 120,
+        "statements": 132,
+        "unrounded_coverage": 90.9090909090909
+      },
+      {
+        "module": "evaluation/preflight.py",
+        "covered_statements": 30,
+        "statements": 30,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/private_benchmark.py",
+        "covered_statements": 34,
+        "statements": 36,
+        "unrounded_coverage": 94.44444444444444
+      },
+      {
+        "module": "evaluation/query_interpretation.py",
+        "covered_statements": 15,
+        "statements": 15,
+        "unrounded_coverage": 100.0
+      },
+      {
+        "module": "evaluation/runner.py",
+        "covered_statements": 160,
+        "statements": 173,
+        "unrounded_coverage": 92.48554913294798
+      },
+      {
+        "module": "evaluation/trace.py",
+        "covered_statements": 47,
+        "statements": 53,
+        "unrounded_coverage": 88.67924528301887
+      }
+    ]
+  },
+  "limitations": [
+    "Timing is specific to the recorded local host and workload",
+    "Fresh grading benchmark uses 14 fixed diagnostic pairs, each repeated twice; it does not requalify the judge",
+    "Quick and promotion preflight runs rejected existing production defects; their timings are not completed passing evaluations",
+    "Full diagnostic forces grading after failed preflight; its final gate is INVALID due to five empty outputs",
+    "Latency is a separate unchanged cache-bypassed benchmark and is excluded from these quality-run timings"
+  ],
+  "required_legacy_checks": {
+    "ab_compare": {
+      "backend": "elasticsearch",
+      "baseline_param": "default",
+      "candidate_param": "default",
+      "k": 10,
+      "comparisons": {
+        "ndcg": {
+          "metric": "nDCG@10",
+          "baseline": 0.4430057236653608,
+          "candidate": 0.449395261630625,
+          "delta": 0.006389537965264203,
+          "lift_percent": 1.4423149914177529
+        },
+        "map": {
+          "metric": "MAP",
+          "baseline": 0.38340237570076274,
+          "candidate": 0.38742649674101287,
+          "delta": 0.004024121040250128,
+          "lift_percent": 1.049581665448747
+        },
+        "precision": {
+          "metric": "Precision@10",
+          "baseline": 0.19354838709677416,
+          "candidate": 0.19677419354838704,
+          "delta": 0.0032258064516128837,
+          "lift_percent": 1.666666666666657
+        },
+        "recall": {
+          "metric": "Recall@10",
+          "baseline": 0.4725806451612903,
+          "candidate": 0.4782258064516129,
+          "delta": 0.005645161290322609,
+          "lift_percent": 1.194539249146764
+        },
+        "ild": {
+          "metric": "Intra-List Diversity",
+          "baseline": 0.6086782359700724,
+          "candidate": 0.608624611465243,
+          "delta": -5.3624504829374864e-05,
+          "lift_percent": -0.008809992153557381
+        },
+        "unique_count": {
+          "metric": "Unique Items Rec'd",
+          "baseline": 469.0,
+          "candidate": 467.0,
+          "delta": -2.0,
+          "lift_percent": -0.42643923240938164
+        },
+        "intent_alignment": {
+          "metric": "Intent Adherence",
+          "baseline": 0.8949206349206349,
+          "candidate": 0.8932539682539683,
+          "delta": -0.0016666666666665941,
+          "lift_percent": -0.1862362539907688
+        },
+        "latency_mean": {
+          "metric": "Latency Mean (ms)",
+          "baseline": 42.273687095955886,
+          "candidate": 659.7136548352278,
+          "delta": 617.4399677392719,
+          "lift_percent": 1460.5775132359802
+        },
+        "latency_p50": {
+          "metric": "Latency P50 (ms)",
+          "baseline": 4.369949994725175,
+          "candidate": 606.7637000232935,
+          "delta": 602.3937500285683,
+          "lift_percent": 13784.911743971858
+        },
+        "latency_p95": {
+          "metric": "Latency P95 (ms)",
+          "baseline": 5.875030007155143,
+          "candidate": 855.9271500271279,
+          "delta": 850.0521200199728,
+          "lift_percent": 14468.898354301211
+        }
+      },
+      "quality_gate": {
+        "enabled": true,
+        "passed": false,
+        "checks": {
+          "latency_mean_improved": false,
+          "latency_p95_improved": false,
+          "ndcg_non_regression": true,
+          "map_non_regression": true
+        }
+      }
+    },
+    "ab_exit_code": 1,
+    "regression_exit_code": 1,
+    "regression": {
+      "ndcg_at_10": 0.4494,
+      "minimum_ndcg": 0.72,
+      "ndcg_passed": false,
+      "ild_at_10": 0.6086,
+      "minimum_ild": 0.45,
+      "ild_passed": true
+    },
+    "timing_limitation": "Historical cached baseline latency is not a comparable cache-cold measurement."
+  }
+}

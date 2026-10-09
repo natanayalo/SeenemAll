@@ -112,6 +112,7 @@ def compare(tmp_path, monkeypatch):
         args = evaluate.parse_args(
             [
                 "--v2",
+                "--continue-on-preflight-failure",
                 "--split",
                 split,
                 "--judgment-mode",

@@ -2,6 +2,14 @@
 
 Updated 9 October 2026 with the measured production reference.
 
+## Runtime improvements
+
+The evaluator now supports a fixed 14-query development diagnostic, performs cheap checks across all selected queries before grading, and grades only uncached pairs with four measured workers by default. The cache remains local and uses recovery journaling plus atomic checkpoints. Existing promotion, evidence-coverage and latency requirements remain enforced. See [the runtime workflow and measurements](evaluation_runtime.md).
+
+The real uncached worker diagnostic executed 85 native requests and measured 28 judgments in 144.07 seconds with one worker, 118.37 with two and 110.89 with four: a 23.03% elapsed reduction, with identical repeated grade/sufficiency decisions and zero failures. Real quick and promotion preflight checks took 49.40 and 63.61 seconds; both rejected existing production defects without grading. A forced full 101-query diagnostic took 104.49 seconds, reused every judgment, retained all 94 unresolved pairs, and had exactly zero nDCG/Recall@100 deltas. Its final gate remains INVALID due to the existing five empty outputs. These quality timings exclude the separate latency benchmark.
+
+Current verification passes **903 tests**, six dependency warnings, **72.39 seconds**; exact coverage **10,958/12,523 = 87.50299449%**. All **40 modified production modules** meet the unrounded 85% gate and repository hooks pass. Historical evidence below retains the measurements made when each artifact was established.
+
 ## Contextual evidence and sufficiency diagnostics
 
 The experimental v2.3 evidence profile now delivers sourced studio, award and country/date-specific streaming facts for 19 affected items. Sufficiency probabilities survive native output, cache and adjudication. Historical v2.2 evidence, qualification and the saved baseline remain compatible and unchanged. See [the detailed diagnostic](nimble_sufficiency_assessment.md).

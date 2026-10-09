@@ -31,7 +31,7 @@ Quality comparisons use the snapshot's frozen production rankings. They retain i
 
 ## Workload and latency
 
-Product development has **51 queries/51 families**, regression has **50/50**, and full has **101/101**. There are **379 declared reference entries** across the full split, with overlap deduplicated within each query. At K=10, capture judges at most **1,389 query-item pairs** (1,010 top-ten results plus 379 references); empty/short results and overlap reduce that number. It does not judge every result at retrieval depth 100. Fingerprinted judgments can be reused, and independent model calls use two workers by default; disk cache writes remain sequential.
+Product development has **51 queries/51 families**, regression has **50/50**, and full has **101/101**. There are **379 declared reference entries** across the full split, with overlap deduplicated within each query. At K=10, capture judges at most **1,389 query-item pairs** (1,010 top-ten results plus 379 references); empty/short results and overlap reduce that number. It does not judge every result at retrieval depth 100. Fingerprinted judgments can be reused. Independent model calls now default to four measured workers; disk writes remain sequential with recovery journaling and atomic checkpoints. The existing snapshot retains its original two-worker capture identity. See [runtime modes and measurements](evaluation_runtime.md).
 
 The full suite is appropriate for establishing a baseline or validating a release. Use the development split for iteration and a small representative query sample for quick diagnostics. Such a sample is not a promotion check: promotion requires at least 50 independent families and at least ten families in each critical slice.
 

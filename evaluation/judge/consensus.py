@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
+import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from evaluation.deterministic import apply_deterministic_override
@@ -25,8 +28,15 @@ DEFAULT_QRELS_DIR = Path("evaluation/qrels")
 class JudgmentCache:
     """Persistent cache for individual query-item judgments."""
 
-    def __init__(self, path: Path = DEFAULT_JUDGMENT_CACHE_PATH) -> None:
+    def __init__(
+        self, path: Path = DEFAULT_JUDGMENT_CACHE_PATH, *, checkpoint_every: int = 25
+    ) -> None:
+        if checkpoint_every < 1:
+            raise ValueError("Checkpoint interval must be positive")
         self.path = path
+        self.journal_path = path.with_suffix(path.suffix + ".journal")
+        self.checkpoint_every = checkpoint_every
+        self._pending = 0
         self._cache: Dict[str, Dict[str, Any]] = {}
         self.load()
 
@@ -50,11 +60,42 @@ class JudgmentCache:
                     self._cache = json.load(fp)
             except Exception:
                 self._cache = {}
+        if self.journal_path.exists():
+            data = self.journal_path.read_bytes()
+            # A crash can leave an incomplete last append. Complete records remain usable.
+            complete = data[: data.rfind(b"\n") + 1]
+            for line in complete.splitlines():
+                entry = json.loads(line)
+                self._cache[entry["key"]] = entry["result"]
+                self._pending += 1
+            if complete != data:
+                self.journal_path.write_bytes(complete)
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("w", encoding="utf-8") as fp:
-            json.dump(self._cache, fp, indent=2, ensure_ascii=False)
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=self.path.parent, delete=False
+        ) as fp:
+            temporary = Path(fp.name)
+            try:
+                json.dump(self._cache, fp, indent=2, ensure_ascii=False)
+                fp.flush()
+                os.fsync(fp.fileno())
+            except BaseException:
+                fp.close()
+                temporary.unlink(missing_ok=True)
+                raise
+        try:
+            os.replace(temporary, self.path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        # Replay is idempotent if a crash occurs between replacement and removal.
+        self.journal_path.unlink(missing_ok=True)
+        self._pending = 0
+
+    def flush(self) -> None:
+        if self._pending:
+            self.save()
 
     def get(
         self, judge_input: JudgeInput, judge: LocalJudgeAdapter
@@ -66,8 +107,17 @@ class JudgmentCache:
         self, judge_input: JudgeInput, judge: LocalJudgeAdapter, result: Dict[str, Any]
     ) -> None:
         key = self._cache_key(judge_input, judge)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.journal_path.open("a", encoding="utf-8") as fp:
+            fp.write(
+                json.dumps({"key": key, "result": result}, ensure_ascii=False) + "\n"
+            )
+            fp.flush()
+            os.fsync(fp.fileno())
         self._cache[key] = result
-        self.save()
+        self._pending += 1
+        if self._pending >= self.checkpoint_every:
+            self.save()
 
 
 class PoolAdjudicator:
@@ -84,6 +134,50 @@ class PoolAdjudicator:
         self.secondary_judge = secondary_judge
         self.tie_breaker_judge = tie_breaker_judge
         self.cache = cache or JudgmentCache()
+        self.inference_calls = 0
+
+    def reusable_output(self, judge: LocalJudgeAdapter, judge_input: JudgeInput):
+        cached = self.cache.get(judge_input, judge)
+        if (
+            cached
+            and cached.get("execution_status") == "over_limit"
+            and len(judge.build_prompt(judge_input)) <= judge.input_character_limit()
+        ):
+            return None
+        return cached
+
+    def warm_pool(
+        self,
+        query: str,
+        evidence: Sequence[ItemEvidence],
+        workers: int,
+        mode: str = "single_judge",
+    ) -> None:
+        """Infer missing pairs concurrently; only the caller writes cache/checkpoints."""
+        if not 1 <= workers <= 4:
+            raise ValueError("Judging requires between one and four workers")
+        judges = [self.primary_judge]
+        if mode == "consensus" and self.secondary_judge is not None:
+            judges.append(self.secondary_judge)
+        inputs = list(
+            {
+                JudgeInput(query, item).input_hash(): JudgeInput(query, item)
+                for item in evidence
+            }.values()
+        )
+        try:
+            for judge in judges:
+                missing = [
+                    inp for inp in inputs if self.reusable_output(judge, inp) is None
+                ]
+                with ThreadPoolExecutor(max_workers=workers) as pool:
+                    for inp, result in zip(
+                        missing, pool.map(judge.judge_pair, missing)
+                    ):
+                        self.inference_calls += 1
+                        self.cache.set(inp, judge, result.to_dict())
+        finally:
+            self.cache.flush()
 
     def deduplicate_pool(
         self,
@@ -112,15 +206,9 @@ class PoolAdjudicator:
         judge_input: JudgeInput,
     ) -> Tuple[int, Dict[int, float], bool, Any, str, Optional[float]]:
         """Run judge or retrieve from persistent cache."""
-        cached = self.cache.get(judge_input, judge)
+        cached = self.reusable_output(judge, judge_input)
         # Retry a prior resource rejection only if the input now fits the guard.
         # Successful judgments and other failures retain their cache semantics.
-        if (
-            cached
-            and cached.get("execution_status") == "over_limit"
-            and len(judge.build_prompt(judge_input)) <= judge.input_character_limit()
-        ):
-            cached = None
         if cached:
             probs = {int(k): float(v) for k, v in cached["probabilities"].items()}
             return (
@@ -134,6 +222,7 @@ class PoolAdjudicator:
             )
 
         output = judge.judge_pair(judge_input)
+        self.inference_calls += 1
         self.cache.set(judge_input, judge, output.to_dict())
         return (
             output.grade,
@@ -356,12 +445,15 @@ class ConsensusJudgeEngine:
         pool_evidence: List[ItemEvidence],
         constraints: Optional[DeterministicConstraint] = None,
         mode: str = "consensus",
+        workers: int = 1,
     ) -> Tuple[Dict[str, float], List[JudgmentRecord], bool]:
         """Label all items in pool and return (qrels_dict, records, had_changes)."""
         q_key = self._query_key(query)
         query_qrels = self._qrels.setdefault(q_key, {})
         records: List[JudgmentRecord] = []
         had_changes = False
+        if workers > 1:
+            self.adjudicator.warm_pool(query, pool_evidence, workers, mode)
 
         for ev in pool_evidence:
             tid_str = str(ev.typed_id)
@@ -383,5 +475,6 @@ class ConsensusJudgeEngine:
 
         if had_changes:
             self.save_qrels()
+        self.adjudicator.cache.flush()
 
         return dict(query_qrels), records, had_changes

@@ -259,6 +259,7 @@ def test_code_identity_hashes_tracked_diff(monkeypatch):
 
 def test_comparison_uses_frozen_ranks_and_rejects_legacy_reference(setup, monkeypatch):
     args, judge, cases, items, runner, _ = setup
+    args.continue_on_preflight_failure = True
     baseline.capture_baseline(args)
     args.save_v2_baseline = None
     args.baseline_file = args.v2_report.parent / "baseline.json"

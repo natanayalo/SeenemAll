@@ -65,6 +65,7 @@ from evaluation.models import (
     TypedId,
 )
 from evaluation.personalization import PersonalizationHarness
+from evaluation.preflight import check_preflight, quick_dev_cases
 from evaluation.private_benchmark import PrivateBenchmarkHarness
 from evaluation.runner import EvaluationRunner, IndexArtifactVerifier
 from evaluation.resolver import (
@@ -1507,9 +1508,26 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="Enable Seen'emAll Evaluation Suite v2 (automated judging, reproducible gates).",
     )
     parser.add_argument(
+        "--judge-workers",
+        type=int,
+        choices=[1, 2, 3, 4],
+        default=4,
+        help="Concurrent missing-pair grading calls (default four, measured on this host).",
+    )
+    parser.add_argument(
+        "--quick-dev",
+        action="store_true",
+        help="Fixed diverse 14-query product development diagnostic; never promotion evidence.",
+    )
+    parser.add_argument(
+        "--continue-on-preflight-failure",
+        action="store_true",
+        help="Collect graded diagnostics even when cheap candidate checks already fail.",
+    )
+    parser.add_argument(
         "--baseline-judge-workers",
         type=int,
-        default=2,
+        default=4,
         help="Independent judging workers for baseline capture (1-4); cache writes remain sequential.",
     )
     parser.add_argument(
@@ -1672,6 +1690,21 @@ def _comparison_params(
 
 def run_evaluation_v2(args: argparse.Namespace) -> int:
     """Execute Evaluation Suite v2 workflow."""
+    started = time.perf_counter()
+    quick = getattr(args, "quick_dev", False)
+    if quick and (
+        args.track != "product"
+        or args.split != "dev"
+        or args.private_eval
+        or getattr(args, "save_v2_baseline", None)
+        or args.qualify_judges
+        or args.latency_benchmark
+        or args.personalization_test
+        or args.hardware_inspect
+        or args.rescore_only
+    ):
+        print("Error: --quick-dev only supports product development comparisons.")
+        return int(EvaluationStatus.INVALID)
     if getattr(args, "save_v2_baseline", None):
         from evaluation.baseline_v2 import capture_baseline
 
@@ -1942,6 +1975,9 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
             )
             return int(EvaluationStatus.INVALID)
 
+    if quick:
+        cases = quick_dev_cases(cases)
+        print("Quick development diagnostic: reduced sample; not promotion evidence.")
     print("\n" + "=" * 76)
     print("          SEEN'EMALL EVALUATION SUITE v2 — LOCAL AUTOMATED JUDGING")
     print(
@@ -2122,6 +2158,8 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
     duplicate_detected = False
 
     per_query_rows = []
+    prepared_cases = []
+    preflight_rows = []
 
     catalog_metadata = (
         load_catalog_metadata()
@@ -2130,6 +2168,8 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
     )
 
     for case in cases:
+        case_failures_before = exec_failures
+        case_fallbacks_before = unexpected_fallbacks
         # Retrieve candidates up to depth 100 so Known-Positive Recall@100 measures true retrieval depth
         k_fetch = max(args.k, 100)
 
@@ -2208,6 +2248,7 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
         )
         candidate_top_ids = {str(TypedId.parse(it)) for it in cand_items[: args.k]}
         pool_evidence = []
+        case_constraint_reasons = []
         for pid_str in pool_ids:
             tid = TypedId.parse(pid_str)
             match = next(
@@ -2230,9 +2271,12 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
             )
             pool_evidence.append(ev)
             if pid_str in candidate_top_ids and case.constraints:
-                valid, _ = check_deterministic_constraints(ev, case.constraints)
+                valid, reasons = check_deterministic_constraints(ev, case.constraints)
                 if not valid:
                     hard_violations += 1
+                    case_constraint_reasons.append(
+                        {"typed_id": pid_str, "reasons": reasons}
+                    )
 
         # Calculate completeness with independently determined catalog eligibility
         eligible_catalog_count = getattr(case, "eligible_catalog_count", None)
@@ -2252,12 +2296,86 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
         else:
             cand_completeness_scores.append(0.0)
 
-        # Adjudicate pool
+        prepared_cases.append((case, base_items, cand_items, pool_ids, pool_evidence))
+        preflight_rows.append(
+            {
+                "case_id": case.case_id,
+                "query": case.query,
+                "execution_failures": exec_failures - case_failures_before,
+                "unexpected_fallbacks": unexpected_fallbacks - case_fallbacks_before,
+                "candidate_count": len(cand_items),
+                "constraint_violations": case_constraint_reasons,
+                "completeness": cand_completeness_scores[-1],
+                "duplicates": check_for_duplicates(base_items, k=args.k)
+                or check_for_duplicates(cand_items, k=args.k),
+                "canonical_order": (
+                    check_canonical_order(cand_items, seq, args.k) if seq else None
+                ),
+            }
+        )
+
+    retrieval_seconds = time.perf_counter() - started
+    preflight = check_preflight(
+        cases,
+        execution_failures=exec_failures,
+        unexpected_fallbacks=unexpected_fallbacks,
+        duplicates=duplicate_detected,
+        empty_outputs=empty_output_cases,
+        hard_violations=hard_violations,
+        disliked_violations=disliked_violations,
+        chronology_violations=chronology_violations,
+        missing_canonical_items=missing_canonical_items,
+        completeness=cand_completeness_scores,
+        statistical_promotion=args.split in ("regression", "full")
+        or bool(args.private_eval),
+    )
+    if not preflight.passed and not getattr(
+        args, "continue_on_preflight_failure", True
+    ):
+        report = {
+            "track": args.track,
+            "split": args.split,
+            "candidate": args.candidate,
+            "baseline": args.baseline,
+            "baseline_source": (
+                str(args.baseline_file)
+                if reference is not None
+                else "live configuration"
+            ),
+            "phase": "preflight",
+            "quality_evaluated": False,
+            "promotion_eligible": False,
+            "query_count": len(cases),
+            "gate_result": preflight.to_dict(),
+            "per_query_results": preflight_rows,
+            "performance": {"elapsed_seconds": retrieval_seconds, "judge_calls": 0},
+            "skipped_checks": [
+                "relevance judging",
+                "nDCG confidence interval",
+                "recall comparison",
+            ],
+        }
+        print(
+            f"Preflight {preflight.status.name}: {', '.join(preflight.reasons)}; grading skipped."
+        )
+        if priv_harness is not None:
+            export = priv_harness.submit_candidate(
+                candidate_identity=f"candidate_{args.candidate}",
+                gate_result=preflight.to_dict(),
+            )
+            return int(export.get("exit_code", int(preflight.status)))
+        args.v2_report.parent.mkdir(parents=True, exist_ok=True)
+        args.v2_report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        return int(preflight.status)
+
+    for case, base_items, cand_items, pool_ids, pool_evidence in prepared_cases:
+        # Grade only missing pairs, preserving the full shared pool and all existing gates.
         qrels, records, _ = engine.label_pool(
             query=case.query,
             pool_evidence=pool_evidence,
             constraints=case.constraints,
             mode=args.judgment_mode,
+            workers=getattr(args, "judge_workers", 1),
         )
 
         for rec in records:
@@ -2401,6 +2519,18 @@ def run_evaluation_v2(args: argparse.Namespace) -> int:
         "gain_mode": args.gain_mode,
         "judgment_mode": args.judgment_mode,
         "judge_config": args.judge_config,
+        "phase": "graded",
+        "quality_evaluated": True,
+        "promotion_eligible": not quick and is_stat_promo,
+        "quick_dev": quick,
+        "query_count": len(cases),
+        "preflight": preflight.to_dict(),
+        "performance": {
+            "elapsed_seconds": time.perf_counter() - started,
+            "retrieval_and_preflight_seconds": retrieval_seconds,
+            "judge_calls": adjudicator.inference_calls,
+            "judge_workers": getattr(args, "judge_workers", 1),
+        },
         "gate_result": gate_result.to_dict(),
         "per_query_results": per_query_rows,
     }
