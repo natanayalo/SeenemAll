@@ -201,6 +201,8 @@ def retrieve_candidates(
                             func.json_build_object(
                                 "service",
                                 Availability.service,
+                                "offer_type",
+                                Availability.offer_type,
                                 "url",
                                 func.coalesce(
                                     Availability.web_url, Availability.deeplink

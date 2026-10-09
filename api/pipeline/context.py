@@ -32,12 +32,41 @@ _CATALOG_METADATA_TTL = 3600.0
 
 _DEFAULT_STREAMING_PROVIDER_ALIASES: Dict[str, Set[str]] = {
     "netflix": {"netflix", "nfx"},
-    "disney_plus": {"disney_plus", "disney", "dnp"},
-    "prime_video": {"prime_video", "primevideo", "amazon", "amz", "amp"},
+    "disney_plus": {"disney_plus", "disney-plus", "disneyplus", "disney", "dnp"},
+    "prime_video": {
+        "prime_video",
+        "prime-video",
+        "primevideo",
+        "amazon_prime_video",
+        "amazon-prime-video",
+        "amazon",
+        "prime",
+        "prv",
+        "amz",
+        "amp",
+    },
     "hulu": {"hulu", "hlu"},
-    "max": {"max", "hbomax", "hbo", "hbm"},
-    "apple_tv_plus": {"apple_tv_plus", "appletvplus", "apple", "atp"},
-    "paramount_plus": {"paramount_plus", "paramountplus", "prm", "pmnt", "paramount"},
+    "max": {"max", "hbomax", "hbo-max", "hbo_max", "hbo", "mxx", "hbm"},
+    "apple_tv_plus": {
+        "apple_tv_plus",
+        "apple-tv-plus",
+        "appletvplus",
+        "apple_tv",
+        "apple-tv",
+        "apple",
+        "atp",
+        "itu",
+    },
+    "paramount_plus": {
+        "paramount_plus",
+        "paramount-plus",
+        "paramountplus",
+        "prm",
+        "pmnt",
+        "paramount",
+        "ppp",
+        "ppe",
+    },
 }
 
 _DEFAULT_TOP_QUERY_KEYWORDS = {

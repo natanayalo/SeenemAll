@@ -445,10 +445,15 @@ async def resolve_query_intent(
             for w in ("tv ", "tv show", "television", "miniseries", "sitcom")
         )
         if not has_tv_explicit:
-            if "tv" in media_type_filters:
-                media_type_filters = [m for m in media_type_filters if m != "tv"]
-            if intent.media_types and "tv" in intent.media_types:
+            media_type_filters = [m for m in media_type_filters if m != "tv"]
+            if not media_type_filters:
+                media_type_filters = ["movie"]
+            if intent.media_types:
                 intent.media_types = [m for m in intent.media_types if m != "tv"]
+                if not intent.media_types:
+                    intent.media_types = ["movie"]
+            else:
+                intent.media_types = ["movie"]
 
     language_filters = _unique_sequence(
         list(query_filter_result.languages) + list(llm_intent.languages or [])

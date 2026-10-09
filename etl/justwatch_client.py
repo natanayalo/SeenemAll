@@ -67,6 +67,8 @@ query TitleOffers(
           packageId
           shortName
           clearName
+          slug
+          technicalName
         }
       }
     }
@@ -251,7 +253,11 @@ def flatten_offers(offers: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
     prepared: List[Dict[str, Any]] = []
     for offer in offers:
         package = offer.get("package") or {}
-        service = package.get("shortName") or str(package.get("packageId") or "")
+        service = (
+            package.get("slug")
+            or package.get("shortName")
+            or str(package.get("packageId") or "")
+        )
         monetization = offer.get("monetizationType")
         if not service or not monetization:
             continue
@@ -267,6 +273,9 @@ def flatten_offers(offers: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "web_url": web_url,
                 "deeplink": offer.get("preAffiliatedStandardWebURL")
                 or offer.get("standardWebURL"),
+                "clear_name": package.get("clearName"),
+                "short_name": package.get("shortName"),
+                "package_id": package.get("packageId"),
             }
         )
     return prepared

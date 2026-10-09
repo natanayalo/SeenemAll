@@ -1,60 +1,60 @@
 {
-  "timestamp": "2026-10-03T22:46:00.687355+00:00",
+  "timestamp": "2026-10-09T23:11:38.327615+00:00",
   "backend": "elasticsearch",
   "config": "default",
   "k": 10,
   "aggregates": {
-    "precision": 0.19354838709677416,
-    "recall": 0.4725806451612903,
-    "map": 0.38340237570076274,
-    "ndcg": 0.4430057236653608,
-    "ild": 0.6086782359700724,
-    "unique_count": 469.0,
+    "precision": 0.19516129032258062,
+    "recall": 0.475,
+    "map": 0.38647722200141554,
+    "ndcg": 0.4465296680793782,
+    "ild": 0.611017692524624,
+    "unique_count": 463.0,
     "coverage_ratio": 0.0,
-    "gini": 0.14164145019636656,
-    "intent_alignment": 0.8949206349206349,
-    "latency_mean": 42.273687095955886,
-    "latency_p50": 4.369949994725175,
-    "latency_p95": 5.875030007155143,
+    "gini": 0.1488247547656223,
+    "intent_alignment": 0.928253968253968,
+    "latency_mean": 41.50238548402652,
+    "latency_p50": 4.249249999702442,
+    "latency_p95": 5.6420800039631995,
     "count": 62,
     "category_metrics": {
       "franchise": {
         "precision": 6.0,
         "recall": 12.833333333333334,
-        "map": 12.738888888888889,
-        "ndcg": 12.859282459276782,
-        "ild": 6.84062711894143,
-        "intent": 11.4,
+        "map": 12.715079365079365,
+        "ndcg": 12.85152455833516,
+        "ild": 6.951455085392,
+        "intent": 13.0,
         "intent_count": 13,
         "count": 13
       },
       "vibe": {
-        "precision": 1.9999999999999998,
-        "recall": 4.2,
-        "map": 2.1815903540903543,
-        "ndcg": 3.738313374041187,
-        "ild": 8.833958365891323,
-        "intent": 13.0,
+        "precision": 2.2,
+        "recall": 4.6000000000000005,
+        "map": 2.4272979797979803,
+        "ndcg": 4.10263748737151,
+        "ild": 8.834859183064495,
+        "intent": 12.850000000000001,
         "intent_count": 13,
         "count": 13
       },
       "constraint": {
         "precision": 0.6000000000000001,
         "recall": 1.0833333333333333,
-        "map": 0.9793447293447293,
+        "map": 0.9985754985754985,
         "ndcg": 1.4070124141455738,
-        "ild": 6.6150172414591735,
-        "intent": 10.466666666666667,
+        "ild": 6.6630039556040535,
+        "intent": 10.666666666666668,
         "intent_count": 11,
         "count": 13
       },
       "cold_start": {
-        "precision": 0.8999999999999999,
-        "recall": 2.666666666666667,
-        "map": 1.2070360195360195,
-        "ndcg": 1.8842683796263817,
-        "ild": 8.229058282353307,
-        "intent": 10.049999999999999,
+        "precision": 0.8,
+        "recall": 2.416666666666667,
+        "map": 1.1565476190476192,
+        "ndcg": 1.7461867209067594,
+        "ild": 8.205713014752012,
+        "intent": 10.1,
         "intent_count": 12,
         "count": 12
       },
@@ -73,8 +73,8 @@
         "recall": 3.0,
         "map": 2.333333333333333,
         "ndcg": 2.5,
-        "ild": 2.6185661364528814,
-        "intent": 2.35,
+        "ild": 2.627242212667742,
+        "intent": 2.65,
         "intent_count": 4,
         "count": 4
       },
@@ -101,9 +101,9 @@
       "recall@10": 1.0,
       "average_precision": 1.0,
       "ndcg@10": 1.0,
-      "ild@10": 0.4187458780616607,
-      "intent_alignment": 0.9,
-      "latency_ms": 2281.64
+      "ild@10": 0.44340328088751013,
+      "intent_alignment": 1.0,
+      "latency_ms": 2243.91
     },
     {
       "backend": "elasticsearch",
@@ -117,7 +117,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.47184688786149187,
       "intent_alignment": 1.0,
-      "latency_ms": 5.92
+      "latency_ms": 5.25
     },
     {
       "backend": "elasticsearch",
@@ -129,9 +129,9 @@
       "recall@10": 1.0,
       "average_precision": 1.0,
       "ndcg@10": 1.0,
-      "ild@10": 0.5610750349829317,
-      "intent_alignment": 0.8,
-      "latency_ms": 4.74
+      "ild@10": 0.6256035809346864,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.28
     },
     {
       "backend": "elasticsearch",
@@ -143,9 +143,9 @@
       "recall@10": 1.0,
       "average_precision": 1.0,
       "ndcg@10": 1.0,
-      "ild@10": 0.5110615892141379,
-      "intent_alignment": 0.7,
-      "latency_ms": 5.0
+      "ild@10": 0.5185736948322105,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.73
     },
     {
       "backend": "elasticsearch",
@@ -157,9 +157,9 @@
       "recall@10": 1.0,
       "average_precision": 1.0,
       "ndcg@10": 1.0,
-      "ild@10": 0.650414908029228,
+      "ild@10": 0.6316989990426003,
       "intent_alignment": 1.0,
-      "latency_ms": 5.03
+      "latency_ms": 4.75
     },
     {
       "backend": "elasticsearch",
@@ -173,7 +173,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.6448800687134746,
       "intent_alignment": 1.0,
-      "latency_ms": 3.9
+      "latency_ms": 4.0
     },
     {
       "backend": "elasticsearch",
@@ -185,9 +185,9 @@
       "recall@10": 1.0,
       "average_precision": 1.0,
       "ndcg@10": 1.0,
-      "ild@10": 0.5934802376416416,
-      "intent_alignment": 0.6,
-      "latency_ms": 4.62
+      "ild@10": 0.5853322107300724,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.55
     },
     {
       "backend": "elasticsearch",
@@ -199,9 +199,9 @@
       "recall@10": 1.0,
       "average_precision": 1.0,
       "ndcg@10": 1.0,
-      "ild@10": 0.5719250130220205,
-      "intent_alignment": 0.95,
-      "latency_ms": 5.0
+      "ild@10": 0.5880312158005959,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.8
     },
     {
       "backend": "elasticsearch",
@@ -213,9 +213,9 @@
       "recall@10": 0.8333333333333334,
       "average_precision": 0.7722222222222221,
       "ndcg@10": 0.8696762340896295,
-      "ild@10": 0.3232740623683165,
-      "intent_alignment": 0.9,
-      "latency_ms": 4.45
+      "ild@10": 0.34319109786576957,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.12
     },
     {
       "backend": "elasticsearch",
@@ -227,9 +227,9 @@
       "recall@10": 1.0,
       "average_precision": 1.0,
       "ndcg@10": 1.0,
-      "ild@10": 0.5413725503791909,
-      "intent_alignment": 0.85,
-      "latency_ms": 4.67
+      "ild@10": 0.5309300513846712,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.75
     },
     {
       "backend": "elasticsearch",
@@ -243,7 +243,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.5121223958509152,
       "intent_alignment": 1.0,
-      "latency_ms": 4.69
+      "latency_ms": 3.95
     },
     {
       "backend": "elasticsearch",
@@ -253,11 +253,11 @@
       "category": "franchise",
       "precision@10": 0.5,
       "recall@10": 1.0,
-      "average_precision": 0.9666666666666666,
-      "ndcg@10": 0.9896062251871525,
-      "ild@10": 0.41689009784977893,
+      "average_precision": 0.9428571428571428,
+      "ndcg@10": 0.9818483242455303,
+      "ild@10": 0.4168900978497791,
       "intent_alignment": 1.0,
-      "latency_ms": 4.97
+      "latency_ms": 5.24
     },
     {
       "backend": "elasticsearch",
@@ -269,9 +269,9 @@
       "recall@10": 1.0,
       "average_precision": 1.0,
       "ndcg@10": 1.0,
-      "ild@10": 0.6235383949666413,
-      "intent_alignment": 0.7,
-      "latency_ms": 4.98
+      "ild@10": 0.638951503638223,
+      "intent_alignment": 1.0,
+      "latency_ms": 3.69
     },
     {
       "backend": "elasticsearch",
@@ -281,11 +281,11 @@
       "category": "vibe",
       "precision@10": 0.2,
       "recall@10": 0.4,
-      "average_precision": 0.3432967032967033,
-      "ndcg@10": 0.4371994911049732,
-      "ild@10": 0.6978896471150854,
+      "average_precision": 0.3116883116883117,
+      "ndcg@10": 0.45221360703148816,
+      "ild@10": 0.6795549132821965,
       "intent_alignment": 1.0,
-      "latency_ms": 4.21
+      "latency_ms": 5.17
     },
     {
       "backend": "elasticsearch",
@@ -297,9 +297,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.677954123207702,
+      "ild@10": 0.6399845248729598,
       "intent_alignment": 1.0,
-      "latency_ms": 5.06
+      "latency_ms": 3.93
     },
     {
       "backend": "elasticsearch",
@@ -311,9 +311,9 @@
       "recall@10": 0.2,
       "average_precision": 0.2,
       "ndcg@10": 0.3391602052736161,
-      "ild@10": 0.666752640920614,
-      "intent_alignment": 1.0,
-      "latency_ms": 4.35
+      "ild@10": 0.7478625917452809,
+      "intent_alignment": 0.9,
+      "latency_ms": 4.83
     },
     {
       "backend": "elasticsearch",
@@ -325,9 +325,9 @@
       "recall@10": 0.5,
       "average_precision": 0.1875,
       "ndcg@10": 0.369453583111095,
-      "ild@10": 0.6386462041925158,
+      "ild@10": 0.6341571099758784,
       "intent_alignment": 1.0,
-      "latency_ms": 4.36
+      "latency_ms": 3.77
     },
     {
       "backend": "elasticsearch",
@@ -341,7 +341,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.7401454309377401,
       "intent_alignment": 1.0,
-      "latency_ms": 3.99
+      "latency_ms": 4.51
     },
     {
       "backend": "elasticsearch",
@@ -349,13 +349,13 @@
       "query": "surreal slow-burn psychological horror",
       "query_id": "q0018_2cd11e42",
       "category": "vibe",
-      "precision@10": 0.2,
-      "recall@10": 0.4,
-      "average_precision": 0.2,
-      "ndcg@10": 0.36005461457723403,
-      "ild@10": 0.6652511215224525,
+      "precision@10": 0.3,
+      "recall@10": 0.6,
+      "average_precision": 0.319047619047619,
+      "ndcg@10": 0.49661976912920763,
+      "ild@10": 0.6521837866839312,
       "intent_alignment": 1.0,
-      "latency_ms": 4.72
+      "latency_ms": 4.01
     },
     {
       "backend": "elasticsearch",
@@ -363,13 +363,13 @@
       "query": "feel-good road trip indie comedy",
       "query_id": "q0019_ca31b7c7",
       "category": "vibe",
-      "precision@10": 0.1,
-      "recall@10": 0.2,
-      "average_precision": 0.02857142857142857,
-      "ndcg@10": 0.11305340175787204,
-      "ild@10": 0.7614548648382814,
+      "precision@10": 0.2,
+      "recall@10": 0.4,
+      "average_precision": 0.06944444444444445,
+      "ndcg@10": 0.2090905274901754,
+      "ild@10": 0.7517114281352717,
       "intent_alignment": 1.0,
-      "latency_ms": 4.92
+      "latency_ms": 5.26
     },
     {
       "backend": "elasticsearch",
@@ -379,11 +379,11 @@
       "category": "vibe",
       "precision@10": 0.2,
       "recall@10": 0.4,
-      "average_precision": 0.09444444444444444,
-      "ndcg@10": 0.24816574496561808,
-      "ild@10": 0.681344778197585,
-      "intent_alignment": 1.0,
-      "latency_ms": 4.51
+      "average_precision": 0.11111111111111112,
+      "ndcg@10": 0.2716774977597197,
+      "ild@10": 0.7234355657924099,
+      "intent_alignment": 0.95,
+      "latency_ms": 4.05
     },
     {
       "backend": "elasticsearch",
@@ -391,13 +391,13 @@
       "query": "claustrophobic isolated survival thrillers",
       "query_id": "q0021_dd3d0353",
       "category": "vibe",
-      "precision@10": 0.2,
-      "recall@10": 0.4,
-      "average_precision": 0.24,
-      "ndcg@10": 0.4371994911049732,
-      "ild@10": 0.7188204416115288,
+      "precision@10": 0.1,
+      "recall@10": 0.2,
+      "average_precision": 0.2363636363636364,
+      "ndcg@10": 0.3391602052736161,
+      "ild@10": 0.7171897772427468,
       "intent_alignment": 1.0,
-      "latency_ms": 4.87
+      "latency_ms": 4.69
     },
     {
       "backend": "elasticsearch",
@@ -407,11 +407,11 @@
       "category": "vibe",
       "precision@10": 0.2,
       "recall@10": 0.4,
-      "average_precision": 0.08444444444444445,
-      "ndcg@10": 0.23330247263525344,
-      "ild@10": 0.6606729337945063,
+      "average_precision": 0.10714285714285714,
+      "ndcg@10": 0.2591217516005785,
+      "ild@10": 0.6121688983292232,
       "intent_alignment": 1.0,
-      "latency_ms": 4.51
+      "latency_ms": 4.5
     },
     {
       "backend": "elasticsearch",
@@ -423,9 +423,9 @@
       "recall@10": 0.5,
       "average_precision": 0.5,
       "ndcg@10": 0.6366824387328317,
-      "ild@10": 0.6218330966904795,
+      "ild@10": 0.6192696828895213,
       "intent_alignment": 1.0,
-      "latency_ms": 4.78
+      "latency_ms": 5.03
     },
     {
       "backend": "elasticsearch",
@@ -433,13 +433,13 @@
       "query": "philosophical hard science fiction",
       "query_id": "q0024_61a8a077",
       "category": "vibe",
-      "precision@10": 0.2,
-      "recall@10": 0.4,
-      "average_precision": 0.12333333333333334,
-      "ndcg@10": 0.2188505885308512,
-      "ild@10": 0.6433538032327554,
+      "precision@10": 0.3,
+      "recall@10": 0.6,
+      "average_precision": 0.205,
+      "ndcg@10": 0.384266559722312,
+      "ild@10": 0.6552957025544638,
       "intent_alignment": 1.0,
-      "latency_ms": 4.81
+      "latency_ms": 4.25
     },
     {
       "backend": "elasticsearch",
@@ -451,9 +451,9 @@
       "recall@10": 0.4,
       "average_precision": 0.18,
       "ndcg@10": 0.34519134224686937,
-      "ild@10": 0.6598392796300764,
+      "ild@10": 0.6618997706228718,
       "intent_alignment": 1.0,
-      "latency_ms": 4.93
+      "latency_ms": 4.69
     },
     {
       "backend": "elasticsearch",
@@ -466,8 +466,8 @@
       "average_precision": 0.0,
       "ndcg@10": 0.0,
       "ild@10": 0.0,
-      "intent_alignment": 0.6,
-      "latency_ms": 3.32
+      "intent_alignment": 0.8,
+      "latency_ms": 2.96
     },
     {
       "backend": "elasticsearch",
@@ -479,9 +479,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.7063473236836226,
+      "ild@10": 0.7244711591007984,
       "intent_alignment": 1.0,
-      "latency_ms": 4.44
+      "latency_ms": 4.09
     },
     {
       "backend": "elasticsearch",
@@ -495,7 +495,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.7177690984344116,
       "intent_alignment": 1.0,
-      "latency_ms": 4.33
+      "latency_ms": 3.79
     },
     {
       "backend": "elasticsearch",
@@ -509,7 +509,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.0,
       "intent_alignment": "",
-      "latency_ms": 32.06
+      "latency_ms": 29.78
     },
     {
       "backend": "elasticsearch",
@@ -523,7 +523,7 @@
       "ndcg@10": 0.3903800499921017,
       "ild@10": 0.5646975324608424,
       "intent_alignment": 1.0,
-      "latency_ms": 3.44
+      "latency_ms": 3.23
     },
     {
       "backend": "elasticsearch",
@@ -533,11 +533,11 @@
       "category": "constraint",
       "precision@10": 0.0,
       "recall@10": 0.0,
-      "average_precision": 0.0,
+      "average_precision": 0.019230769230769232,
       "ndcg@10": 0.0,
-      "ild@10": 0.6463797259129375,
+      "ild@10": 0.6762426046406417,
       "intent_alignment": 1.0,
-      "latency_ms": 4.4
+      "latency_ms": 5.66
     },
     {
       "backend": "elasticsearch",
@@ -551,7 +551,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.662340457006442,
       "intent_alignment": 1.0,
-      "latency_ms": 3.85
+      "latency_ms": 4.1
     },
     {
       "backend": "elasticsearch",
@@ -565,7 +565,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.7600346224984557,
       "intent_alignment": 0.9333333333333332,
-      "latency_ms": 4.81
+      "latency_ms": 4.47
     },
     {
       "backend": "elasticsearch",
@@ -579,7 +579,7 @@
       "ndcg@10": 0.6366824387328317,
       "ild@10": 0.5984290512874898,
       "intent_alignment": 0.9333333333333332,
-      "latency_ms": 3.83
+      "latency_ms": 3.81
     },
     {
       "backend": "elasticsearch",
@@ -593,7 +593,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.0,
       "intent_alignment": "",
-      "latency_ms": 49.12
+      "latency_ms": 48.45
     },
     {
       "backend": "elasticsearch",
@@ -607,7 +607,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.7279583884533035,
       "intent_alignment": 1.0,
-      "latency_ms": 4.33
+      "latency_ms": 4.64
     },
     {
       "backend": "elasticsearch",
@@ -621,7 +621,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.6643986818012282,
       "intent_alignment": 1.0,
-      "latency_ms": 4.26
+      "latency_ms": 3.68
     },
     {
       "backend": "elasticsearch",
@@ -635,7 +635,7 @@
       "ndcg@10": 0.37994992542064054,
       "ild@10": 0.5666623599204399,
       "intent_alignment": 1.0,
-      "latency_ms": 4.33
+      "latency_ms": 4.82
     },
     {
       "backend": "elasticsearch",
@@ -649,7 +649,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.6422955258057136,
       "intent_alignment": 0.65,
-      "latency_ms": 4.03
+      "latency_ms": 4.07
     },
     {
       "backend": "elasticsearch",
@@ -663,7 +663,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.6957024502660759,
       "intent_alignment": 0.0,
-      "latency_ms": 4.42
+      "latency_ms": 4.91
     },
     {
       "backend": "elasticsearch",
@@ -671,13 +671,13 @@
       "query": "cold_start: uplifting feel-good crowdpleasers",
       "query_id": "q0041_89d5e85a",
       "category": "cold_start",
-      "precision@10": 0.1,
-      "recall@10": 0.25,
-      "average_precision": 0.027777777777777776,
-      "ndcg@10": 0.11751610475642714,
-      "ild@10": 0.772577940934384,
+      "precision@10": 0.0,
+      "recall@10": 0.0,
+      "average_precision": 0.0,
+      "ndcg@10": 0.0,
+      "ild@10": 0.7337463310285688,
       "intent_alignment": 1.0,
-      "latency_ms": 4.24
+      "latency_ms": 4.12
     },
     {
       "backend": "elasticsearch",
@@ -691,7 +691,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.6710191170088828,
       "intent_alignment": 0.75,
-      "latency_ms": 4.19
+      "latency_ms": 4.69
     },
     {
       "backend": "elasticsearch",
@@ -701,11 +701,11 @@
       "category": "cold_start",
       "precision@10": 0.1,
       "recall@10": 0.25,
-      "average_precision": 0.09821428571428571,
+      "average_precision": 0.09583333333333333,
       "ndcg@10": 0.16812753627111746,
       "ild@10": 0.6525467171723954,
       "intent_alignment": 1.0,
-      "latency_ms": 4.03
+      "latency_ms": 3.87
     },
     {
       "backend": "elasticsearch",
@@ -717,9 +717,9 @@
       "recall@10": 0.0,
       "average_precision": 0.0,
       "ndcg@10": 0.0,
-      "ild@10": 0.6861217342738611,
+      "ild@10": 0.6503612780175093,
       "intent_alignment": 1.0,
-      "latency_ms": 4.02
+      "latency_ms": 4.46
     },
     {
       "backend": "elasticsearch",
@@ -733,7 +733,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.5906707311340057,
       "intent_alignment": 0.8,
-      "latency_ms": 4.77
+      "latency_ms": 4.2
     },
     {
       "backend": "elasticsearch",
@@ -745,9 +745,9 @@
       "recall@10": 0.5,
       "average_precision": 0.19642857142857142,
       "ndcg@10": 0.3764290720714305,
-      "ild@10": 0.6965639858602557,
+      "ild@10": 0.7009009931861633,
       "intent_alignment": 1.0,
-      "latency_ms": 4.36
+      "latency_ms": 4.42
     },
     {
       "backend": "elasticsearch",
@@ -761,7 +761,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.7049460842499522,
       "intent_alignment": 1.0,
-      "latency_ms": 4.3
+      "latency_ms": 3.88
     },
     {
       "backend": "elasticsearch",
@@ -775,7 +775,7 @@
       "ndcg@10": 0.8385465274895063,
       "ild@10": 0.7041569538830604,
       "intent_alignment": 0.9,
-      "latency_ms": 3.99
+      "latency_ms": 4.14
     },
     {
       "backend": "elasticsearch",
@@ -785,11 +785,11 @@
       "category": "cold_start",
       "precision@10": 0.1,
       "recall@10": 0.3333333333333333,
-      "average_precision": 0.08333333333333333,
-      "ndcg@10": 0.20210734650054757,
-      "ild@10": 0.6764263405700582,
-      "intent_alignment": 0.95,
-      "latency_ms": 4.38
+      "average_precision": 0.06666666666666667,
+      "ndcg@10": 0.18154179253735267,
+      "ild@10": 0.7169869258096169,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.02
     },
     {
       "backend": "elasticsearch",
@@ -799,11 +799,11 @@
       "category": "cold_start",
       "precision@10": 0.1,
       "recall@10": 0.3333333333333333,
-      "average_precision": 0.11794871794871796,
+      "average_precision": 0.11428571428571428,
       "ndcg@10": 0.18154179253735267,
-      "ild@10": 0.7360307011946603,
+      "ild@10": 0.7423799071900669,
       "intent_alignment": 1.0,
-      "latency_ms": 4.63
+      "latency_ms": 4.47
     },
     {
       "backend": "elasticsearch",
@@ -817,7 +817,7 @@
       "ndcg@10": 0.9828920819566879,
       "ild@10": 0.6859659923559527,
       "intent_alignment": 1.0,
-      "latency_ms": 3.36
+      "latency_ms": 3.47
     },
     {
       "backend": "elasticsearch",
@@ -831,7 +831,7 @@
       "ndcg@10": 0.7227265726449519,
       "ild@10": 0.5485248722742901,
       "intent_alignment": 1.0,
-      "latency_ms": 3.77
+      "latency_ms": 2.83
     },
     {
       "backend": "elasticsearch",
@@ -845,7 +845,7 @@
       "ndcg@10": 0.9267582364714126,
       "ild@10": 0.6036404826028784,
       "intent_alignment": 0.9285714285714286,
-      "latency_ms": 3.36
+      "latency_ms": 3.96
     },
     {
       "backend": "elasticsearch",
@@ -859,7 +859,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.7495875506125603,
       "intent_alignment": 1.0,
-      "latency_ms": 3.68
+      "latency_ms": 2.82
     },
     {
       "backend": "elasticsearch",
@@ -873,7 +873,7 @@
       "ndcg@10": 0.38268031849431083,
       "ild@10": 0.6482729685478336,
       "intent_alignment": 1.0,
-      "latency_ms": 3.67
+      "latency_ms": 4.07
     },
     {
       "backend": "elasticsearch",
@@ -885,9 +885,9 @@
       "recall@10": 1.0,
       "average_precision": 1.0,
       "ndcg@10": 1.0,
-      "ild@10": 0.6252499952229158,
-      "intent_alignment": 0.7,
-      "latency_ms": 5.04
+      "ild@10": 0.6339260714377762,
+      "intent_alignment": 1.0,
+      "latency_ms": 4.44
     },
     {
       "backend": "elasticsearch",
@@ -901,7 +901,7 @@
       "ndcg@10": 0.5,
       "ild@10": 0.6466845205939108,
       "intent_alignment": 0.75,
-      "latency_ms": 4.16
+      "latency_ms": 4.68
     },
     {
       "backend": "elasticsearch",
@@ -915,7 +915,7 @@
       "ndcg@10": 0.0,
       "ild@10": 0.6545181385020122,
       "intent_alignment": 0.0,
-      "latency_ms": 4.35
+      "latency_ms": 3.77
     },
     {
       "backend": "elasticsearch",
@@ -929,7 +929,7 @@
       "ndcg@10": 1.0,
       "ild@10": 0.6921134821340428,
       "intent_alignment": 0.9,
-      "latency_ms": 3.56
+      "latency_ms": 3.85
     },
     {
       "backend": "elasticsearch",
@@ -943,7 +943,7 @@
       "ndcg@10": 0.6131471927654584,
       "ild@10": 0.6071620824935136,
       "intent_alignment": 1.0,
-      "latency_ms": 4.35
+      "latency_ms": 3.58
     },
     {
       "backend": "elasticsearch",
@@ -957,7 +957,7 @@
       "ndcg@10": 0.44927383782962327,
       "ild@10": 0.7576695361593576,
       "intent_alignment": 0.5,
-      "latency_ms": 4.13
+      "latency_ms": 4.25
     }
   ]
 }

@@ -85,7 +85,12 @@ def _normalise_offer(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             "web_url": raw.get("web_url"),
         }
 
-    provider = raw.get("package_short_name") or raw.get("provider_id")
+    provider = (
+        raw.get("package_slug")
+        or raw.get("slug")
+        or raw.get("package_short_name")
+        or raw.get("provider_id")
+    )
     monetization = raw.get("monetization_type") or raw.get("presentation_type")
     if provider is None or monetization is None:
         return None
