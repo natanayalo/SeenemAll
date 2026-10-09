@@ -570,7 +570,11 @@ def score_candidates(
                 {
                     "service": opt["service"],
                     "url": opt["url"],
-                    "offer_type": opt.get("offer_type"),
+                    **(
+                        {"offer_type": opt["offer_type"]}
+                        if opt.get("offer_type") is not None
+                        else {}
+                    ),
                 }
                 for opt in watch_options
                 if opt.get("url") is not None

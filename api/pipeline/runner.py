@@ -74,11 +74,12 @@ class RecommendationPipeline:
             rerank_budget = (
                 max(params.limit, 25) if params.rerank is not False else params.limit
             )
+        diversity_limit = max(params.limit, rerank_budget)
         with timer("recommend.diversity_latency_ms"):
             diversified = apply_diversity_policies(
                 scored.ordered,
                 scored.serendipity_context,
-                limit=rerank_budget,
+                limit=diversity_limit,
                 diversify=params.diversify,
                 boost_ids=pool.boost_ids,
                 exempt_collection_ids=set(
@@ -91,16 +92,23 @@ class RecommendationPipeline:
             )
 
         # Stage 6: Presentation & Reranking
-        METRICS.histogram("recommend.rerank_candidate_count").observe(len(diversified))
+        to_rerank = (
+            diversified[:rerank_budget]
+            if rerank_budget < len(diversified)
+            else diversified
+        )
+        rest = diversified[rerank_budget:] if rerank_budget < len(diversified) else []
+        METRICS.histogram("recommend.rerank_candidate_count").observe(len(to_rerank))
         with timer("recommend.rerank_latency_ms"):
-            reranked = rerank_candidates(
-                diversified,
+            reranked_top = rerank_candidates(
+                to_rerank,
                 intent=intent.intent_filters,
                 query=params.query,
                 context=context,
                 rerank=params.rerank,
                 rerank_provider=params.rerank_provider,
             )
+        reranked = reranked_top + rest
 
         matched_coll_ids = set(getattr(intent, "matched_collection_ids", ()) or ())
         coll_item_ids = set(getattr(intent, "collection_item_ids", ()) or ())
@@ -176,15 +184,6 @@ class RecommendationPipeline:
                         )
                     )
                 reranked = franchise_items + other_items
-
-        # If rerank_budget evaluated fewer items than params.limit, append remaining candidates
-        # from scored.ordered so the downstream pool is not prematurely truncated below params.limit.
-        if len(reranked) < params.limit and len(scored.ordered) > len(reranked):
-            reranked_ids = {it["id"] for it in reranked if it.get("id") is not None}
-            remaining_pool = [
-                it for it in scored.ordered if it.get("id") not in reranked_ids
-            ]
-            reranked.extend(remaining_pool[: params.limit - len(reranked)])
 
         # Enrich any replacement items missing explanations (e.g. from serendipity slot insertion)
         missing_explanation = [it for it in reranked if not it.get("explanation")]

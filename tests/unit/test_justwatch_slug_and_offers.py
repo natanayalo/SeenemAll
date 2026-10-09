@@ -107,29 +107,82 @@ def test_default_aliases_include_slugs_and_shortcodes():
     assert "nfx" in netflix
 
 
-def test_watch_link_route_resolves_aliases_and_slugs(monkeypatch):
-    client = TestClient(app)
+class _MockWatchSession:
+    def __init__(self, services_map: dict[str, tuple[str | None, str | None]]):
+        self._services_map = services_map
 
-    # Test route parameters acceptance
-    resp = client.get("/watch-link/999999?service=amazon-prime-video&country=IL")
-    # Will return 404 because item 999999 doesn't exist, but endpoint executes validation successfully
-    assert resp.status_code == 404
-    assert resp.json()["detail"] == "Link not found"
+    def execute(self, statement, params=None):
+        from tests.helpers import FakeResult
+
+        compiled = statement.compile()
+        services_in_query = set()
+        for v in compiled.params.values():
+            if isinstance(v, (list, tuple, set)):
+                services_in_query.update(v)
+            elif isinstance(v, str):
+                services_in_query.add(v)
+
+        for srv, urls in self._services_map.items():
+            if srv in services_in_query:
+                return FakeResult([urls])
+        return FakeResult([])
+
+
+def test_watch_link_route_resolves_aliases_and_slugs(monkeypatch):
+    from api.db.session import get_db
+
+    session = _MockWatchSession(
+        {"amazon-prime-video": (None, "https://primevideo.com/watch")}
+    )
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            resp = client.get(
+                "/watch-link/999999?service=amazon-prime-video&country=IL",
+                follow_redirects=False,
+            )
+            assert resp.status_code == 307
+            assert resp.headers["location"] == "https://primevideo.com/watch"
+
+            resp_404 = client.get(
+                "/watch-link/999999?service=unknown-service&country=IL"
+            )
+            assert resp_404.status_code == 404
+            assert resp_404.json()["detail"] == "Link not found"
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_apple_tv_plus_does_not_redirect_to_apple_tv_store():
-    # If a movie only has apple-tv (store) available, requesting apple-tv-plus must not redirect to it
-    client = TestClient(app)
-    # Item 383 (The Terminator) has apple-tv and netflix in IL, but NOT apple-tv-plus
-    resp = client.get("/watch-link/383?service=apple-tv-plus&country=IL")
-    assert resp.status_code == 404
-    assert resp.json()["detail"] == "Link not found"
+    from api.db.session import get_db
 
-    resp_store = client.get(
-        "/watch-link/383?service=apple-tv&country=IL", follow_redirects=False
-    )
-    assert resp_store.status_code == 307
-    assert "apple.com" in resp_store.headers["location"]
+    # If a movie only has apple-tv (store) available, requesting apple-tv-plus must not redirect to it
+    session = _MockWatchSession({"apple-tv": (None, "https://apple.com/store/383")})
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            # Requesting apple-tv-plus must NOT match apple-tv store row
+            resp = client.get("/watch-link/383?service=apple-tv-plus&country=IL")
+            assert resp.status_code == 404
+            assert resp.json()["detail"] == "Link not found"
+
+            # Requesting apple-tv matches apple-tv store row
+            resp_store = client.get(
+                "/watch-link/383?service=apple-tv&country=IL",
+                follow_redirects=False,
+            )
+            assert resp_store.status_code == 307
+            assert "apple.com" in resp_store.headers["location"]
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_score_candidates_preserves_offer_type():
