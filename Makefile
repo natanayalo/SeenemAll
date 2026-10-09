@@ -1,4 +1,4 @@
-.PHONY: up down logs sh migrate rev head alembic-init etl-tmdb embed etl-justwatch eval eval-baseline eval-benchmark eval-ab eval-report es-setup es-sync
+.PHONY: up down logs sh migrate rev head alembic-init etl-tmdb embed etl-justwatch eval eval-baseline eval-benchmark eval-ab eval-report eval-v2 eval-v2-quick eval-v2-promotion eval-v2-judge-benchmark eval-v2-baseline es-setup es-sync
 
 EVAL_PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,python)
 
@@ -49,6 +49,21 @@ eval-benchmark:
 
 eval-ab:
 	$(EVAL_PYTHON) -m evaluation.evaluate --ab-compare --baseline-file evaluation/baseline.json --candidate default --backend elasticsearch --k=10 --set evaluation/evaluation_set.json
+
+eval-v2-baseline:
+	$(EVAL_PYTHON) -m evaluation.evaluate --v2 --split full --config $(if $(CONFIG),$(CONFIG),default) --backend elasticsearch --save-v2-baseline "$(if $(BASELINE),$(BASELINE),evaluation/baseline_v2.json)" --v2-report evaluation/artifacts/production_v2_report.json
+
+eval-v2:
+	$(EVAL_PYTHON) -m evaluation.evaluate --v2 --split $(if $(SPLIT),$(SPLIT),dev) --baseline-file "$(if $(BASELINE),$(BASELINE),evaluation/baseline_v2.json)" --candidate $(if $(CONFIG),$(CONFIG),default) --backend elasticsearch
+
+eval-v2-quick:
+	$(EVAL_PYTHON) -m evaluation.evaluate --v2 --quick-dev --baseline-file "$(if $(BASELINE),$(BASELINE),evaluation/baseline_v2.json)" --candidate $(if $(CONFIG),$(CONFIG),default) --backend elasticsearch
+
+eval-v2-promotion:
+	$(EVAL_PYTHON) -m evaluation.evaluate --v2 --split regression --baseline-file "$(if $(BASELINE),$(BASELINE),evaluation/baseline_v2.json)" --candidate $(if $(CONFIG),$(CONFIG),default) --backend elasticsearch
+
+eval-v2-judge-benchmark:
+	$(EVAL_PYTHON) -m evaluation.judge.throughput --output evaluation/artifacts/judge_workers.json
 
 eval-report:
 	@if [ -f evaluation/evaluation_set.titles.json ]; then \

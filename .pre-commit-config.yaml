@@ -4,6 +4,9 @@ repos:
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
+        # Preserve the byte identity of the previously frozen qrels snapshot.
+
+        exclude: ^evaluation/qrels/qrels_v2\.0\.json$
       - id: check-merge-conflict
       - id: check-yaml
       - id: check-json

@@ -99,6 +99,7 @@
 - Computes Precision@K, Recall@K, MAP, nDCG@K; writes per-rank and summary CSVs
 - Generates Evidently ranking reports (`evaluation/report.html`)
 - Driven by CLI (`python -m evaluation.evaluate`) and make targets (`make eval`, `make eval-report`)
+- Evaluation-v2 uses qualified Nimble judgments and frozen catalog evidence. Its product splits contain 51 development queries, 50 regression queries, and 101 queries in the full split. See `docs/evaluation_v2_baseline.md` for production-reference capture and comparison.
 
 ---
 
@@ -111,11 +112,14 @@ Every feature, model upgrade, or ranking pipeline adjustment must follow this ve
    - Run: `pytest --cov=api --cov-report=term-missing`
 
 2. **Quality Evaluation & Counterfactual A/B Testing:**
+   - For evaluation-v2, compare against `evaluation/baseline_v2.json` using `--v2 --baseline-file evaluation/baseline_v2.json --candidate <your_config> --backend elasticsearch --split full`. Use the development subset for iteration. The reference records current production, including unresolved evidence and quality defects; it does not waive the comparison gates.
+   - Measure v2 latency with both configurations under the same warm-model, result-cache-cold conditions. Historical cached timing snapshots do not establish a latency regression.
    - Benchmark candidate configuration against stored baseline across the 62 golden queries.
    - Run A/B evaluation: `python -m evaluation.evaluate --ab-compare --baseline-file evaluation/baseline.json --candidate <your_config> --backend elasticsearch` (or `make eval-ab`)
    - Verify automated regression gate: `python -m evaluation.evaluate --benchmark --k 10 --candidate <your_config>`
 
 3. **Store New Baseline Snapshot (When Establishing New Standards):**
+   - When migrating the measurement contract, record current production as a separate v2 reference with `--v2 --split full --config default --backend elasticsearch --save-v2-baseline evaluation/baseline_v2.json`. Preserve the legacy snapshot for history. Use a new filename for subsequent immutable v2 references; recording a reference is separate from promoting a better configuration.
    - When a feature improves recommendation metrics and sets a new production baseline (e.g., Cross-Encoder reranking), record the new baseline snapshot:
      ```bash
      # Save new baseline snapshot

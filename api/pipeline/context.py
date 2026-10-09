@@ -262,18 +262,38 @@ def get_cache_key(canonical_id: str, params: RecommendParams) -> str:
     return f"{canonical_id}:{hashed}"
 
 
-def load_user_context(db: Session, user_id: str, profile: str | None) -> UserContext:
+def load_user_context(
+    db: Session,
+    user_id: str,
+    profile: str | None,
+    mask_preferences: bool = False,
+) -> UserContext:
     canonical_id = canonical_profile_id(user_id, profile)
     loader = get_hook("load_user_state", load_user_state)
     long_v, short_v, exclude, profile_meta = loader(db, canonical_id)
     exclude_set: Set[int] = set(exclude or [])
-    cold_start = short_v is None
+
+    if mask_preferences:
+        # Mask preference vectors and taste clusters for counterfactual comparison
+        # while strictly preserving user seen/disliked exclusions
+        long_v = None
+        short_v = None
+        taste_clusters: List[Any] = []
+        profile_meta = {
+            key: value
+            for key, value in (profile_meta or {}).items()
+            if key not in {"taste_clusters", "genre_prefs", "neighbors"}
+        }
+        cold_start = True
+    else:
+        cold_start = short_v is None
+        taste_clusters = (profile_meta or {}).get("taste_clusters") or []
+
     if cold_start:
         METRICS.counter("recommend.cold_start").inc()
 
     provider_alias_map = get_streaming_alias_map(db)
     top_query_keywords = get_top_query_keywords(db)
-    taste_clusters = (profile_meta or {}).get("taste_clusters") or []
 
     return UserContext(
         canonical_id=canonical_id,
@@ -297,6 +317,10 @@ async def get_or_compute_recommendations(
     canonical_id: str,
     compute_fn: Any,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any] | None]:
+    if getattr(params, "bypass_cache", False):
+        result = await compute_fn(request, params, db)
+        return result.items, result.debug_context
+
     cache_key = get_cache_key(canonical_id, params)
     cached = cache_get(cache_key)
 

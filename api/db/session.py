@@ -72,7 +72,16 @@ def _attach_sql_logging(engine):
 
 def init_engine():
     global _engine, _SessionLocal
-    db_url = os.getenv("DATABASE_URL", "postgresql+psycopg2://app:app@db:5432/reco")
+    db_url = os.getenv("EVAL_DB_DSN") or os.getenv(
+        "DATABASE_URL", "postgresql+psycopg2://app:app@db:5432/reco"
+    )
+    if "@db:" in db_url:
+        import socket
+
+        try:
+            socket.gethostbyname("db")
+        except (socket.gaierror, OSError):
+            db_url = db_url.replace("@db:", "@localhost:")
     _engine = create_engine(db_url, pool_pre_ping=True, future=True)
     _attach_sql_logging(_engine)
     _SessionLocal = sessionmaker(

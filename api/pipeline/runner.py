@@ -8,6 +8,7 @@ from fastapi import Request
 from sqlalchemy.orm import Session
 
 from api.core.metrics import METRICS, timer
+from api.core.inference_metrics import inference_request, InferenceCollector
 from api.pipeline.context import load_user_context
 from api.pipeline.diversity import apply_diversity_policies
 from api.pipeline.intent import resolve_query_intent
@@ -26,11 +27,22 @@ class RecommendationPipeline:
         params: RecommendParams,
         db: Session,
     ) -> ComputeResult:
+        with inference_request() as collector:
+            return await self._run(request, params, db, collector)
+
+    async def _run(
+        self, request, params, db, collector: InferenceCollector
+    ) -> ComputeResult:
         _pipeline_start = time.perf_counter()
 
         # Stage 1: Context Resolution
         with timer("recommend.context_latency_ms"):
-            context = load_user_context(db, params.user_id, params.profile)
+            context = load_user_context(
+                db,
+                params.user_id,
+                params.profile,
+                mask_preferences=getattr(params, "mask_preferences", False),
+            )
 
         # Stage 2: Query Understanding
         with timer("recommend.intent_latency_ms"):
@@ -112,6 +124,7 @@ class RecommendationPipeline:
 
         debug_snapshot: Dict[str, Any] | None = None
         if params.debug:
+            inf_stats = collector.snapshot()
             debug_snapshot = build_debug_snapshot(
                 db=db,
                 allowlist=pool.prefilter.allowed_ids,
@@ -123,6 +136,11 @@ class RecommendationPipeline:
                 neighbors_count=len(context.profile_meta.get("neighbors") or []),
                 cold_start=context.cold_start,
                 pipeline_ms=pipeline_ms,
+                actual_inferences_performed=inf_stats.get(
+                    "actual_inferences_performed", 0
+                ),
+                cache_hits=inf_stats.get("cache_hits", 0),
+                inference_stats=inf_stats,
             )
 
         return ComputeResult(items=reranked, debug_context=debug_snapshot or {})

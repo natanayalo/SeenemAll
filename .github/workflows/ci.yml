@@ -37,6 +37,8 @@ jobs:
     needs: lint
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -55,6 +57,8 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: python -m pytest
+      - name: Check coverage of changed modules
+        run: python -m evaluation.coverage_gate --base "${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"
   openvino:
     name: "⚡ OpenVINO compatibility"
     runs-on: ubuntu-latest

@@ -1,0 +1,20 @@
+{
+  "version": "v1",
+  "scope": "Focused sufficiency diagnostic; expectations are not sent to the model and do not establish qualification",
+  "cases": [
+    {"case_id": "matrix_membership", "query": "The Matrix collection", "typed_id": "movie:603", "expected_sufficient": {"v2.2": true, "v2.3": true}, "minimum_grade": 2},
+    {"case_id": "star_wars_membership", "query": "Star Wars chronological", "typed_id": "movie:11", "expected_sufficient": {"v2.2": true, "v2.3": true}, "minimum_grade": 2},
+    {"case_id": "jedi_membership", "query": "Star Wars chronological", "typed_id": "movie:1892", "expected_sufficient": {"v2.2": true, "v2.3": true}, "minimum_grade": 2},
+    {"case_id": "toy_story_membership", "query": "Toy Story collection chronologically", "typed_id": "movie:301528", "expected_sufficient": {"v2.2": true, "v2.3": true}, "minimum_grade": 2},
+    {"case_id": "predator_year_and_genre", "query": "sci-fi movies released between 1980 and 1989", "typed_id": "movie:106", "expected_sufficient": {"v2.2": true, "v2.3": true}, "minimum_grade": 2},
+    {"case_id": "known_year_mismatch", "query": "sci-fi movies released between 1980 and 1989", "typed_id": "movie:603", "expected_sufficient": {"v2.2": true, "v2.3": true}, "maximum_grade": 0},
+    {"case_id": "known_language_mismatch", "query": "French-language science-fiction movies", "typed_id": "movie:106", "expected_sufficient": {"v2.2": true, "v2.3": true}, "maximum_grade": 0},
+    {"case_id": "known_runtime_mismatch", "query": "science-fiction movies under 90 minutes", "typed_id": "movie:106", "expected_sufficient": {"v2.2": true, "v2.3": true}, "maximum_grade": 0},
+    {"case_id": "ghibli_studio", "query": "Hayao Miyazaki Studio Ghibli animated movies", "typed_id": "movie:8392", "expected_sufficient": {"v2.2": false, "v2.3": true}, "minimum_grade": 2},
+    {"case_id": "netflix_il_offer", "query": "Japanese animated movies on Netflix in Israel", "typed_id": "movie:8392", "expected_sufficient": {"v2.2": false, "v2.3": true}, "minimum_grade": 2},
+    {"case_id": "academy_award", "query": "Academy Award Best Picture-winning dramas", "typed_id": "movie:453", "expected_sufficient": {"v2.2": false, "v2.3": true}, "minimum_grade": 2},
+    {"case_id": "award_and_provider", "query": "Oscar-winning dramas on Netflix in Israel", "typed_id": "movie:453", "expected_sufficient": {"v2.2": false, "v2.3": true}, "minimum_grade": 2},
+    {"case_id": "unknown_country", "query": "Oscar-winning dramas on Netflix in Canada", "typed_id": "movie:453", "expected_sufficient": {"v2.2": false, "v2.3": false}},
+    {"case_id": "unknown_award", "query": "Academy Award Best Picture-winning science-fiction movies", "typed_id": "movie:106", "expected_sufficient": {"v2.2": false, "v2.3": false}}
+  ]
+}

@@ -1,0 +1,2168 @@
+{
+  "schema": "seenemall.judge-throughput.v1",
+  "diagnostic_only": true,
+  "qualification_changed": false,
+  "judgment_cache_used": false,
+  "judge_fingerprint": "1f005ca2ac68f282d51b2dd9ccc9a8ded5b01a34c0dd8e25e25888e2ecd860cd",
+  "artifact_verified_after_run": true,
+  "distinct_pairs": 14,
+  "repeats": 2,
+  "native_requests": 85,
+  "recommended_workers": 4,
+  "input_manifest_sha256": "a09266a9144bd83497ccbcc24ef81621f4a28043ac3f7ff286e1dee89b74d0cf",
+  "measurements": [
+    {
+      "workers": 1,
+      "requests": 28,
+      "elapsed_seconds": 144.06645110005047,
+      "pairs_per_second": 0.1943547563377869,
+      "execution_failures": 0,
+      "decision_agreement": 1.0,
+      "repeatable": true,
+      "eligible": true
+    },
+    {
+      "workers": 2,
+      "requests": 28,
+      "elapsed_seconds": 118.37379870004952,
+      "pairs_per_second": 0.23653883129111988,
+      "execution_failures": 0,
+      "decision_agreement": 1.0,
+      "repeatable": true,
+      "eligible": true
+    },
+    {
+      "workers": 4,
+      "requests": 28,
+      "elapsed_seconds": 110.89199530007318,
+      "pairs_per_second": 0.2524979366114943,
+      "execution_failures": 0,
+      "decision_agreement": 1.0,
+      "repeatable": true,
+      "eligible": true
+    }
+  ],
+  "raw_outputs": [
+    {
+      "workers": 1,
+      "outputs": [
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.0062056006710617196,
+            "1": 0.01992917558819249,
+            "2": 0.6171563835147724,
+            "3": 0.35670884022597343
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.3244,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "4bc4e68448f63434b0c268b1b77c25f1f42a47b06b297c40166a490eb89560f0"
+          },
+          "evidence_sufficiency_probability": 0.6559010046821244
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.005206930295201149,
+            "1": 0.015105417994809672,
+            "2": 0.9506694318509175,
+            "3": 0.0290182198590718
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.0035,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "1b66052799608a2417b3decd991b7f0d04906fec9ee1f7600e3ebdd323216b80"
+          },
+          "evidence_sufficiency_probability": 0.4900563954418168
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.005070331966263358,
+            "1": 0.03050485650396608,
+            "2": 0.6266623091373683,
+            "3": 0.33776250239240224
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.2971,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "2520174518d2679152126da5f49128819dc479c5a67eb3ae4f5a4254908d860f"
+          },
+          "evidence_sufficiency_probability": 0.7066002568992329
+        },
+        {
+          "grade": 1,
+          "probabilities": {
+            "0": 0.3443674107395898,
+            "1": 0.5918127117575931,
+            "2": 0.060043771670167195,
+            "3": 0.0037761058326498793
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.7232,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.7490011752828177
+        },
+        {
+          "grade": 1,
+          "probabilities": {
+            "0": 0.26196373219745706,
+            "1": 0.6799489642378066,
+            "2": 0.052439227247575486,
+            "3": 0.0056480763171609
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.8018,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.804428740981946
+        },
+        {
+          "grade": 0,
+          "probabilities": {
+            "0": 0.5561508587244759,
+            "1": 0.424607440615624,
+            "2": 0.014928501708645767,
+            "3": 0.004313198951254387
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.4674,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.7042872888244431
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0011135311967449687,
+            "1": 0.006930104186418153,
+            "2": 0.1504905882766654,
+            "3": 0.8414657763401715
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.8323,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "e4d3b6806b6838dec7ec1f6442f946534cd976063ef294f8f320f74662cdaf96"
+          },
+          "evidence_sufficiency_probability": 0.38283520350256073
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0006351659547210118,
+            "1": 0.009040318320918844,
+            "2": 0.47247174944460296,
+            "3": 0.5178527662797572
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.5075,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "59eaadad54d24e61ffbb0766ee500a11ce9cfd3cfc7f8c66763b135759fd92d0"
+          },
+          "evidence_sufficiency_probability": 0.8238006804325324
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.00036648432137511276,
+            "1": 0.0041449160288795275,
+            "2": 0.07576443519995747,
+            "3": 0.919724164449788
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.9148,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "3b1166f9f21859d7fbb152f3bb346a4bd720e171c6686bd94725553d59eefc9e"
+          },
+          "evidence_sufficiency_probability": 0.7997284038107897
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0008664476579498896,
+            "1": 0.009711275736092177,
+            "2": 0.36762143980575884,
+            "3": 0.6218008368001992
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.6104,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "cdd25e93bad95118b48f4d5f882bc1ab0d76851084777e80be8b72e406340574"
+          },
+          "evidence_sufficiency_probability": 0.7863230270192001
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.001332275646351931,
+            "1": 0.006866897520060481,
+            "2": 0.3835474187461328,
+            "3": 0.6082534080874548
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.5987,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "5c3cbaecc373db09eac9dfbfcce9e8a1402a5ebfea2f2ca496b81fff6f58f7b7"
+          },
+          "evidence_sufficiency_probability": 0.4133217388460857
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0013897466958459489,
+            "1": 0.011327610362546498,
+            "2": 0.4433253006881514,
+            "3": 0.5439573422534562
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.5299,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "38c95149fcbd8b22d9975023619f295f6db294ac0e31837bbca5db47642411eb"
+          },
+          "evidence_sufficiency_probability": 0.5295884203159812
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.002775938397880275,
+            "1": 0.01722154602502972,
+            "2": 0.29358958371426397,
+            "3": 0.6864129318628261
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.6636,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "82ace5af177bc226020e09556797ee5adb704e1538375e93bc2f0d2bb1928b5c"
+          },
+          "evidence_sufficiency_probability": 0.6703840859425779
+        },
+        {
+          "grade": 0,
+          "probabilities": {
+            "0": 0.9559734212136825,
+            "1": 0.04336627426781771,
+            "2": 0.00015136817174804144,
+            "3": 0.0005089363467518257
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.0452,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "a2496ab5e13865a302c5a8be3e17c71ba962eb9bb635e449fe32da8f5750f6ce"
+          },
+          "evidence_sufficiency_probability": 0.9614032223742562
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.0062056006710617196,
+            "1": 0.01992917558819249,
+            "2": 0.6171563835147724,
+            "3": 0.35670884022597343
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.3244,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "4bc4e68448f63434b0c268b1b77c25f1f42a47b06b297c40166a490eb89560f0"
+          },
+          "evidence_sufficiency_probability": 0.6559010046821244
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.005206930295201149,
+            "1": 0.015105417994809672,
+            "2": 0.9506694318509175,
+            "3": 0.0290182198590718
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.0035,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "1b66052799608a2417b3decd991b7f0d04906fec9ee1f7600e3ebdd323216b80"
+          },
+          "evidence_sufficiency_probability": 0.4900563954418168
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.005070331966263358,
+            "1": 0.03050485650396608,
+            "2": 0.6266623091373683,
+            "3": 0.33776250239240224
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.2971,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "2520174518d2679152126da5f49128819dc479c5a67eb3ae4f5a4254908d860f"
+          },
+          "evidence_sufficiency_probability": 0.7066002568992329
+        },
+        {
+          "grade": 1,
+          "probabilities": {
+            "0": 0.3443674107395898,
+            "1": 0.5918127117575931,
+            "2": 0.060043771670167195,
+            "3": 0.0037761058326498793
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.7232,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.7490011752828177
+        },
+        {
+          "grade": 1,
+          "probabilities": {
+            "0": 0.26196373219745706,
+            "1": 0.6799489642378066,
+            "2": 0.052439227247575486,
+            "3": 0.0056480763171609
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.8018,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.804428740981946
+        },
+        {
+          "grade": 0,
+          "probabilities": {
+            "0": 0.5561508587244759,
+            "1": 0.424607440615624,
+            "2": 0.014928501708645767,
+            "3": 0.004313198951254387
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.4674,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.7042872888244431
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0011135311967449687,
+            "1": 0.006930104186418153,
+            "2": 0.1504905882766654,
+            "3": 0.8414657763401715
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.8323,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "e4d3b6806b6838dec7ec1f6442f946534cd976063ef294f8f320f74662cdaf96"
+          },
+          "evidence_sufficiency_probability": 0.38283520350256073
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0006351659547210118,
+            "1": 0.009040318320918844,
+            "2": 0.47247174944460296,
+            "3": 0.5178527662797572
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.5075,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "59eaadad54d24e61ffbb0766ee500a11ce9cfd3cfc7f8c66763b135759fd92d0"
+          },
+          "evidence_sufficiency_probability": 0.8238006804325324
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.00036648432137511276,
+            "1": 0.0041449160288795275,
+            "2": 0.07576443519995747,
+            "3": 0.919724164449788
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.9148,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "3b1166f9f21859d7fbb152f3bb346a4bd720e171c6686bd94725553d59eefc9e"
+          },
+          "evidence_sufficiency_probability": 0.7997284038107897
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0008664476579498896,
+            "1": 0.009711275736092177,
+            "2": 0.36762143980575884,
+            "3": 0.6218008368001992
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.6104,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "cdd25e93bad95118b48f4d5f882bc1ab0d76851084777e80be8b72e406340574"
+          },
+          "evidence_sufficiency_probability": 0.7863230270192001
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.001332275646351931,
+            "1": 0.006866897520060481,
+            "2": 0.3835474187461328,
+            "3": 0.6082534080874548
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.5987,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "5c3cbaecc373db09eac9dfbfcce9e8a1402a5ebfea2f2ca496b81fff6f58f7b7"
+          },
+          "evidence_sufficiency_probability": 0.4133217388460857
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0013897466958459489,
+            "1": 0.011327610362546498,
+            "2": 0.4433253006881514,
+            "3": 0.5439573422534562
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.5299,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "38c95149fcbd8b22d9975023619f295f6db294ac0e31837bbca5db47642411eb"
+          },
+          "evidence_sufficiency_probability": 0.5295884203159812
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.002775938397880275,
+            "1": 0.01722154602502972,
+            "2": 0.29358958371426397,
+            "3": 0.6864129318628261
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.6636,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "82ace5af177bc226020e09556797ee5adb704e1538375e93bc2f0d2bb1928b5c"
+          },
+          "evidence_sufficiency_probability": 0.6703840859425779
+        },
+        {
+          "grade": 0,
+          "probabilities": {
+            "0": 0.9559734212136825,
+            "1": 0.04336627426781771,
+            "2": 0.00015136817174804144,
+            "3": 0.0005089363467518257
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.0452,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "a2496ab5e13865a302c5a8be3e17c71ba962eb9bb635e449fe32da8f5750f6ce"
+          },
+          "evidence_sufficiency_probability": 0.9614032223742562
+        }
+      ]
+    },
+    {
+      "workers": 2,
+      "outputs": [
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.0062056006710617196,
+            "1": 0.01992917558819249,
+            "2": 0.6171563835147724,
+            "3": 0.35670884022597343
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.3244,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "4bc4e68448f63434b0c268b1b77c25f1f42a47b06b297c40166a490eb89560f0"
+          },
+          "evidence_sufficiency_probability": 0.6559010046821244
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.005206930295201149,
+            "1": 0.015105417994809672,
+            "2": 0.9506694318509175,
+            "3": 0.0290182198590718
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.0035,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "1b66052799608a2417b3decd991b7f0d04906fec9ee1f7600e3ebdd323216b80"
+          },
+          "evidence_sufficiency_probability": 0.4900563954418168
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.005070331966263358,
+            "1": 0.03050485650396608,
+            "2": 0.6266623091373683,
+            "3": 0.33776250239240224
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.2971,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "2520174518d2679152126da5f49128819dc479c5a67eb3ae4f5a4254908d860f"
+          },
+          "evidence_sufficiency_probability": 0.7066002568992329
+        },
+        {
+          "grade": 1,
+          "probabilities": {
+            "0": 0.3443674107395898,
+            "1": 0.5918127117575931,
+            "2": 0.060043771670167195,
+            "3": 0.0037761058326498793
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.7232,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.7490011752828177
+        },
+        {
+          "grade": 1,
+          "probabilities": {
+            "0": 0.26196373219745706,
+            "1": 0.6799489642378066,
+            "2": 0.052439227247575486,
+            "3": 0.0056480763171609
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.8018,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.804428740981946
+        },
+        {
+          "grade": 0,
+          "probabilities": {
+            "0": 0.5561508587244759,
+            "1": 0.424607440615624,
+            "2": 0.014928501708645767,
+            "3": 0.004313198951254387
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.4674,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.7042872888244431
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0011135311967449687,
+            "1": 0.006930104186418153,
+            "2": 0.1504905882766654,
+            "3": 0.8414657763401715
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.8323,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "e4d3b6806b6838dec7ec1f6442f946534cd976063ef294f8f320f74662cdaf96"
+          },
+          "evidence_sufficiency_probability": 0.38283520350256073
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0006351659547210118,
+            "1": 0.009040318320918844,
+            "2": 0.47247174944460296,
+            "3": 0.5178527662797572
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.5075,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "59eaadad54d24e61ffbb0766ee500a11ce9cfd3cfc7f8c66763b135759fd92d0"
+          },
+          "evidence_sufficiency_probability": 0.8238006804325324
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.00036648432137511276,
+            "1": 0.0041449160288795275,
+            "2": 0.07576443519995747,
+            "3": 0.919724164449788
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.9148,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "3b1166f9f21859d7fbb152f3bb346a4bd720e171c6686bd94725553d59eefc9e"
+          },
+          "evidence_sufficiency_probability": 0.7997284038107897
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0008664476579498896,
+            "1": 0.009711275736092177,
+            "2": 0.36762143980575884,
+            "3": 0.6218008368001992
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.6104,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "cdd25e93bad95118b48f4d5f882bc1ab0d76851084777e80be8b72e406340574"
+          },
+          "evidence_sufficiency_probability": 0.7863230270192001
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.001332275646351931,
+            "1": 0.006866897520060481,
+            "2": 0.3835474187461328,
+            "3": 0.6082534080874548
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.5987,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "5c3cbaecc373db09eac9dfbfcce9e8a1402a5ebfea2f2ca496b81fff6f58f7b7"
+          },
+          "evidence_sufficiency_probability": 0.4133217388460857
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0013897466958459489,
+            "1": 0.011327610362546498,
+            "2": 0.4433253006881514,
+            "3": 0.5439573422534562
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.5299,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "38c95149fcbd8b22d9975023619f295f6db294ac0e31837bbca5db47642411eb"
+          },
+          "evidence_sufficiency_probability": 0.5295884203159812
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.002775938397880275,
+            "1": 0.01722154602502972,
+            "2": 0.29358958371426397,
+            "3": 0.6864129318628261
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.6636,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "82ace5af177bc226020e09556797ee5adb704e1538375e93bc2f0d2bb1928b5c"
+          },
+          "evidence_sufficiency_probability": 0.6703840859425779
+        },
+        {
+          "grade": 0,
+          "probabilities": {
+            "0": 0.9559734212136825,
+            "1": 0.04336627426781771,
+            "2": 0.00015136817174804144,
+            "3": 0.0005089363467518257
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.0452,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "a2496ab5e13865a302c5a8be3e17c71ba962eb9bb635e449fe32da8f5750f6ce"
+          },
+          "evidence_sufficiency_probability": 0.9614032223742562
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.0062056006710617196,
+            "1": 0.01992917558819249,
+            "2": 0.6171563835147724,
+            "3": 0.35670884022597343
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.3244,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "4bc4e68448f63434b0c268b1b77c25f1f42a47b06b297c40166a490eb89560f0"
+          },
+          "evidence_sufficiency_probability": 0.6559010046821244
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.005206930295201149,
+            "1": 0.015105417994809672,
+            "2": 0.9506694318509175,
+            "3": 0.0290182198590718
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.0035,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "1b66052799608a2417b3decd991b7f0d04906fec9ee1f7600e3ebdd323216b80"
+          },
+          "evidence_sufficiency_probability": 0.4900563954418168
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.005070331966263358,
+            "1": 0.03050485650396608,
+            "2": 0.6266623091373683,
+            "3": 0.33776250239240224
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.2971,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "2520174518d2679152126da5f49128819dc479c5a67eb3ae4f5a4254908d860f"
+          },
+          "evidence_sufficiency_probability": 0.7066002568992329
+        },
+        {
+          "grade": 1,
+          "probabilities": {
+            "0": 0.3443674107395898,
+            "1": 0.5918127117575931,
+            "2": 0.060043771670167195,
+            "3": 0.0037761058326498793
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.7232,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.7490011752828177
+        },
+        {
+          "grade": 1,
+          "probabilities": {
+            "0": 0.26196373219745706,
+            "1": 0.6799489642378066,
+            "2": 0.052439227247575486,
+            "3": 0.0056480763171609
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.8018,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.804428740981946
+        },
+        {
+          "grade": 0,
+          "probabilities": {
+            "0": 0.5561508587244759,
+            "1": 0.424607440615624,
+            "2": 0.014928501708645767,
+            "3": 0.004313198951254387
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.4674,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.7042872888244431
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0011135311967449687,
+            "1": 0.006930104186418153,
+            "2": 0.1504905882766654,
+            "3": 0.8414657763401715
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.8323,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "e4d3b6806b6838dec7ec1f6442f946534cd976063ef294f8f320f74662cdaf96"
+          },
+          "evidence_sufficiency_probability": 0.38283520350256073
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0006351659547210118,
+            "1": 0.009040318320918844,
+            "2": 0.47247174944460296,
+            "3": 0.5178527662797572
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.5075,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "59eaadad54d24e61ffbb0766ee500a11ce9cfd3cfc7f8c66763b135759fd92d0"
+          },
+          "evidence_sufficiency_probability": 0.8238006804325324
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.00036648432137511276,
+            "1": 0.0041449160288795275,
+            "2": 0.07576443519995747,
+            "3": 0.919724164449788
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.9148,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "3b1166f9f21859d7fbb152f3bb346a4bd720e171c6686bd94725553d59eefc9e"
+          },
+          "evidence_sufficiency_probability": 0.7997284038107897
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0008664476579498896,
+            "1": 0.009711275736092177,
+            "2": 0.36762143980575884,
+            "3": 0.6218008368001992
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.6104,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "cdd25e93bad95118b48f4d5f882bc1ab0d76851084777e80be8b72e406340574"
+          },
+          "evidence_sufficiency_probability": 0.7863230270192001
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.001332275646351931,
+            "1": 0.006866897520060481,
+            "2": 0.3835474187461328,
+            "3": 0.6082534080874548
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.5987,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "5c3cbaecc373db09eac9dfbfcce9e8a1402a5ebfea2f2ca496b81fff6f58f7b7"
+          },
+          "evidence_sufficiency_probability": 0.4133217388460857
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0013897466958459489,
+            "1": 0.011327610362546498,
+            "2": 0.4433253006881514,
+            "3": 0.5439573422534562
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.5299,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "38c95149fcbd8b22d9975023619f295f6db294ac0e31837bbca5db47642411eb"
+          },
+          "evidence_sufficiency_probability": 0.5295884203159812
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.002775938397880275,
+            "1": 0.01722154602502972,
+            "2": 0.29358958371426397,
+            "3": 0.6864129318628261
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.6636,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "82ace5af177bc226020e09556797ee5adb704e1538375e93bc2f0d2bb1928b5c"
+          },
+          "evidence_sufficiency_probability": 0.6703840859425779
+        },
+        {
+          "grade": 0,
+          "probabilities": {
+            "0": 0.9559734212136825,
+            "1": 0.04336627426781771,
+            "2": 0.00015136817174804144,
+            "3": 0.0005089363467518257
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.0452,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "a2496ab5e13865a302c5a8be3e17c71ba962eb9bb635e449fe32da8f5750f6ce"
+          },
+          "evidence_sufficiency_probability": 0.9614032223742562
+        }
+      ]
+    },
+    {
+      "workers": 4,
+      "outputs": [
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.0062056006710617196,
+            "1": 0.01992917558819249,
+            "2": 0.6171563835147724,
+            "3": 0.35670884022597343
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.3244,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "4bc4e68448f63434b0c268b1b77c25f1f42a47b06b297c40166a490eb89560f0"
+          },
+          "evidence_sufficiency_probability": 0.6559010046821244
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.005206930295201149,
+            "1": 0.015105417994809672,
+            "2": 0.9506694318509175,
+            "3": 0.0290182198590718
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.0035,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "1b66052799608a2417b3decd991b7f0d04906fec9ee1f7600e3ebdd323216b80"
+          },
+          "evidence_sufficiency_probability": 0.4900563954418168
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.005070331966263358,
+            "1": 0.03050485650396608,
+            "2": 0.6266623091373683,
+            "3": 0.33776250239240224
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.2971,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "2520174518d2679152126da5f49128819dc479c5a67eb3ae4f5a4254908d860f"
+          },
+          "evidence_sufficiency_probability": 0.7066002568992329
+        },
+        {
+          "grade": 1,
+          "probabilities": {
+            "0": 0.3443674107395898,
+            "1": 0.5918127117575931,
+            "2": 0.060043771670167195,
+            "3": 0.0037761058326498793
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.7232,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.7490011752828177
+        },
+        {
+          "grade": 1,
+          "probabilities": {
+            "0": 0.26196373219745706,
+            "1": 0.6799489642378066,
+            "2": 0.052439227247575486,
+            "3": 0.0056480763171609
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.8018,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.804428740981946
+        },
+        {
+          "grade": 0,
+          "probabilities": {
+            "0": 0.5561508587244759,
+            "1": 0.424607440615624,
+            "2": 0.014928501708645767,
+            "3": 0.004313198951254387
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.4674,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.7042872888244431
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0011135311967449687,
+            "1": 0.006930104186418153,
+            "2": 0.1504905882766654,
+            "3": 0.8414657763401715
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.8323,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "e4d3b6806b6838dec7ec1f6442f946534cd976063ef294f8f320f74662cdaf96"
+          },
+          "evidence_sufficiency_probability": 0.38283520350256073
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0006351659547210118,
+            "1": 0.009040318320918844,
+            "2": 0.47247174944460296,
+            "3": 0.5178527662797572
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.5075,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "59eaadad54d24e61ffbb0766ee500a11ce9cfd3cfc7f8c66763b135759fd92d0"
+          },
+          "evidence_sufficiency_probability": 0.8238006804325324
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.00036648432137511276,
+            "1": 0.0041449160288795275,
+            "2": 0.07576443519995747,
+            "3": 0.919724164449788
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.9148,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "3b1166f9f21859d7fbb152f3bb346a4bd720e171c6686bd94725553d59eefc9e"
+          },
+          "evidence_sufficiency_probability": 0.7997284038107897
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0008664476579498896,
+            "1": 0.009711275736092177,
+            "2": 0.36762143980575884,
+            "3": 0.6218008368001992
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.6104,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "cdd25e93bad95118b48f4d5f882bc1ab0d76851084777e80be8b72e406340574"
+          },
+          "evidence_sufficiency_probability": 0.7863230270192001
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.001332275646351931,
+            "1": 0.006866897520060481,
+            "2": 0.3835474187461328,
+            "3": 0.6082534080874548
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.5987,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "5c3cbaecc373db09eac9dfbfcce9e8a1402a5ebfea2f2ca496b81fff6f58f7b7"
+          },
+          "evidence_sufficiency_probability": 0.4133217388460857
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0013897466958459489,
+            "1": 0.011327610362546498,
+            "2": 0.4433253006881514,
+            "3": 0.5439573422534562
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.5299,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "38c95149fcbd8b22d9975023619f295f6db294ac0e31837bbca5db47642411eb"
+          },
+          "evidence_sufficiency_probability": 0.5295884203159812
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.002775938397880275,
+            "1": 0.01722154602502972,
+            "2": 0.29358958371426397,
+            "3": 0.6864129318628261
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.6636,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "82ace5af177bc226020e09556797ee5adb704e1538375e93bc2f0d2bb1928b5c"
+          },
+          "evidence_sufficiency_probability": 0.6703840859425779
+        },
+        {
+          "grade": 0,
+          "probabilities": {
+            "0": 0.9559734212136825,
+            "1": 0.04336627426781771,
+            "2": 0.00015136817174804144,
+            "3": 0.0005089363467518257
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.0452,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "a2496ab5e13865a302c5a8be3e17c71ba962eb9bb635e449fe32da8f5750f6ce"
+          },
+          "evidence_sufficiency_probability": 0.9614032223742562
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.0062056006710617196,
+            "1": 0.01992917558819249,
+            "2": 0.6171563835147724,
+            "3": 0.35670884022597343
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.3244,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "4bc4e68448f63434b0c268b1b77c25f1f42a47b06b297c40166a490eb89560f0"
+          },
+          "evidence_sufficiency_probability": 0.6559010046821244
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.005206930295201149,
+            "1": 0.015105417994809672,
+            "2": 0.9506694318509175,
+            "3": 0.0290182198590718
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.0035,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "1b66052799608a2417b3decd991b7f0d04906fec9ee1f7600e3ebdd323216b80"
+          },
+          "evidence_sufficiency_probability": 0.4900563954418168
+        },
+        {
+          "grade": 2,
+          "probabilities": {
+            "0": 0.005070331966263358,
+            "1": 0.03050485650396608,
+            "2": 0.6266623091373683,
+            "3": 0.33776250239240224
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.2971,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "2520174518d2679152126da5f49128819dc479c5a67eb3ae4f5a4254908d860f"
+          },
+          "evidence_sufficiency_probability": 0.7066002568992329
+        },
+        {
+          "grade": 1,
+          "probabilities": {
+            "0": 0.3443674107395898,
+            "1": 0.5918127117575931,
+            "2": 0.060043771670167195,
+            "3": 0.0037761058326498793
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.7232,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.7490011752828177
+        },
+        {
+          "grade": 1,
+          "probabilities": {
+            "0": 0.26196373219745706,
+            "1": 0.6799489642378066,
+            "2": 0.052439227247575486,
+            "3": 0.0056480763171609
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.8018,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.804428740981946
+        },
+        {
+          "grade": 0,
+          "probabilities": {
+            "0": 0.5561508587244759,
+            "1": 0.424607440615624,
+            "2": 0.014928501708645767,
+            "3": 0.004313198951254387
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.4674,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+          },
+          "evidence_sufficiency_probability": 0.7042872888244431
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0011135311967449687,
+            "1": 0.006930104186418153,
+            "2": 0.1504905882766654,
+            "3": 0.8414657763401715
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.8323,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "e4d3b6806b6838dec7ec1f6442f946534cd976063ef294f8f320f74662cdaf96"
+          },
+          "evidence_sufficiency_probability": 0.38283520350256073
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0006351659547210118,
+            "1": 0.009040318320918844,
+            "2": 0.47247174944460296,
+            "3": 0.5178527662797572
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.5075,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "59eaadad54d24e61ffbb0766ee500a11ce9cfd3cfc7f8c66763b135759fd92d0"
+          },
+          "evidence_sufficiency_probability": 0.8238006804325324
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.00036648432137511276,
+            "1": 0.0041449160288795275,
+            "2": 0.07576443519995747,
+            "3": 0.919724164449788
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.9148,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "3b1166f9f21859d7fbb152f3bb346a4bd720e171c6686bd94725553d59eefc9e"
+          },
+          "evidence_sufficiency_probability": 0.7997284038107897
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0008664476579498896,
+            "1": 0.009711275736092177,
+            "2": 0.36762143980575884,
+            "3": 0.6218008368001992
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.6104,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "cdd25e93bad95118b48f4d5f882bc1ab0d76851084777e80be8b72e406340574"
+          },
+          "evidence_sufficiency_probability": 0.7863230270192001
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.001332275646351931,
+            "1": 0.006866897520060481,
+            "2": 0.3835474187461328,
+            "3": 0.6082534080874548
+          },
+          "evidence_sufficiency": false,
+          "execution_status": "success",
+          "expected_score": 2.5987,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "5c3cbaecc373db09eac9dfbfcce9e8a1402a5ebfea2f2ca496b81fff6f58f7b7"
+          },
+          "evidence_sufficiency_probability": 0.4133217388460857
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.0013897466958459489,
+            "1": 0.011327610362546498,
+            "2": 0.4433253006881514,
+            "3": 0.5439573422534562
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.5299,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "38c95149fcbd8b22d9975023619f295f6db294ac0e31837bbca5db47642411eb"
+          },
+          "evidence_sufficiency_probability": 0.5295884203159812
+        },
+        {
+          "grade": 3,
+          "probabilities": {
+            "0": 0.002775938397880275,
+            "1": 0.01722154602502972,
+            "2": 0.29358958371426397,
+            "3": 0.6864129318628261
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 2.6636,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "82ace5af177bc226020e09556797ee5adb704e1538375e93bc2f0d2bb1928b5c"
+          },
+          "evidence_sufficiency_probability": 0.6703840859425779
+        },
+        {
+          "grade": 0,
+          "probabilities": {
+            "0": 0.9559734212136825,
+            "1": 0.04336627426781771,
+            "2": 0.00015136817174804144,
+            "3": 0.0005089363467518257
+          },
+          "evidence_sufficiency": true,
+          "execution_status": "success",
+          "expected_score": 0.0452,
+          "latency_ms": 0.0,
+          "provenance": {
+            "model_name": "bespoke-nimble-9b",
+            "checkpoint_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "tokenizer_revision": "9b953de7a5336756ece1cb1e8632e374b3dbdabe3d02d405cf8291da2d43a131",
+            "projection_head_revision": null,
+            "quantization": "Q8_0",
+            "runtime": "systemone_ollama",
+            "prompt_rubric_hash": "413cdd4f225339c22373a369f30de885d57bfc0c485abe1b77134be8a205fe14",
+            "evidence_hash": "a2496ab5e13865a302c5a8be3e17c71ba962eb9bb635e449fe32da8f5750f6ce"
+          },
+          "evidence_sufficiency_probability": 0.9614032223742562
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Small fixed diagnostic; not a qualification or broad accuracy test",
+    "Sequential arm runs first; thermal and scheduling effects may affect throughput"
+  ],
+  "input_manifest": [
+    {
+      "query": "Alien sci-fi horror franchise in order",
+      "typed_id": "movie:348",
+      "input_hash": "fef1f6dd4222a4634632e321e4b9ac5e926d30a3fb2ed616378a9684b49127a7",
+      "evidence_hash": "4bc4e68448f63434b0c268b1b77c25f1f42a47b06b297c40166a490eb89560f0"
+    },
+    {
+      "query": "Back to the Future trilogy in order",
+      "typed_id": "movie:105",
+      "input_hash": "f27a11b350e111fa3636014669e762513bb6c44f402f131ca465b11f18b18cd7",
+      "evidence_hash": "1b66052799608a2417b3decd991b7f0d04906fec9ee1f7600e3ebdd323216b80"
+    },
+    {
+      "query": "Mission Impossible action movies series",
+      "typed_id": "movie:954",
+      "input_hash": "124d918f87643ca30ed4c384934d504c8715178ae9606e694780452a2f6620ef",
+      "evidence_hash": "2520174518d2679152126da5f49128819dc479c5a67eb3ae4f5a4254908d860f"
+    },
+    {
+      "query": "cozy rainy day feel-good movies",
+      "typed_id": "movie:278",
+      "input_hash": "243f28ecd8376c29e10d2993ae7020efa44f84b04544fe0fb0ce4bd5ece9abde",
+      "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+    },
+    {
+      "query": "dark atmospheric neo-noir mysteries",
+      "typed_id": "movie:278",
+      "input_hash": "c8c3b2dedd3b9016db74301798f4086d407cd8ead81267fc2e98c5e480a79483",
+      "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+    },
+    {
+      "query": "mind-bending psychological thrillers with twists",
+      "typed_id": "movie:278",
+      "input_hash": "b323f3b32b5528a8ba5ed99d20a3a78e5f28c0892a5aa15b5ca65e20fb1d1307",
+      "evidence_hash": "ae4b2c7668ceebd75d7871ffc121dd518bf44698f44832cf94a84458b0fabffa"
+    },
+    {
+      "query": "Korean horror movies under 2h on Netflix",
+      "typed_id": "movie:396535",
+      "input_hash": "6704b029a255fe96da28afb12ea6907481a6d360acb07f2cb7efaedd157f219a",
+      "evidence_hash": "e4d3b6806b6838dec7ec1f6442f946534cd976063ef294f8f320f74662cdaf96"
+    },
+    {
+      "query": "2010s comedy movies under 95 minutes",
+      "typed_id": "movie:246741",
+      "input_hash": "cf96697e3d5bfc8039de9eaa87bcf36e2afc3de4beee1167117abe2118353da4",
+      "evidence_hash": "59eaadad54d24e61ffbb0766ee500a11ce9cfd3cfc7f8c66763b135759fd92d0"
+    },
+    {
+      "query": "neo-noir crime movies",
+      "typed_id": "movie:829",
+      "input_hash": "2e4d496b7a824c65e8785fe10b3f50a43b2fe3cb66fb28f3fac2d0d8bb4def91",
+      "evidence_hash": "3b1166f9f21859d7fbb152f3bb346a4bd720e171c6686bd94725553d59eefc9e"
+    },
+    {
+      "query": "Christopher Nolan sci-fi mind-bending movies",
+      "typed_id": "movie:27205",
+      "input_hash": "4919a02212079feb6d0fa94dc840d9906cdd66efd3953bf03fb8840d0c2f5a11",
+      "evidence_hash": "cdd25e93bad95118b48f4d5f882bc1ab0d76851084777e80be8b72e406340574"
+    },
+    {
+      "query": "Hayao Miyazaki studio ghibli anime",
+      "typed_id": "movie:129",
+      "input_hash": "9ef416125843d86b385b8c82b094970c357fadf384d3227ff9eac946e71ae3f3",
+      "evidence_hash": "5c3cbaecc373db09eac9dfbfcce9e8a1402a5ebfea2f2ca496b81fff6f58f7b7"
+    },
+    {
+      "query": "Tom Cruise high-octane action movies",
+      "typed_id": "movie:361743",
+      "input_hash": "f5cbfbb4e54ab9ba375a5d6551c53f41054ac8efe025a6a992616bf5f527fd97",
+      "evidence_hash": "38c95149fcbd8b22d9975023619f295f6db294ac0e31837bbca5db47642411eb"
+    },
+    {
+      "query": "Spidr-man multiverse animated",
+      "typed_id": "movie:324857",
+      "input_hash": "771760d1f5675ab8902e3f841acb6f2475e4dfbbfc112efbc2d2bee1110d8c95",
+      "evidence_hash": "82ace5af177bc226020e09556797ee5adb704e1538375e93bc2f0d2bb1928b5c"
+    },
+    {
+      "query": "Korean thriller movies under 2 hours",
+      "typed_id": "movie:496243",
+      "input_hash": "87d6df1165f9bda1b1f1941b5840aad21a3d566b8d5899e8509fc3ba8b6e238c",
+      "evidence_hash": "a2496ab5e13865a302c5a8be3e17c71ba962eb9bb635e449fe32da8f5750f6ce"
+    }
+  ]
+}

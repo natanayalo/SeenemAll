@@ -89,6 +89,14 @@ class RecommendParams:
         description="Override local reranker ('cross_encoder' or 'small').",
     )
     debug: bool = Query(False, description="Include debug diagnostics in response.")
+    bypass_cache: bool = Query(
+        False,
+        description="Bypass recommendation cache for latency benchmarks and evaluation.",
+    )
+    mask_preferences: bool = Query(
+        False,
+        description="Mask user preference features/vectors to evaluate cold-start counterfactual for the same user.",
+    )
 
     def __post_init__(self):
         from fastapi.params import Param

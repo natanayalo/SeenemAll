@@ -9,13 +9,38 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, 
 import threading
 
 import spacy
+import spacy.util
+import spacy.vectors
 from spacy.matcher import PhraseMatcher
 from sqlalchemy import select
+
 
 from api.db.models import Item
 from api.db.session import get_sessionmaker
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_spacy_vectors() -> None:
+    try:
+        from thinc.backends import NumpyOps
+        from thinc.backends import registry as thinc_registry
+
+        if "NumpyOps" not in thinc_registry.ops:
+            thinc_registry.ops.register("NumpyOps", func=NumpyOps)
+    except Exception:
+        pass
+    try:
+        if "spacy.Vectors.v1" not in spacy.util.registry.vectors:
+            if hasattr(spacy.vectors, "create_mode_vectors"):
+                spacy.util.registry.vectors.register(
+                    "spacy.Vectors.v1", func=spacy.vectors.create_mode_vectors
+                )
+    except Exception:
+        pass
+
+
+_ensure_spacy_vectors()
 
 
 def is_comparative_prefix(prefix: str) -> bool:
@@ -93,6 +118,7 @@ class QueryFilterMatcher:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._initialized = False
+        _ensure_spacy_vectors()
         self._nlp = spacy.blank("en")
         self._matcher = PhraseMatcher(self._nlp.vocab, attr="LOWER")
         self._language_map: Dict[str, str] = {}

@@ -248,3 +248,50 @@ def test_query_filter_matcher_multi_collection_grouping(monkeypatch):
     assert 531241 in coll_ids
     # TV collection with (TV) should be skipped from generic alias
     assert 225941 not in coll_ids
+
+
+def test_collection_aliases_fuzzy_names_and_unknowns():
+    matcher = QueryFilterMatcher()
+    matcher._initialized = True
+    matcher._collection_map = {
+        "star wars": (1, "Star Wars"),
+        "spiderman": (2, "Spider-Man"),
+        "alien": (3, "Alien"),
+    }
+    matcher._multi_collection_map = {
+        key: [value] for key, value in matcher._collection_map.items()
+    }
+    for query, expected in [
+        ("", None),
+        ("Star Wars movies", 1),
+        ("the Star Wars", 1),
+        ("star,wars", 1),
+        ("spi-derman", 2),
+        ("please find star wars", 1),
+        ("xx", None),
+        ("starr worz", 1),
+        ("unknown franchise", None),
+        ("star wars (original)", 1),
+        ("the star wars (original)", 1),
+    ]:
+        one = matcher.resolve_collection(query)
+        many = matcher.resolve_collections(query, threshold=0.7)
+        assert (one[0] if one else None) == expected
+        assert [item[0] for item in many] == ([] if expected is None else [expected])
+
+
+def test_spacy_registry_repair_and_optional_failure(monkeypatch):
+    import api.core.filter_matcher as module
+    from thinc.backends import registry as thinc_registry
+    from unittest.mock import MagicMock
+
+    ops, vectors = MagicMock(), MagicMock()
+    ops.__contains__.return_value = vectors.__contains__.return_value = False
+    monkeypatch.setattr(thinc_registry, "ops", ops)
+    monkeypatch.setattr(module.spacy.util.registry, "vectors", vectors)
+    module._ensure_spacy_vectors()
+    ops.register.assert_called_once()
+    vectors.register.assert_called_once()
+    ops.register.side_effect = RuntimeError("optional registration unavailable")
+    vectors.register.side_effect = RuntimeError("optional registration unavailable")
+    module._ensure_spacy_vectors()  # An optional registry cannot prevent startup.

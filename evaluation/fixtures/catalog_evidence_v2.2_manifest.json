@@ -1,0 +1,11 @@
+{
+  "created_at": "2026-10-05T22:30:25.652506+00:00",
+  "source": "read-only snapshot of local items table",
+  "contract": "v2.2",
+  "rows": 5396,
+  "bytes": 6805483,
+  "sha256": "16a94583d06a1e931005a2d44affed3d58ac2de4897c9630b14365988d3e753f",
+  "cast_rows": 3159,
+  "director_rows": 2196,
+  "rating_rows": 4783
+}

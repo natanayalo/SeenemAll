@@ -89,6 +89,9 @@ def build_debug_snapshot(
     neighbors_count: int,
     cold_start: bool,
     pipeline_ms: float,
+    actual_inferences_performed: int = 0,
+    cache_hits: int = 0,
+    inference_stats: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     allow_sample = list((allowlist or [])[:_DEBUG_ALLOWLIST_LIMIT])
     boost_sample = list(boost_ids[:_DEBUG_BOOST_LIMIT])
@@ -112,10 +115,15 @@ def build_debug_snapshot(
         "metrics": {
             "initial_candidates": initial_candidates_count,
             "post_filter_candidates": post_filter_candidates_count,
+            "actual_inferences_performed": actual_inferences_performed,
+            "cache_hits": cache_hits,
             "neighbors_found": neighbors_count,
             "cold_start": cold_start,
             "pipeline_latency_ms": round(pipeline_ms, 2),
         },
+        "actual_inferences_performed": actual_inferences_performed,
+        "cache_hits": cache_hits,
+        "inference_stats": inference_stats or {},
     }
 
 

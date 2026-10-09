@@ -21,6 +21,12 @@ from cachetools import TTLCache
 from api.core.legacy_intent_parser import IntentFilters
 from api.core.prompt_eval import load_prompt_template
 from api.core.embeddings import encode_texts
+from api.core.inference_metrics import (
+    record_success,
+    record_cache_hit,
+    record_failure,
+    submit_with_inference_context,
+)
 
 logger = logging.getLogger(__name__)
 # Ensure INFO-level reranker messages surface unless overridden globally.
@@ -924,6 +930,7 @@ def _execute_small_rerank(
 
     text_inputs = [query_text] + documents
     embeddings = encode_texts(text_inputs)
+    record_success("small", len(items))
     if (
         not isinstance(embeddings, np.ndarray)
         or embeddings.shape[0] != len(text_inputs)
@@ -1011,15 +1018,19 @@ def _call_small_reranker(
     with _SMALL_RERANK_CACHE_LOCK:
         cached = _SMALL_RERANK_CACHE.get(cache_key)
     if cached is not None:
+        record_cache_hit("small")
         return [
             LLMDecision(item_id=item_id, score=score, explanation=None)
             for item_id, score in cached
         ]
 
-    future = _SMALL_RERANK_EXECUTOR.submit(_execute_small_rerank, query_text, subset)
+    future = submit_with_inference_context(
+        _SMALL_RERANK_EXECUTOR, _execute_small_rerank, query_text, subset
+    )
     try:
         scored = future.result(timeout=settings.timeout)
     except FuturesTimeout:
+        record_failure("small")
         future.cancel()
         logger.warning(
             "Small reranker timed out after %.2fs; using baseline ordering.",
@@ -1027,12 +1038,14 @@ def _call_small_reranker(
         )
         return []
     except Exception as exc:  # pragma: no cover - defensive logging
+        record_failure("small")
         logger.warning(
             "Small reranker failed with error: %s; using baseline ordering.", exc
         )
         return []
 
     if not scored:
+        record_failure("small")
         return []
 
     with _SMALL_RERANK_CACHE_LOCK:
@@ -1080,17 +1093,23 @@ def _call_cross_encoder_reranker(
     with _CROSS_ENCODER_CACHE_LOCK:
         cached = _CROSS_ENCODER_CACHE.get(cache_key)
     if cached is not None:
+        record_cache_hit("cross_encoder")
         return [
             LLMDecision(item_id=item_id, score=score, explanation=None)
             for item_id, score in cached
         ]
 
-    future = _CROSS_ENCODER_EXECUTOR.submit(
-        _execute_cross_encoder_rerank, query_text, subset, settings.model
+    future = submit_with_inference_context(
+        _CROSS_ENCODER_EXECUTOR,
+        _execute_cross_encoder_rerank,
+        query_text,
+        subset,
+        settings.model,
     )
     try:
         scored = future.result(timeout=settings.timeout)
     except FuturesTimeout:
+        record_failure("cross_encoder")
         future.cancel()
         logger.warning(
             "Cross-Encoder reranker timed out after %.2fs; using baseline ordering.",
@@ -1098,6 +1117,7 @@ def _call_cross_encoder_reranker(
         )
         return []
     except Exception as exc:  # pragma: no cover - defensive logging
+        record_failure("cross_encoder")
         logger.warning(
             "Cross-Encoder reranker failed with error: %s; using baseline ordering.",
             exc,
@@ -1105,6 +1125,7 @@ def _call_cross_encoder_reranker(
         return []
 
     if not scored:
+        record_failure("cross_encoder")
         return []
 
     with _CROSS_ENCODER_CACHE_LOCK:
@@ -1116,17 +1137,19 @@ def _call_cross_encoder_reranker(
     ]
 
 
-def _reset_small_rerank_cache_for_tests() -> None:
+def clear_reranker_result_caches() -> None:
+    """Clear exact-query results while retaining loaded model instances."""
     with _SMALL_RERANK_CACHE_LOCK:
         _SMALL_RERANK_CACHE.clear()
     with _CROSS_ENCODER_CACHE_LOCK:
         _CROSS_ENCODER_CACHE.clear()
-    try:
-        from api.core.cross_encoder import reset_cross_encoder_cache_for_tests
 
-        reset_cross_encoder_cache_for_tests()
-    except Exception:
-        pass
+
+def _reset_small_rerank_cache_for_tests() -> None:
+    clear_reranker_result_caches()
+    from api.core.cross_encoder import reset_cross_encoder_cache_for_tests
+
+    reset_cross_encoder_cache_for_tests()
 
 
 def _call_reranker(

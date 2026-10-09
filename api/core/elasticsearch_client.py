@@ -9,7 +9,20 @@ from api import config
 
 
 def _parse_hosts(raw_hosts: str) -> List[str]:
-    return [host.strip() for host in raw_hosts.split(",") if host.strip()]
+    import socket
+
+    hosts = [host.strip() for host in raw_hosts.split(",") if host.strip()]
+    resolved: List[str] = []
+    for h in hosts:
+        if "://elasticsearch:" in h:
+            try:
+                socket.gethostbyname("elasticsearch")
+                resolved.append(h)
+            except (socket.gaierror, OSError):
+                resolved.append(h.replace("://elasticsearch:", "://localhost:"))
+        else:
+            resolved.append(h)
+    return resolved
 
 
 def _client_kwargs() -> Dict:

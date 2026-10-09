@@ -31,7 +31,43 @@ except ImportError:  # pragma: no cover - missing dependency feedback
     httpx = None
     HAVE_HTTPX = False
 
-from evaluation.datasets import load_public_dataset
+from evaluation.datasets import load_evaluation_cases, load_public_dataset
+from evaluation.evidence import load_catalog_metadata, pool_item_evidence
+from evaluation.deterministic import (
+    check_canonical_order,
+    check_deterministic_constraints,
+)
+from evaluation.judge.base import LocalJudgeAdapter
+from evaluation.judge.consensus import (
+    ConsensusJudgeEngine,
+    JudgmentCache,
+    PoolAdjudicator,
+)
+from evaluation.judge.ollama import discover_ollama_judges
+from evaluation.judge.qualification import (
+    generate_judge_control_cases as generate_factual_control_cases,
+    qualification_record_matches,
+    JudgeQualificationRunner,
+    inspect_local_hardware,
+)
+from evaluation.judge.stub import StubJudgeAdapter
+from evaluation.latency import LatencyHarness
+from evaluation.metrics import (
+    calculate_completeness,
+    calculate_coverage,
+    calculate_known_positive_recall_at_k,
+    check_for_duplicates,
+    evaluate_comparison_gates,
+)
+from evaluation.models import (
+    EvaluationStatus,
+    GainMode,
+    TypedId,
+)
+from evaluation.personalization import PersonalizationHarness
+from evaluation.preflight import check_preflight, quick_dev_cases
+from evaluation.private_benchmark import PrivateBenchmarkHarness
+from evaluation.runner import EvaluationRunner, IndexArtifactVerifier
 from evaluation.resolver import (
     fetch_embeddings_for_tmdb_ids,
     fetch_titles_for_tmdb_ids,
@@ -318,8 +354,22 @@ def calculate_average_precision(
 
 
 def calculate_ndcg_at_k(
-    recommended: Sequence[int], golden: Sequence[int], k: int
+    recommended: Sequence[Any],
+    golden: Any,
+    k: int = 10,
+    gain_mode: Optional[GainMode] = None,
+    **kwargs: Any,
 ) -> float:
+    if isinstance(golden, dict) or gain_mode is not None:
+        from evaluation.metrics import calculate_ndcg_at_k as v2_ndcg
+
+        return v2_ndcg(
+            recommended_items=recommended,
+            qrels=golden,
+            k=k,
+            gain_mode=gain_mode or GainMode.GRADED_EXPONENTIAL,
+            **kwargs,
+        )
     if k <= 0 or not golden:
         return 0.0
     golden_set = set(golden)
@@ -631,6 +681,26 @@ def evaluate_entries(
                 payload = dict(params)
                 payload["ann_backend_override"] = backend
 
+                if "seed_history" in entry.raw or "train_items" in entry.raw:
+                    history_items = (
+                        entry.raw.get("seed_history")
+                        or entry.raw.get("train_items")
+                        or []
+                    )
+                    if history_items:
+                        from api.db.session import get_sessionmaker
+                        from evaluation.personalization import seed_persona_fixtures
+
+                        SessionLocal = get_sessionmaker()
+                        with SessionLocal() as db_s:
+                            persona_dict = {
+                                "persona_id": entry.user_id,
+                                "seed_history": history_items,
+                                "known_negatives": entry.raw.get("known_negatives", []),
+                            }
+                            # Verify seeded user state; fail explicitly if seeding fails
+                            seed_persona_fixtures(db_s, persona_dict, verify=True)
+
                 t_start = time.perf_counter()
                 items = call_recommendation_api_items(
                     query=entry.query,
@@ -651,7 +721,20 @@ def evaluate_entries(
                 avg_prec = calculate_average_precision(
                     recommended_ids, entry.golden_ids
                 )
-                ndcg = calculate_ndcg_at_k(recommended_ids, entry.golden_ids, k)
+                golden_scores = entry.raw.get("golden_scores")
+                if golden_scores and isinstance(golden_scores, dict):
+                    qrels = {
+                        str(TypedId("movie", int(tid))): float(sc)
+                        for tid, sc in golden_scores.items()
+                    }
+                    ndcg = calculate_ndcg_at_k(
+                        recommended_ids,
+                        qrels,
+                        k,
+                        gain_mode=GainMode.CONTINUOUS_IDENTITY,
+                    )
+                else:
+                    ndcg = calculate_ndcg_at_k(recommended_ids, entry.golden_ids, k)
 
                 # Intra-List Diversity
                 top_items = items[:k]
@@ -1309,7 +1392,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--dataset",
-        choices=["none", "movielens20m"],
+        choices=["none", "movielens20m", "tag_genome"],
         default="none",
         help="Optional public dataset to evaluate against.",
     )
@@ -1412,6 +1495,145 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Allow saving baseline even if candidate metrics regressed against the existing baseline.",
     )
+    # Evaluation Suite v2 Flags
+    parser.add_argument(
+        "--save-v2-baseline",
+        type=Path,
+        default=None,
+        help="Record an immutable full-product production v2 reference with qualified judging and cache-cold latency.",
+    )
+    parser.add_argument(
+        "--v2",
+        action="store_true",
+        help="Enable Seen'emAll Evaluation Suite v2 (automated judging, reproducible gates).",
+    )
+    parser.add_argument(
+        "--judge-workers",
+        type=int,
+        choices=[1, 2, 3, 4],
+        default=4,
+        help="Concurrent missing-pair grading calls (default four, measured on this host).",
+    )
+    parser.add_argument(
+        "--quick-dev",
+        action="store_true",
+        help="Fixed diverse 14-query product development diagnostic; never promotion evidence.",
+    )
+    parser.add_argument(
+        "--continue-on-preflight-failure",
+        action="store_true",
+        help="Collect graded diagnostics even when cheap candidate checks already fail.",
+    )
+    parser.add_argument(
+        "--baseline-judge-workers",
+        type=int,
+        default=4,
+        help="Independent judging workers for baseline capture (1-4); cache writes remain sequential.",
+    )
+    parser.add_argument(
+        "--track",
+        type=str,
+        default="product",
+        choices=["product", "cold_start", "personalization", "anchor"],
+        help="Evaluation track ('product', 'cold_start', 'personalization', 'anchor').",
+    )
+    parser.add_argument(
+        "--split",
+        type=str,
+        default="dev",
+        choices=["dev", "regression", "full"],
+        help="Evaluation split ('dev', 'regression', 'full').",
+    )
+    parser.add_argument(
+        "--judgment-mode",
+        type=str,
+        default="single_judge",
+        choices=["consensus", "single_judge"],
+        help="Use the qualified Nimble single judge; consensus is reserved for explicit test panels.",
+    )
+    parser.add_argument(
+        "--judge-config",
+        type=str,
+        default="nimble",
+        choices=["nimble", "stub"],
+        help="Nimble via Ollama, or a deterministic stub for automated tests.",
+    )
+    parser.add_argument(
+        "--evidence-version",
+        choices=["v2.2", "v2.3"],
+        default="v2.2",
+        help="Frozen evidence profile; enriched v2.3 requires a separate qualification and reference.",
+    )
+    parser.add_argument(
+        "--allow-stub-judges-for-testing",
+        action="store_true",
+        help="Allow stub judges in authoritative/consensus mode (strictly for automated testing).",
+    )
+    parser.add_argument(
+        "--gain-mode",
+        type=str,
+        default="graded_exponential",
+        choices=["graded_exponential", "continuous_identity"],
+        help="Relevance gain formulation for DCG/nDCG.",
+    )
+    parser.add_argument(
+        "--hardware-inspect",
+        action="store_true",
+        help="Inspect local hardware devices (GPU, NPU, CPU, RAM) and runtime availability.",
+    )
+    parser.add_argument(
+        "--judge-runtime",
+        choices=["ollama"],
+        default="ollama",
+        help="Use the installed, pinned Ollama Nimble model (no downloads).",
+    )
+    parser.add_argument(
+        "--qualify-judges",
+        action="store_true",
+        help="Run Milestone 0 local judge qualification pilot and report acceptance.",
+    )
+    parser.add_argument(
+        "--option-order-diagnostic",
+        action="store_true",
+        help="Also measure reversed grading options; this diagnostic does not gate qualification.",
+    )
+    parser.add_argument(
+        "--latency-benchmark",
+        action="store_true",
+        help="Run warm-model query-cache-cold latency benchmark using ABBA BAAB repetition pattern.",
+    )
+    parser.add_argument(
+        "--personalization-test",
+        action="store_true",
+        help="Run synthetic personalization behavioral gate benchmark.",
+    )
+    parser.add_argument(
+        "--private-eval",
+        action="store_true",
+        help="Run private holdout benchmark with confidential output redaction.",
+    )
+    parser.add_argument(
+        "--rescore-only",
+        action="store_true",
+        help="Rescore existing ranked outputs against updated qrels without re-running retrieval.",
+    )
+    parser.add_argument(
+        "--verify-index",
+        action="store_true",
+        help="Verify Elasticsearch index artifact matches expected frozen settings/UUID before running.",
+    )
+    parser.add_argument(
+        "--expected-index-checksum",
+        type=str,
+        default=None,
+        help="Expected sha256 checksum of frozen Elasticsearch index artifact.",
+    )
+    parser.add_argument(
+        "--v2-report",
+        type=Path,
+        default=Path("evaluation/v2_comparison_report.json"),
+        help="Output path for v2 comparison report JSON.",
+    )
     return parser.parse_args(argv)
 
 
@@ -1425,7 +1647,10 @@ def load_entries_from_args(args: argparse.Namespace) -> List[EvaluationEntry]:
 
         entries = [
             EvaluationEntry(
-                query=item["query"], golden_ids=item["golden_ids"], raw=dict(item)
+                query=item["query"],
+                golden_ids=item["golden_ids"],
+                raw=dict(item),
+                user_id=str(item.get("user_id") or "u1"),
             )
             for item in dataset_entries
         ]
@@ -1451,8 +1676,887 @@ def load_entries_from_args(args: argparse.Namespace) -> List[EvaluationEntry]:
     return entries
 
 
+def _comparison_params(
+    args: argparse.Namespace,
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Resolve both systems with the explicitly selected retrieval backend."""
+    grid = default_param_grid()
+    base_params = grid.get(args.baseline, lambda r: {})({}) or {}
+    cand_params = grid.get(args.candidate, lambda r: {})({}) or {}
+    for params in (base_params, cand_params):
+        params["ann_backend_override"] = args.backend
+    return base_params, cand_params
+
+
+def run_evaluation_v2(args: argparse.Namespace) -> int:
+    """Execute Evaluation Suite v2 workflow."""
+    started = time.perf_counter()
+    quick = getattr(args, "quick_dev", False)
+    if quick and (
+        args.track != "product"
+        or args.split != "dev"
+        or args.private_eval
+        or getattr(args, "save_v2_baseline", None)
+        or args.qualify_judges
+        or args.latency_benchmark
+        or args.personalization_test
+        or args.hardware_inspect
+        or args.rescore_only
+    ):
+        print("Error: --quick-dev only supports product development comparisons.")
+        return int(EvaluationStatus.INVALID)
+    if getattr(args, "save_v2_baseline", None):
+        from evaluation.baseline_v2 import capture_baseline
+
+        return capture_baseline(args)
+    # 1. Hardware Inspection Mode
+    if args.hardware_inspect:
+        hw_info = inspect_local_hardware()
+        print("\n" + "=" * 70)
+        print("          LOCAL HARDWARE & RUNTIME INSPECTION REPORT")
+        print("=" * 70)
+        print(f"  Detected Devices:        {', '.join(hw_info['devices'])}")
+        print(f"  System RAM:              {hw_info['ram_gb']} GB")
+        print(
+            f"  Intel Arc GPU (16GB):    {'Available' if hw_info['gpu_available'] else 'Not Detected'}"
+        )
+        print(
+            f"  Intel NPU:               {'Available' if hw_info['npu_available'] else 'Not Detected'}"
+        )
+        print(f"  OpenVINO Devices:        {hw_info['openvino_devices']}")
+        print(f"  PyTorch Version:         {hw_info.get('pytorch_version', 'N/A')}")
+        print(
+            f"  Transformers Version:    {hw_info.get('transformers_version', 'N/A')}"
+        )
+        print(
+            f"  Local Ollama Daemon:     {'Active' if hw_info['ollama_available'] else 'Offline / Inactive'}"
+        )
+        print("=" * 70 + "\n")
+        return 0
+
+    # 2. Local Judge Qualification Pilot (Milestone 0)
+    if args.qualify_judges:
+        evidence_version = getattr(args, "evidence_version", "v2.2")
+        runner = JudgeQualificationRunner(evidence_version=evidence_version)
+        candidates: Dict[str, LocalJudgeAdapter] = dict(
+            discover_ollama_judges()
+            if evidence_version == "v2.2"
+            else discover_ollama_judges(evidence_version)
+        )
+        pilot_families = [
+            "fam_vibe_noir",
+            "fam_vibe_cozy",
+            "fam_fr_bttf",
+            "fam_fr_matrix",
+            "fam_ent_nolan",
+            "fam_ent_spielberg",
+            "fam_c_short_action",
+            "fam_c_french_romance",
+            "fam_vibe_psych",
+            "fam_vibe_sports",
+            "fam_fr_toy_story",
+            "fam_fr_alien",
+            "fam_ent_tarantino",
+            "fam_ent_villeneuve",
+            "fam_c_80s_scifi",
+            "fam_c_anim_under_100",
+            "fam_vibe_whimsical",
+            "fam_vibe_apocalyptic",
+            "fam_fr_indy",
+            "fam_c_short_comedy",
+        ]
+        controls = generate_factual_control_cases()
+        catalog_cases = load_evaluation_cases(split="dev") + load_evaluation_cases(
+            split="regression"
+        )
+        if catalog_cases:
+            pilot_families = list(dict.fromkeys(c.family_id for c in catalog_cases))[
+                :20
+            ]
+        reports: Dict[str, Dict[str, Any]] = {}
+        print("\n" + "=" * 76)
+        print("          MILESTONE 0: LOCAL JUDGE QUALIFICATION PILOT")
+        print("=" * 76)
+        for name, judge in candidates.items():
+            print(f"Evaluating candidate [{name}] ({judge.runtime})...")
+            rep = runner.run_candidate_pilot(
+                judge,
+                query_families=pilot_families,
+                control_cases=controls,
+                catalog_cases=catalog_cases,
+                run_option_order_diagnostic=getattr(
+                    args, "option_order_diagnostic", False
+                ),
+            )
+            reports[name] = rep
+            status_str = (
+                "QUALIFIED" if rep["qualified"] else "DISQUALIFIED / UNQUALIFIED"
+            )
+            print(
+                f"  -> {status_str}: Repeatability={rep['repeatability_rate']:.1%}, "
+                f"Option-order Diagnostic={rep['option_permutation_rate']:.1%} "
+                f"({rep.get('permutation_tests', 0)} tests), "
+                f"Control Accuracy={rep['control_accuracy']:.1%}, "
+                f"Failures={rep['execution_failures']}"
+            )
+
+        primary, secondary, tie_breaker, panel_mode = runner.select_judge_panel(
+            reports, candidates
+        )
+        print("\n" + "-" * 76)
+        print("  Selected Local Judge Panel:")
+        print(f"    Primary Judge:     {primary.model_name if primary else 'None'}")
+        print(f"    Secondary Judge:   {secondary.model_name if secondary else 'None'}")
+        print(
+            f"    Tie-Breaker Judge: {tie_breaker.model_name if tie_breaker else 'None'}"
+        )
+        print(f"    Operation Mode:    {panel_mode}")
+        print("=" * 76 + "\n")
+
+        qual_file = Path(
+            "evaluation/.judge_qualification_ollama.json"
+            if evidence_version == "v2.2"
+            else "evaluation/.judge_qualification_ollama_v2.3.json"
+        )
+        qual_file.parent.mkdir(parents=True, exist_ok=True)
+        qual_data = {
+            "primary": primary.model_name if primary else None,
+            "secondary": secondary.model_name if secondary else None,
+            "tie_breaker": tie_breaker.model_name if tie_breaker else None,
+            "panel_mode": panel_mode,
+            "reports": reports,
+        }
+        with qual_file.open("w", encoding="utf-8") as fp:
+            json.dump(qual_data, fp, indent=2)
+        print(f"Saved judge qualification results to {qual_file}\n")
+        return 0
+
+    # 3. Latency Benchmark Mode
+    if args.latency_benchmark:
+        exec_runner = EvaluationRunner(in_process=True)
+        harness = LatencyHarness(runner=exec_runner, warmup_count=5, repetition_count=5)
+        test_queries = [
+            "Star Wars chronological",
+            "mind-bending sci-fi",
+            "classic movies",
+            "action movies under 90 minutes",
+            "French romance",
+            "Christopher Nolan films",
+            "Harry Potter movies",
+            "animated family movies",
+            "feel good comedy",
+            "neo noir",
+        ]
+        base_p, cand_p = _comparison_params(args)
+        print("\n" + "=" * 76)
+        print("          WARM-MODEL QUERY-CACHE-COLD LATENCY BENCHMARK")
+        print("=" * 76)
+        lat_res = harness.benchmark_paired_latency(test_queries, base_p, cand_p)
+        print(f"  Baseline P50:            {lat_res.get('baseline_p50_ms', 0)} ms")
+        print(f"  Baseline P95:            {lat_res.get('baseline_p95_ms', 0)} ms")
+        print(f"  Candidate P50:           {lat_res.get('candidate_p50_ms', 0)} ms")
+        print(f"  Candidate P95:           {lat_res.get('candidate_p95_ms', 0)} ms")
+        print(
+            f"  Median Paired Ratio:     {lat_res.get('median_paired_ratio', 1.0):.4f} (gate: <= 1.10 -> {'PASS' if lat_res.get('median_paired_ratio_pass') else 'FAIL'})"
+        )
+        print(
+            f"  Candidate P95 Ratio:     {lat_res.get('p95_ratio', 1.0):.4f} (gate: <= 1.15 -> {'PASS' if lat_res.get('p95_ratio_pass') else 'FAIL'})"
+        )
+        gate_status = "PASS" if lat_res.get("passed") else "FAIL"
+        print(f"\n  Latency Gate Result:     {gate_status}")
+        print("=" * 76 + "\n")
+        return 0 if lat_res.get("passed") else 1
+
+    # 4. Synthetic Personalization Behavioral Gate Mode
+    if args.personalization_test:
+        from api.db.session import get_sessionmaker
+
+        exec_runner = EvaluationRunner(in_process=True)
+        pers_harness = PersonalizationHarness(
+            runner=exec_runner,
+            db_session_factory=get_sessionmaker(),
+            verify_seeding=True,
+        )
+        base_p, cand_p = _comparison_params(args)
+        print("\n" + "=" * 76)
+        print("          SYNTHETIC PERSONALIZATION BEHAVIORAL GATES")
+        print("=" * 76)
+        pers_res = pers_harness.run_personalization_benchmark(
+            k=args.k, baseline_params=base_p, candidate_params=cand_p
+        )
+        print(
+            f"  Mean Personalization Lift:    {pers_res.get('mean_personalization_lift', 0):+.4f} (gate: >= 0 -> {'PASS' if pers_res.get('mean_lift_pass') else 'FAIL'})"
+        )
+        print(
+            f"  Known-Disliked Violations:    {pers_res.get('total_disliked_violations', 0)} (gate: 0 -> {'PASS' if pers_res.get('disliked_pass') else 'FAIL'})"
+        )
+        print(
+            f"  Max Persona nDCG Decline:     {pers_res.get('max_persona_ndcg_decline', 0):.4f} (gate: <= 0.03 -> {'PASS' if pers_res.get('decline_pass') else 'FAIL'})"
+        )
+        print("  Persona Details:")
+        for pr in pers_res.get("persona_results", []):
+            print(
+                f"    - {pr['persona_key']}: Cand nDCG={pr['candidate_ndcg']:.3f}, Masked Base={pr['masked_baseline_ndcg']:.3f}, Lift={pr['total_personalization_system_lift']:+.3f}, Disliked Violations={pr['disliked_violations_count']}"
+            )
+        gate_status = "PASS" if pers_res.get("passed") else "FAIL"
+        print(f"\n  Personalization Gate Result:  {gate_status}")
+        print("=" * 76 + "\n")
+        return 0 if pers_res.get("passed") else 1
+
+    # Verify index artifact if requested
+    if getattr(args, "verify_index", False) or getattr(
+        args, "expected_index_checksum", None
+    ):
+        expected_chk = getattr(args, "expected_index_checksum", None)
+        manifest_file = Path("evaluation/fixtures/frozen_index_manifest.json")
+        if not expected_chk and manifest_file.exists():
+            try:
+                with manifest_file.open("r", encoding="utf-8") as fp:
+                    m_data = json.load(fp)
+                    expected_chk = m_data.get("checksum") or m_data.get(
+                        "expected_checksum"
+                    )
+            except Exception:
+                pass
+
+        if not expected_chk:
+            print(
+                "\nError: Index artifact verification requested but no expected checksum provided."
+            )
+            print(
+                "Specify --expected-index-checksum <hash> or provide 'evaluation/fixtures/frozen_index_manifest.json'."
+            )
+            return int(EvaluationStatus.INVALID)
+
+        verifier = IndexArtifactVerifier(expected_checksum=expected_chk)
+        try:
+            from api.core.elasticsearch_client import get_elasticsearch_client
+
+            es = get_elasticsearch_client()
+            if es is None:
+                print(
+                    "\nError: Elasticsearch client is unavailable. Cannot verify frozen index artifact."
+                )
+                return int(EvaluationStatus.INVALID)
+
+            meta = verifier.fetch_live_index_metadata(es)
+            if not verifier.verify_reuse(meta):
+                print(
+                    "\nError: Index artifact verification failed: live index does not match expected frozen artifact!"
+                )
+                return int(EvaluationStatus.INVALID)
+        except Exception as exc:
+            print(f"\nIndex artifact verification error: {exc}")
+            return int(EvaluationStatus.INVALID)
+
+    # 5. Private Holdout Benchmark Mode
+    priv_harness = None
+    if args.private_eval:
+        priv_harness = PrivateBenchmarkHarness()
+        holdout_path = priv_harness.benchmark_dir / "holdout_cases.json"
+        if not holdout_path.exists():
+            print(f"\nError: Private holdout dataset not found at '{holdout_path}'.")
+            print("Private promotion requires an actual isolated holdout dataset.")
+            print("Missing holdout files produce an explicit invalid decision.")
+            return int(EvaluationStatus.INVALID)
+
+        cases = load_evaluation_cases(path=holdout_path)
+        if not cases:
+            print(
+                f"\nError: Private holdout dataset at '{holdout_path}' contains no valid test cases."
+            )
+            return int(EvaluationStatus.INVALID)
+    else:
+        # 6. Core v2 Automated Judging & Comparison Gate Runner
+        cases = load_evaluation_cases(track=args.track, split=args.split)
+        if not cases:
+            print(
+                f"No test cases found for track={args.track!r}, split={args.split!r}."
+            )
+            return int(EvaluationStatus.INVALID)
+
+    if quick:
+        cases = quick_dev_cases(cases)
+        print("Quick development diagnostic: reduced sample; not promotion evidence.")
+    print("\n" + "=" * 76)
+    print("          SEEN'EMALL EVALUATION SUITE v2 — LOCAL AUTOMATED JUDGING")
+    print(
+        f"          Track: [{args.track}]  |  Split: [{args.split}]  |  Cases: {len(cases)}"
+    )
+    print(f"          Baseline: [{args.baseline}]  vs  Candidate: [{args.candidate}]")
+    print(
+        f"          Judgment Mode: [{args.judgment_mode}]  |  Gain Mode: [{args.gain_mode}]"
+    )
+    print("=" * 76)
+
+    # Check authoritative run restrictions on stub judges
+    is_authoritative = (
+        args.judgment_mode == "consensus"
+        or args.private_eval
+        or args.split in ("regression", "full")
+    )
+    if is_authoritative and args.judge_config == "stub":
+        if not getattr(args, "allow_stub_judges_for_testing", False):
+            print(
+                "\nError: Stub judges are strictly rejected in authoritative evaluation runs."
+            )
+            print(
+                "Consensus mode, regression/full splits, and private promotion require a qualified local model panel."
+            )
+            print("Use the qualified Nimble model (--judge-config nimble).")
+            return int(EvaluationStatus.INVALID)
+
+    # Check qualification records in authoritative runs
+    evidence_version = getattr(args, "evidence_version", "v2.2")
+    ollama_candidates = (
+        discover_ollama_judges()
+        if evidence_version == "v2.2"
+        else discover_ollama_judges(evidence_version)
+    )
+    ollama_panel_names = []
+    if ollama_candidates is not None and args.judge_config != "stub":
+        primary_name = "bespoke-nimble-9b"
+        if args.judge_config != "nimble":
+            print(f"Error: Unsupported judge configuration: {args.judge_config}")
+            return int(EvaluationStatus.INVALID)
+        if args.judgment_mode != "single_judge":
+            print(
+                "Error: Nimble is qualified as a single judge; no production consensus panel is configured."
+            )
+            return int(EvaluationStatus.INVALID)
+        ollama_panel_names = [primary_name] + [
+            name for name in ollama_candidates if name != primary_name
+        ]
+    qual_file = Path(
+        "evaluation/.judge_qualification_ollama.json"
+        if evidence_version == "v2.2"
+        else "evaluation/.judge_qualification_ollama_v2.3.json"
+    )
+    if is_authoritative and not getattr(args, "allow_stub_judges_for_testing", False):
+        if not qual_file.exists():
+            print(
+                f"\nError: Missing qualification record file '{qual_file}' for authoritative evaluation."
+            )
+            print(
+                "Consensus mode, regression/full splits, and private promotion require a qualified local model panel."
+            )
+            print(
+                "Run 'python -m evaluation.evaluate --qualify-judges' before running authoritative evaluation."
+            )
+            return int(EvaluationStatus.INVALID)
+
+        try:
+            with qual_file.open("r", encoding="utf-8") as fp:
+                loaded_qual_data = json.load(fp)
+            if not isinstance(loaded_qual_data, dict):
+                raise ValueError("Malformed qualification file: expected JSON object")
+            raw_reports = loaded_qual_data.get("reports")
+            if not isinstance(raw_reports, dict):
+                raise ValueError(
+                    "Malformed qualification file: missing or invalid 'reports' mapping"
+                )
+        except Exception as exc:
+            print(
+                f"\nError: Qualification record file '{qual_file}' is invalid or malformed: {exc}"
+            )
+            return int(EvaluationStatus.INVALID)
+
+        reports_dict: Dict[str, Any] = raw_reports
+        panel_model_names = ollama_panel_names[:1]
+
+        for model_name in panel_model_names:
+            if model_name not in reports_dict:
+                print(
+                    f"\nError: Panel judge '{model_name}' has no qualification report in {qual_file}."
+                )
+                return int(EvaluationStatus.INVALID)
+            report_entry = reports_dict[model_name]
+            current_judge = ollama_candidates[model_name]
+            if not qualification_record_matches(current_judge, report_entry):
+                print(
+                    f"Error: Stale or unqualified contract for {model_name}; "
+                    "rerun --qualify-judges."
+                )
+                return int(EvaluationStatus.INVALID)
+
+    # Initialize Judges
+    p_judge: LocalJudgeAdapter
+    s_judge: Optional[LocalJudgeAdapter]
+    t_judge: Optional[LocalJudgeAdapter]
+
+    if args.judge_config == "stub":
+        p_judge = StubJudgeAdapter("stub-primary", fixed_grade=2)
+        s_judge = StubJudgeAdapter("stub-secondary", fixed_grade=2)
+        t_judge = StubJudgeAdapter("stub-tie", fixed_grade=2)
+    else:
+        p_judge = ollama_candidates["bespoke-nimble-9b"]
+        s_judge = None
+        t_judge = None
+
+    reference = None
+    if getattr(args, "baseline_file", None):
+        from evaluation.baseline_v2 import load_reference
+
+        try:
+            reference = load_reference(args.baseline_file, cases, p_judge, args)
+        except (ValueError, KeyError, TypeError, OSError) as exc:
+            print(f"Invalid v2 production reference: {exc}")
+            return int(EvaluationStatus.INVALID)
+        args.baseline = reference["config"]
+
+    if priv_harness is not None:
+        priv_cache = JudgmentCache(priv_harness.benchmark_dir / ".judgment_cache.json")
+        adjudicator = PoolAdjudicator(
+            primary_judge=p_judge,
+            secondary_judge=s_judge if args.judgment_mode == "consensus" else None,
+            tie_breaker_judge=t_judge if args.judgment_mode == "consensus" else None,
+            cache=priv_cache,
+        )
+        engine = ConsensusJudgeEngine(
+            adjudicator=adjudicator,
+            qrels_dir=priv_harness.benchmark_dir / "qrels",
+            redact_queries=True,
+            immutable=True,
+        )
+    else:
+        adjudicator = PoolAdjudicator(
+            primary_judge=p_judge,
+            secondary_judge=s_judge if args.judgment_mode == "consensus" else None,
+            tie_breaker_judge=t_judge if args.judgment_mode == "consensus" else None,
+        )
+        engine = ConsensusJudgeEngine(adjudicator=adjudicator)
+
+    exec_runner = EvaluationRunner(in_process=True)
+    base_params, cand_params = _comparison_params(args)
+    reference_rows = {}
+    if reference is not None:
+        reference_rows = {
+            row["case"]["case_id"]: row for row in reference["per_query_results"]
+        }
+        # Retain independently judged reference positives in the shared denominator.
+        for row in reference_rows.values():
+            engine.seed_query_qrels(row["case"]["query"], row["qrels"])
+
+    gain_mode = GainMode(args.gain_mode)
+
+    family_base_ndcg: Dict[str, List[float]] = defaultdict(list)
+    family_cand_ndcg: Dict[str, List[float]] = defaultdict(list)
+    slice_family_deltas: Dict[str, List[float]] = defaultdict(list)
+
+    total_base_rec100 = []
+    total_cand_rec100 = []
+    hard_violations = 0
+    disliked_violations = 0
+    chronology_violations = 0
+    missing_canonical_items = 0
+    cand_completeness_scores = []
+    empty_output_cases = 0
+    exploratory_covs = []
+    unresolved_items = 0
+    exec_failures = 0
+    unexpected_fallbacks = 0
+    duplicate_detected = False
+
+    per_query_rows = []
+    prepared_cases = []
+    preflight_rows = []
+
+    catalog_metadata = (
+        load_catalog_metadata()
+        if evidence_version == "v2.2"
+        else load_catalog_metadata(evidence_version=evidence_version)
+    )
+
+    for case in cases:
+        case_failures_before = exec_failures
+        case_fallbacks_before = unexpected_fallbacks
+        # Retrieve candidates up to depth 100 so Known-Positive Recall@100 measures true retrieval depth
+        k_fetch = max(args.k, 100)
+
+        # Run baseline
+        if reference is not None:
+            base_items = [
+                {
+                    "tmdb_id": TypedId.parse(identifier).id,
+                    "media_type": TypedId.parse(identifier).media_type,
+                }
+                for identifier in reference_rows[case.case_id]["ranked_ids"]
+            ]
+        else:
+            base_items, base_trace = exec_runner.run_case(
+                case, params=base_params, k=k_fetch
+            )
+            if base_trace.errors:
+                exec_failures += 1
+            if base_trace.fallbacks:
+                unexpected_fallbacks += 1
+
+        # Run candidate
+        cand_items, cand_trace = exec_runner.run_case(
+            case, params=cand_params, k=k_fetch
+        )
+        if cand_trace.errors:
+            exec_failures += 1
+        if cand_trace.fallbacks:
+            unexpected_fallbacks += 1
+
+        if not cand_items:
+            empty_output_cases += 1
+
+        if check_for_duplicates(base_items, k=args.k) or check_for_duplicates(
+            cand_items, k=args.k
+        ):
+            duplicate_detected = True
+
+        # Check disliked violations in candidate recommendations
+        if case.constraints and case.constraints.disliked_ids:
+            disliked_set = set(case.constraints.disliked_ids)
+            for it in cand_items[: args.k]:
+                try:
+                    cid = int(TypedId.parse(it).id)
+                    if cid in disliked_set:
+                        disliked_violations += 1
+                except Exception:
+                    pass
+
+        # Check canonical sequence chronology inversions and franchise presence
+        seq = getattr(case, "canonical_sequence", None)
+        if seq:
+            order_res = check_canonical_order(cand_items[: args.k], seq, k=args.k)
+            invs = order_res.get("inversions", 0)
+            missing_count = order_res.get("missing_prefix_count", 0)
+            exact_prefix = order_res.get("exact_prefix_match", False)
+
+            # Separate missing-item checks from inversion counts, and require exact prefix preservation
+            if invs > 0:
+                chronology_violations += invs
+            if missing_count > 0:
+                missing_canonical_items += missing_count
+            if not exact_prefix and invs == 0 and missing_count == 0:
+                chronology_violations += 1
+
+        # Judge declared references independently of whether either top-K retrieved them.
+        # Reference IDs nominate evidence to judge; their labels never supply grades.
+        references = case.golden_set or case.golden_ids or []
+        default_media = (
+            case.constraints.media_type if case.constraints else None
+        ) or "movie"
+        reference_ids = [str(TypedId.parse(ref, default_media)) for ref in references]
+        pool_ids = adjudicator.deduplicate_pool(
+            [base_items[: args.k], cand_items[: args.k], reference_ids],
+            max_pool_size=2 * args.k + len(reference_ids),
+        )
+        candidate_top_ids = {str(TypedId.parse(it)) for it in cand_items[: args.k]}
+        pool_evidence = []
+        case_constraint_reasons = []
+        for pid_str in pool_ids:
+            tid = TypedId.parse(pid_str)
+            match = next(
+                (
+                    it
+                    for it in (base_items[: args.k] + cand_items[: args.k])
+                    if str(TypedId.parse(it)) == pid_str
+                ),
+                None,
+            )
+            ev = (
+                pool_item_evidence(tid, match or {}, catalog_metadata)
+                if evidence_version == "v2.2"
+                else pool_item_evidence(
+                    tid,
+                    match or {},
+                    catalog_metadata,
+                    evidence_version=evidence_version,
+                )
+            )
+            pool_evidence.append(ev)
+            if pid_str in candidate_top_ids and case.constraints:
+                valid, reasons = check_deterministic_constraints(ev, case.constraints)
+                if not valid:
+                    hard_violations += 1
+                    case_constraint_reasons.append(
+                        {"typed_id": pid_str, "reasons": reasons}
+                    )
+
+        # Calculate completeness with independently determined catalog eligibility
+        eligible_catalog_count = getattr(case, "eligible_catalog_count", None)
+        if eligible_catalog_count is None:
+            if getattr(case, "expected_empty", False):
+                eligible_catalog_count = 0
+            else:
+                eligible_catalog_count = args.k
+
+        if cand_items:
+            comp = calculate_completeness(
+                cand_items,
+                eligible_catalog_count=eligible_catalog_count,
+                k=args.k,
+            )
+            cand_completeness_scores.append(comp)
+        else:
+            cand_completeness_scores.append(0.0)
+
+        prepared_cases.append((case, base_items, cand_items, pool_ids, pool_evidence))
+        preflight_rows.append(
+            {
+                "case_id": case.case_id,
+                "query": case.query,
+                "execution_failures": exec_failures - case_failures_before,
+                "unexpected_fallbacks": unexpected_fallbacks - case_fallbacks_before,
+                "candidate_count": len(cand_items),
+                "constraint_violations": case_constraint_reasons,
+                "completeness": cand_completeness_scores[-1],
+                "duplicates": check_for_duplicates(base_items, k=args.k)
+                or check_for_duplicates(cand_items, k=args.k),
+                "canonical_order": (
+                    check_canonical_order(cand_items, seq, args.k) if seq else None
+                ),
+            }
+        )
+
+    retrieval_seconds = time.perf_counter() - started
+    preflight = check_preflight(
+        cases,
+        execution_failures=exec_failures,
+        unexpected_fallbacks=unexpected_fallbacks,
+        duplicates=duplicate_detected,
+        empty_outputs=empty_output_cases,
+        hard_violations=hard_violations,
+        disliked_violations=disliked_violations,
+        chronology_violations=chronology_violations,
+        missing_canonical_items=missing_canonical_items,
+        completeness=cand_completeness_scores,
+        statistical_promotion=args.split in ("regression", "full")
+        or bool(args.private_eval),
+    )
+    if not preflight.passed and not getattr(
+        args, "continue_on_preflight_failure", True
+    ):
+        report = {
+            "track": args.track,
+            "split": args.split,
+            "candidate": args.candidate,
+            "baseline": args.baseline,
+            "baseline_source": (
+                str(args.baseline_file)
+                if reference is not None
+                else "live configuration"
+            ),
+            "phase": "preflight",
+            "quality_evaluated": False,
+            "promotion_eligible": False,
+            "query_count": len(cases),
+            "gate_result": preflight.to_dict(),
+            "per_query_results": preflight_rows,
+            "performance": {"elapsed_seconds": retrieval_seconds, "judge_calls": 0},
+            "skipped_checks": [
+                "relevance judging",
+                "nDCG confidence interval",
+                "recall comparison",
+            ],
+        }
+        print(
+            f"Preflight {preflight.status.name}: {', '.join(preflight.reasons)}; grading skipped."
+        )
+        if priv_harness is not None:
+            export = priv_harness.submit_candidate(
+                candidate_identity=f"candidate_{args.candidate}",
+                gate_result=preflight.to_dict(),
+            )
+            return int(export.get("exit_code", int(preflight.status)))
+        args.v2_report.parent.mkdir(parents=True, exist_ok=True)
+        args.v2_report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        return int(preflight.status)
+
+    for case, base_items, cand_items, pool_ids, pool_evidence in prepared_cases:
+        # Grade only missing pairs, preserving the full shared pool and all existing gates.
+        qrels, records, _ = engine.label_pool(
+            query=case.query,
+            pool_evidence=pool_evidence,
+            constraints=case.constraints,
+            mode=args.judgment_mode,
+            workers=getattr(args, "judge_workers", 1),
+        )
+
+        for rec in records:
+            if any(
+                status not in {"success", "abstain"}
+                for status in rec.execution_statuses
+            ):
+                exec_failures += 1
+        # Both systems' top-K and the shared recall references require valid judgments,
+        # including single-judge abstentions and insufficient evidence.
+        case_unresolved = len(set(pool_ids) - qrels.keys())
+        unresolved_items += case_unresolved
+
+        # Compute nDCG@K on top-K
+        b_ndcg = calculate_ndcg_at_k(
+            base_items[: args.k], qrels, k=args.k, gain_mode=gain_mode
+        )
+        c_ndcg = calculate_ndcg_at_k(
+            cand_items[: args.k], qrels, k=args.k, gain_mode=gain_mode
+        )
+
+        family_base_ndcg[case.family_id].append(b_ndcg)
+        family_cand_ndcg[case.family_id].append(c_ndcg)
+
+        # Compute Known-Positive Recall@100 on retrieved up to 100 items
+        b_r100 = calculate_known_positive_recall_at_k(base_items[:100], qrels, k=100)
+        c_r100 = calculate_known_positive_recall_at_k(cand_items[:100], qrels, k=100)
+        total_base_rec100.append(b_r100)
+        total_cand_rec100.append(c_r100)
+
+        # Coverage on top-K
+        for items in (base_items, cand_items):
+            if items:
+                exploratory_covs.append(
+                    calculate_coverage(items[: args.k], qrels, k=args.k)
+                )
+
+        per_query_rows.append(
+            {
+                "case_id": case.case_id,
+                "family_id": case.family_id,
+                "query": case.query,
+                "base_ndcg": b_ndcg,
+                "cand_ndcg": c_ndcg,
+                "delta_ndcg": c_ndcg - b_ndcg,
+                "base_recall_100": b_r100,
+                "cand_recall_100": c_r100,
+                "unresolved_judgments": case_unresolved,
+            }
+        )
+
+    # Average paraphrases within each family
+    family_ndcg_deltas = {}
+    for fam_id in family_base_ndcg:
+        mean_b = float(np.mean(family_base_ndcg[fam_id]))
+        mean_c = float(np.mean(family_cand_ndcg[fam_id]))
+        family_ndcg_deltas[fam_id] = mean_c - mean_b
+
+    # Slice deltas: group by unique family_id within each slice to prevent double-counting
+    slice_family_map: Dict[str, Dict[str, float]] = defaultdict(dict)
+    for c in cases:
+        fam_d = family_ndcg_deltas.get(c.family_id, 0.0)
+        for s_tag in c.slice_tags:
+            slice_family_map[s_tag][c.family_id] = fam_d
+
+    slice_family_deltas = {
+        s_tag: list(f_map.values()) for s_tag, f_map in slice_family_map.items()
+    }
+
+    base_r100_mean = float(np.mean(total_base_rec100)) if total_base_rec100 else 0.0
+    cand_r100_mean = float(np.mean(total_cand_rec100)) if total_cand_rec100 else 0.0
+
+    # Evaluate all gates
+    is_stat_promo = (args.split in ("regression", "full")) or bool(args.private_eval)
+    gate_result = evaluate_comparison_gates(
+        family_ndcg_deltas=family_ndcg_deltas,
+        slice_family_deltas=slice_family_deltas,
+        baseline_recall_100=base_r100_mean,
+        candidate_recall_100=cand_r100_mean,
+        hard_constraint_violations=hard_violations,
+        disliked_violations=disliked_violations,
+        exploratory_coverages=exploratory_covs,
+        authoritative_unresolved_count=unresolved_items,
+        execution_failures=exec_failures,
+        unexpected_fallbacks=unexpected_fallbacks,
+        duplicate_outputs_detected=duplicate_detected,
+        is_statistical_promotion=is_stat_promo,
+        completeness_scores=cand_completeness_scores,
+        chronology_violations=chronology_violations,
+        missing_canonical_items=missing_canonical_items,
+        empty_output_cases=empty_output_cases,
+    )
+
+    # Print Report Banner
+    status_name = gate_result.status.name
+    banner_char = (
+        "="
+        if gate_result.passed
+        else ("!" if gate_result.status == EvaluationStatus.FAIL else "*")
+    )
+    print("\n" + banner_char * 76)
+    print(
+        f"               COMPARISON DECISION: {status_name} (Exit {int(gate_result.status)})"
+    )
+    print(banner_char * 76)
+    print(f"  {'Gate Check':<34} {'Status':<10} {'Details'}")
+    print("  " + "-" * 72)
+    for chk in gate_result.checks:
+        chk_status = "PASSED" if chk.passed else "FAILED"
+        print(f"  {chk.name:<34} {chk_status:<10} {chk.details}")
+    if gate_result.reasons:
+        print("\n  Gate Evaluation Reasons:")
+        for r in gate_result.reasons:
+            print(f"    - {r}")
+    print(banner_char * 76 + "\n")
+
+    if priv_harness is not None:
+        export_data = priv_harness.submit_candidate(
+            candidate_identity=f"candidate_{args.candidate}",
+            gate_result=gate_result.to_dict(),
+        )
+        print("\n" + "=" * 76)
+        print("          PRIVATE PROMOTION BENCHMARK (CONFIDENTIAL)")
+        print("=" * 76)
+        print(f"  Submission Index:       {export_data.get('submission_index')}")
+        print(f"  Status:                 {export_data.get('status')}")
+        print(f"  Passed:                 {export_data.get('passed')}")
+        print(f"  Holdout Refresh Needed: {export_data.get('refresh_required')}")
+        print("=" * 76 + "\n")
+        return int(export_data.get("exit_code", int(gate_result.status)))
+
+    # Save v2 report JSON
+    report_dict = {
+        "track": args.track,
+        "split": args.split,
+        "baseline": args.baseline,
+        "baseline_source": (
+            str(args.baseline_file) if reference is not None else "live configuration"
+        ),
+        "candidate": args.candidate,
+        "gain_mode": args.gain_mode,
+        "judgment_mode": args.judgment_mode,
+        "judge_config": args.judge_config,
+        "phase": "graded",
+        "quality_evaluated": True,
+        "promotion_eligible": not quick and is_stat_promo,
+        "quick_dev": quick,
+        "query_count": len(cases),
+        "preflight": preflight.to_dict(),
+        "performance": {
+            "elapsed_seconds": time.perf_counter() - started,
+            "retrieval_and_preflight_seconds": retrieval_seconds,
+            "judge_calls": adjudicator.inference_calls,
+            "judge_workers": getattr(args, "judge_workers", 1),
+        },
+        "gate_result": gate_result.to_dict(),
+        "per_query_results": per_query_rows,
+    }
+    args.v2_report.parent.mkdir(parents=True, exist_ok=True)
+    with args.v2_report.open("w", encoding="utf-8") as fp:
+        json.dump(report_dict, fp, indent=2)
+    print(f"Evaluation Suite v2 report saved to {args.v2_report}\n")
+
+    return int(gate_result.status)
+
+
 def main(argv: Optional[Sequence[str]] = None) -> None:
     args = parse_args(argv)
+
+    if (
+        args.v2
+        or args.save_v2_baseline
+        or args.qualify_judges
+        or args.hardware_inspect
+        or args.latency_benchmark
+        or args.personalization_test
+        or args.private_eval
+        or args.rescore_only
+    ):
+        code = run_evaluation_v2(args)
+        sys.exit(code)
 
     entries = load_entries_from_args(args)
     if not entries:
