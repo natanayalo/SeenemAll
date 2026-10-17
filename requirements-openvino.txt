@@ -5,7 +5,7 @@
 # api/core/model_security.py until optimum-intel supports Transformers >=5.10.
 # PYSEC-2026-4174 (GHSA-x9r9-c232-4q39) affects GenerativePreTrainedModel.load_custom_generate()
 # which SeenemAll does not use (only embedding and classification models are used).
-transformers==5.5.4
+transformers==5.10.1
 huggingface-hub==1.10.2
 # GLiNER's DeBERTa tokenizer needs protobuf to load the SentencePiece model during export.
 protobuf==7.36.2
